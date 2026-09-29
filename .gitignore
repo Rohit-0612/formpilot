@@ -25,7 +25,6 @@ pip-wheel-metadata/
 venv/
 env/
 ENV/
-.python-version
 .mypy_cache/
 .ruff_cache/
 .pytype/
@@ -74,6 +73,7 @@ storage/
 data/
 media/
 tmp/
+var/
 backend/storage/
 backend/uploads/
 backend/outputs/
