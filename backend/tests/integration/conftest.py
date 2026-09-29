@@ -2,14 +2,17 @@ from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from alembic import command
+from redis.asyncio import Redis
 from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.config import Settings
 from tests.integration.db import (
     alembic_config,
     drop_database,
     recreate_database,
+    redis_test_url,
     savepoint_session,
     truncate_all_tables,
 )
@@ -45,3 +48,25 @@ async def truncate_all(engine: AsyncEngine) -> AsyncIterator[None]:
     """Use in tests whose code commits through its own engine; empties every table afterwards."""
     yield
     await truncate_all_tables(engine)
+
+
+@pytest.fixture
+async def redis_url() -> AsyncIterator[str]:
+    """A dedicated Redis database, flushed before and after the test."""
+    url = redis_test_url()
+    client = Redis.from_url(url)
+    await client.flushdb()
+    yield url
+    await client.flushdb()
+    await client.aclose()
+
+
+@pytest.fixture
+def live_settings(settings: Settings, migrated_db_url: URL, redis_url: str) -> Settings:
+    """Settings pointing at the test database and test Redis (for worker/CLI tests)."""
+    return settings.model_copy(
+        update={
+            "database_url": migrated_db_url.render_as_string(hide_password=False),
+            "redis_url": redis_url,
+        }
+    )

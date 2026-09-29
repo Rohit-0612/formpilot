@@ -4,6 +4,7 @@ import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from alembic.config import Config
 from pydantic import ValidationError
@@ -11,7 +12,7 @@ from sqlalchemy import URL, create_engine, make_url, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.pool import NullPool
 
-from app.config import DatabaseSettings
+from app.config import DatabaseSettings, QueueSettings
 from app.db.base import Base
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -89,3 +90,20 @@ async def truncate_all_tables(engine: AsyncEngine) -> None:
     tables = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
     async with engine.begin() as conn:
         await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+
+
+# --- Redis -----------------------------------------------------------------------
+
+TEST_REDIS_DB = 15
+
+
+def redis_test_url() -> str:
+    """REDIS_URL with the database index replaced by TEST_REDIS_DB (never the dev queue)."""
+    try:
+        base = QueueSettings().redis_url  # type: ignore[call-arg]
+    except ValidationError as exc:
+        raise RuntimeError(
+            "REDIS_URL is not set. Run `make services` (creates .env and starts Redis)."
+        ) from exc
+    parts = urlsplit(base)
+    return urlunsplit(parts._replace(path=f"/{TEST_REDIS_DB}"))

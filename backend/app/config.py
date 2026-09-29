@@ -29,11 +29,18 @@ class DatabaseSettings(BaseSettings):
     database_url: str
 
 
-class Settings(DatabaseSettings):
+class QueueSettings(BaseSettings):
+    """Only what Redis tooling needs (e.g. the test suite's queue fixtures)."""
+
     model_config = _SETTINGS_CONFIG
 
-    # Connections (database_url is inherited)
     redis_url: str
+
+
+class Settings(DatabaseSettings, QueueSettings):
+    model_config = _SETTINGS_CONFIG
+
+    # database_url and redis_url are inherited.
 
     # Auth
     jwt_secret: SecretStr
@@ -51,6 +58,9 @@ class Settings(DatabaseSettings):
 
     # Health checks
     health_timeout_seconds: float = Field(default=2.0, gt=0)
+
+    # Background jobs
+    job_timeout_seconds: int = Field(default=300, gt=0)
 
     @field_validator("jwt_secret")
     @classmethod

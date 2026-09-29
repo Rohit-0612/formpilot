@@ -11,6 +11,7 @@
 | 2 | SQLAlchemy 2.0 models for the six SPEC §7 tables, Alembic initial migration `0001`, async session dependency, integration test harness (savepoint sessions, truncate helper), compose `postgres` + `redis`, first Makefile targets | `backend/app/db/`, `backend/alembic.ini`, `backend/tests/integration/`, `docker-compose.yml`, `Makefile` |
 | 3 | Auth: Argon2id password hashing, HS256 JWT in an `fp_session` httpOnly cookie, `POST /auth/register`, `/auth/login`, `/auth/logout`, `GET /auth/me`, `current_user` dependency, value-free 422 and 500 responses | `backend/app/security.py`, `backend/app/services/users.py`, `backend/app/api/routes/auth.py`, `backend/app/api/deps.py`, `backend/app/api/errors.py` |
 | 4 | `Storage` interface and `LocalStorage` (atomic writes, owner-only permissions, strict keys, traversal and symlink protection) | `backend/app/storage/base.py`, `backend/app/storage/local.py` |
+| 5 | Background jobs: `JobService` (create + enqueue), `JobStore` (status transitions), arq worker with a no-op `ping` task, `python -m app.jobs.cli ping [--wait N]` | `backend/app/services/jobs.py`, `backend/app/jobs/{tasks,worker,cli}.py` |
 
 ## Key decisions and alternatives considered
 
@@ -122,6 +123,36 @@
 - Ruff's `ASYNC240` (blocking `pathlib` in async functions) is ignored under `tests/**` only;
   tests inspect the filesystem on purpose. App code still follows it.
 
+### Step 5 decisions and deviations
+- **arq 0.28 with redis 5.x (`redis>=5.2,<6`), not redis 8.** The latest arq (0.28.0) requires
+  `redis<6`; `uv add arq` had silently resolved to the old arq 0.25.0 because that release has
+  no upper bound, i.e. an untested arq/redis combination. We pin the combination arq supports.
+  Our only other redis use (the health check's `ping()`) works the same on 5.x.
+- **The `jobs` row is the source of truth; arq only delivers work.** Transitions are conditional
+  `UPDATE ... WHERE status IN (...)`: `queued -> running -> done | failed`, and
+  `queued -> failed` for enqueue failures. A job runs at most once; finished jobs never change.
+  The worker runs with `max_tries = 1`, `retry_jobs = False` so arq never silently re-runs work.
+- **Tasks never raise to arq.** arq logs a failed job as `"failed, <Type>: <message>"` (the
+  message is in the log *text*, out of reach of our processor) and stores the exception in Redis.
+  `run_tracked` catches the error, logs it with `log.exception()` (sanitised), stores only the
+  class name in `jobs.error`, and returns `"failed"`. Cancellation (timeout/shutdown) is recorded
+  as `failed` / `Cancelled` and re-raised so arq can stop the task.
+- **Job arguments are ids only.** arq logs `function('<args>')` when a job starts.
+- **Enqueue after commit.** The row is committed first so the worker always finds it; if
+  enqueueing fails the row becomes `failed` with `EnqueueFailed:<Type>` and `JobEnqueueError` is
+  raised. arq's job id is our job id, so a duplicate enqueue is refused by arq.
+- **Queue name** `formpilot:jobs`. **`JOB_TIMEOUT_SECONDS`** (default 300) added to config.
+- **`QueueSettings` split out** (only `REDIS_URL`), like `DatabaseSettings`; `Settings` inherits
+  both. Used by the test suite's Redis fixture.
+- **`worker.py` reads settings at import time** because arq expects plain class attributes. The
+  task functions and `startup`/`shutdown` live in `tasks.py`, which does not, so unit tests need
+  no environment; integration tests pass their settings to `startup` through the worker `ctx`
+  and build the `Worker` from the real `WorkerSettings` attributes.
+- **CLI output goes through the structured logger** (`job_enqueued`, `job_finished` with
+  status); exit code 0 only when the job is `done`, 1 on `failed` or timeout.
+- **Tests:** Redis database 15 (flushed before and after), never the dev queue; worker tests use
+  `truncate_all` [A1]. A unit `FakeJobStore` covers `run_tracked`'s paths without Postgres.
+
 ### Exception messages are never logged (after Step 3 review)
 - `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the
   final formatter chain, so it runs for **every** event: our structlog loggers and stdlib
@@ -144,6 +175,10 @@
   expires (`JWT_TTL_MINUTES`, default 60). Revocation would need a server-side denylist or
   session table.
 - No rate limiting or lockout on login or register.
+- A worker killed hard (e.g. SIGKILL, OOM) mid-job leaves its row `running` forever; there is no
+  reaper for stale `running` jobs yet.
+- arq keeps each job's return value in Redis for an hour (`"done"`, `"failed"`, `"skipped"`;
+  no values).
 - `POST /auth/register` returns 409 for an existing email, so registration reveals whether an
   email has an account (login does not).
 - Exception messages are dropped from every log event (enforced, see "Exception messages are
@@ -153,6 +188,9 @@
 ## Open issues
 
 ### Known issues
+- **arq 0.28 `DeprecationWarning` (visible, not filtered).** `arq.worker.Worker.close()` calls
+  redis-py's deprecated `close()` instead of `aclose()`. It is inside arq, harmless, and appears
+  in the worker integration tests. Left visible pending a decision.
 - **Starlette `httpx2` deprecation warning (suppressed).** Starlette 1.7 warns that its
   `TestClient` should use `httpx2` instead of `httpx`. We did not add a dependency. A pytest
   `filterwarnings` entry in `backend/pyproject.toml` ignores exactly that message from exactly
