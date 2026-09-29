@@ -175,8 +175,8 @@
   expires (`JWT_TTL_MINUTES`, default 60). Revocation would need a server-side denylist or
   session table.
 - No rate limiting or lockout on login or register.
-- A worker killed hard (e.g. SIGKILL, OOM) mid-job leaves its row `running` forever; there is no
-  reaper for stale `running` jobs yet.
+- A worker killed hard (e.g. SIGKILL, OOM) mid-job leaves its row `running`; there is no reaper
+  for stale `running` jobs yet. Scheduled for Phase 2 (see "Notes for the next phase").
 - arq keeps each job's return value in Redis for an hour (`"done"`, `"failed"`, `"skipped"`;
   no values).
 - `POST /auth/register` returns 409 for an existing email, so registration reveals whether an
@@ -188,9 +188,13 @@
 ## Open issues
 
 ### Known issues
-- **arq 0.28 `DeprecationWarning` (visible, not filtered).** `arq.worker.Worker.close()` calls
-  redis-py's deprecated `close()` instead of `aclose()`. It is inside arq, harmless, and appears
-  in the worker integration tests. Left visible pending a decision.
+- **arq 0.28 `DeprecationWarning` (suppressed).** `arq.worker.Worker.close()` calls redis-py's
+  deprecated `close()` instead of `aclose()`. It is inside arq and harmless. A pytest
+  `filterwarnings` entry in `backend/pyproject.toml` ignores only that message, as a
+  `DeprecationWarning`, attributed to the `arq.worker` module; our own code calling the
+  deprecated `close()` still warns. Revisit when arq releases a version that uses `aclose()`.
+- **Rule (CLAUDE.md §5):** warnings from our own code are fixed, never filtered; a warning inside
+  third-party code we cannot fix gets a narrowly scoped filter, a comment and an entry here.
 - **Starlette `httpx2` deprecation warning (suppressed).** Starlette 1.7 warns that its
   `TestClient` should use `httpx2` instead of `httpx`. We did not add a dependency. A pytest
   `filterwarnings` entry in `backend/pyproject.toml` ignores exactly that message from exactly
@@ -205,6 +209,12 @@
   (SPEC §7), so Phase 4 must decide how these events are stored (e.g. make `document_id`
   nullable, or a separate `profile_audit_events` table) and add a migration if needed.
   Tracked as a Phase 4 deliverable in `docs/PLAN.md`.
+
+- **Phase 2 — stale `running` jobs.** A worker killed mid-job leaves its row `running`, which in
+  Phase 2 would leave a document stuck in `analyzing`. On worker startup, mark jobs that have been
+  `running` longer than `JOB_TIMEOUT_SECONDS` as `failed` with error `Stale`. `jobs` has no
+  `started_at` yet (only `created_at` / `finished_at`), so this likely needs a migration adding
+  it, set by `JobStore.mark_running`. Tracked as a Phase 2 deliverable in `docs/PLAN.md`.
 
 _The rest is written at the end of Phase 1._
 

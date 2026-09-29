@@ -71,6 +71,9 @@ Deliverables
 - Web: upload page, job progress, page viewer with field boxes overlaid (no editing yet).
 - Test fixtures: a script that generates small synthetic fillable PDFs (text, checkbox, radio,
   choice) for unit tests.
+- On worker startup, mark jobs left in running state beyond the job timeout as failed (Stale),
+  so a crashed worker never leaves a document stuck in analyzing. Add a `jobs.started_at`
+  column if needed.
 
 Acceptance
 - [ ] On every fillable form in `eval/dataset/dev/`, extracted field count equals the widget count.

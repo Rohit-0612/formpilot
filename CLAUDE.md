@@ -86,6 +86,8 @@ If anything in a request conflicts with SPEC.md or PLAN.md, stop and ask. Do not
 - Validators: include known-valid and known-invalid vectors (e.g. Verhoeff test vectors).
 - PDF tests use small synthetic PDFs generated in `tests/fixtures/` (commit the generator script).
 - LLM-dependent tests use `FakeProvider` (scripted outputs) or the recorded-response cache.
+- Warnings from our own code are fixed, never filtered. A warning raised inside third-party code
+  that we cannot fix gets a narrowly scoped filter with a comment and a Known issues entry.
 - Run: `make test` (unit), `make eval` (evaluation, needs a model or the recorded cache).
 
 ## 6. Evaluation rules

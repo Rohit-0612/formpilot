@@ -67,6 +67,10 @@ filterwarnings = [
     # (no new dependency; see docs/decisions/phase-1.md, known issues) and hide only this exact
     # message from this exact class. Every other warning stays visible.
     'ignore:Using `httpx` with `starlette\.testclient` is deprecated; install `httpx2` instead\.:starlette.exceptions.StarletteDeprecationWarning',
+    # arq 0.28's Worker.close() calls redis-py's deprecated close() instead of aclose(). It is
+    # inside arq, which we cannot fix (see docs/decisions/phase-1.md, known issues). Scoped to
+    # this message, DeprecationWarning, and warnings attributed to the arq.worker module only.
+    'ignore:Call to deprecated close\. \(Use aclose\(\) instead\):DeprecationWarning:arq\.worker',
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
