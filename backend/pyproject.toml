@@ -50,7 +50,8 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]  # asserts and fake secrets are fine in tests
+# Tests may assert, use fake secrets, and inspect the filesystem directly from async tests.
+"tests/**" = ["S101", "S105", "S106", "ASYNC240"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -10,6 +10,7 @@
 | 1 | FastAPI app factory, pydantic-settings config, structlog JSON logging, request-logging middleware, `GET /api/v1/health` (Postgres + Redis probes with timeout, 503 when degraded) | `backend/app/{main,config,logging}.py`, `backend/app/api/`, `backend/app/services/health.py` |
 | 2 | SQLAlchemy 2.0 models for the six SPEC §7 tables, Alembic initial migration `0001`, async session dependency, integration test harness (savepoint sessions, truncate helper), compose `postgres` + `redis`, first Makefile targets | `backend/app/db/`, `backend/alembic.ini`, `backend/tests/integration/`, `docker-compose.yml`, `Makefile` |
 | 3 | Auth: Argon2id password hashing, HS256 JWT in an `fp_session` httpOnly cookie, `POST /auth/register`, `/auth/login`, `/auth/logout`, `GET /auth/me`, `current_user` dependency, value-free 422 and 500 responses | `backend/app/security.py`, `backend/app/services/users.py`, `backend/app/api/routes/auth.py`, `backend/app/api/deps.py`, `backend/app/api/errors.py` |
+| 4 | `Storage` interface and `LocalStorage` (atomic writes, owner-only permissions, strict keys, traversal and symlink protection) | `backend/app/storage/base.py`, `backend/app/storage/local.py` |
 
 ## Key decisions and alternatives considered
 
@@ -98,6 +99,28 @@
   - Auth logs carry `user_id` only; failed logins and duplicate registrations log no identifier.
 - **Duplicate registration is detected by the unique constraint**, not a pre-check query, so
   two concurrent registrations cannot both succeed.
+
+### Step 4 decisions and deviations
+- **Async interface, blocking I/O in a thread.** `Storage` methods are `async` so an S3-style
+  backend can be added later without changing callers; `LocalStorage` runs filesystem calls via
+  `asyncio.to_thread`.
+- **`open(key)` from the plan was dropped.** Uploads are capped at 20 MB (SPEC §8), so
+  `put(bytes)` / `get() -> bytes` are enough; streaming can be added when a phase needs it.
+  No storage factory or FastAPI dependency yet either — Phase 2 (uploads) wires it in.
+- **Strict keys.** "/"-separated segments of `[A-Za-z0-9._-]`, not starting with ".", max 1024
+  chars. This rules out `..`, absolute paths, backslashes, empty segments and hidden files
+  (temp files start with `.tmp-`, so they can never collide with a key). Errors never echo the
+  key. After validation the resolved path must still be inside the root, which also blocks a
+  symlink planted inside the storage root.
+- **Atomic writes:** temp file in the same directory, `fsync`, `os.replace`. A failed write
+  leaves the old content and no temp file (tested by failing `os.replace`).
+- **Owner-only permissions:** directories 0700, files 0600, independent of the umask. Uploaded
+  forms are private.
+- **Deletion semantics:** deleting a missing key is a no-op; `delete_prefix("documents/abc")`
+  removes only keys under `documents/abc/` (never `documents/abcd/...`, never a file named
+  exactly `documents/abc`), matching how an object-store prefix delete would be used.
+- Ruff's `ASYNC240` (blocking `pathlib` in async functions) is ignored under `tests/**` only;
+  tests inspect the filesystem on purpose. App code still follows it.
 
 ### Exception messages are never logged (after Step 3 review)
 - `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the
