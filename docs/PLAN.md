@@ -124,6 +124,7 @@ Goal: known values fill themselves; unknown ones become a few questions; everyth
 
 Deliverables
 - `vault/`: Fernet encryption, profile read/update service, masking, sensitive opt-in.
+- Decide how audit events without a document (profile changes) are stored; add a migration if needed.
 - `passes/match.py` including derived values (full name, age, today's date).
 - `validators/` per SPEC §6.6 including `verhoeff.py`; `passes/validate.py`; `passes/fit.py`.
 - `passes/questions.py` (groups + templates) and `passes/answers.py` (code parsing +

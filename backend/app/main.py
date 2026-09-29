@@ -2,6 +2,7 @@
 
 import re
 import time
+import traceback
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -9,8 +10,10 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 
+from app.api.errors import register_error_handlers
 from app.api.router import api_router
 from app.config import Settings, get_settings
 from app.db.session import make_engine, make_sessionmaker
@@ -44,14 +47,23 @@ async def log_requests(
     start = time.perf_counter()
     try:
         response = await call_next(request)
-    except Exception:
-        log.exception(
+    except Exception as exc:
+        # Log the exception type and stack frames only. Exception messages can carry values
+        # (e.g. an IntegrityError's "Key (email)=(...)"), so they are never logged. Returning a
+        # response here also stops uvicorn from logging the full exception itself.
+        log.error(
             "request_failed",
             method=request.method,
             route=_route_template(request),
             duration_ms=round((time.perf_counter() - start) * 1000, 1),
+            exc_type=type(exc).__name__,
+            stack="".join(traceback.format_tb(exc.__traceback__)),
         )
-        raise
+        response = JSONResponse(
+            status_code=500, content={"detail": "Internal server error", "request_id": request_id}
+        )
+        response.headers[REQUEST_ID_HEADER] = request_id
+        return response
     log.info(
         "request",
         method=request.method,
@@ -93,5 +105,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Content-Type", REQUEST_ID_HEADER],
         expose_headers=[REQUEST_ID_HEADER],
     )
+    register_error_handlers(app)
     app.include_router(api_router)
     return app
