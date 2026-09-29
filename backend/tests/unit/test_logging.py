@@ -121,3 +121,100 @@ def test_every_api_route_template_carries_the_prefix(settings: Settings) -> None
 
     assert api_paths
     assert all(path.startswith(API_PREFIX + "/") for path in api_paths), api_paths
+
+
+# --- exception messages are never logged -----------------------------------------
+
+LEAKY_EMAIL = "asha.verma@example.com"
+
+
+def _raise_leaky() -> None:
+    raise ValueError(f"Key (email)=({LEAKY_EMAIL}) already exists")
+
+
+def test_log_exception_keeps_type_and_stack_but_drops_the_message() -> None:
+    stream = io.StringIO()
+    configure_logging("INFO", json=True, stream=stream)
+
+    try:
+        _raise_leaky()
+    except ValueError:
+        get_logger("formpilot.test").exception("something_failed", document_id="doc-1")
+
+    output = stream.getvalue()
+    # The stack shows source lines (code such as the f-string template), never runtime values.
+    assert LEAKY_EMAIL not in output
+    assert f"Key (email)=({LEAKY_EMAIL}) already exists" not in output
+    (entry,) = _lines(stream)
+    assert entry["event"] == "something_failed"
+    assert entry["level"] == "error"
+    assert entry["exc_type"] == "ValueError"
+    assert "_raise_leaky" in entry["stack"]
+    assert "test_logging.py" in entry["stack"]
+    assert "exc_info" not in entry
+    assert "exception" not in entry
+
+
+def test_stdlib_logger_exceptions_are_sanitised_too() -> None:
+    """Third-party code (uvicorn, SQLAlchemy, arq) logs through the stdlib."""
+    stream = io.StringIO()
+    configure_logging("INFO", json=True, stream=stream)
+
+    try:
+        _raise_leaky()
+    except ValueError:
+        logging.getLogger("uvicorn.error").exception("Exception in ASGI application")
+
+    (entry,) = _lines(stream)
+    assert LEAKY_EMAIL not in stream.getvalue()
+    assert entry["exc_type"] == "ValueError"
+    assert "_raise_leaky" in entry["stack"]
+
+
+def test_exception_passed_as_exc_info_is_sanitised() -> None:
+    stream = io.StringIO()
+    configure_logging("INFO", json=True, stream=stream)
+
+    try:
+        _raise_leaky()
+    except ValueError as exc:
+        caught = exc
+    get_logger("formpilot.test").error("stored_error", exc_info=caught)
+
+    (entry,) = _lines(stream)
+    assert LEAKY_EMAIL not in stream.getvalue()
+    assert entry["exc_type"] == "ValueError"
+
+
+def test_chained_exception_messages_are_dropped_and_types_kept() -> None:
+    stream = io.StringIO()
+    configure_logging("INFO", json=True, stream=stream)
+
+    try:
+        try:
+            _raise_leaky()
+        except ValueError as inner:
+            raise RuntimeError(f"could not save {LEAKY_EMAIL}") from inner
+    except RuntimeError:
+        get_logger("formpilot.test").exception("save_failed")
+
+    (entry,) = _lines(stream)
+    assert LEAKY_EMAIL not in stream.getvalue()
+    assert entry["exc_type"] == "RuntimeError"
+    assert entry["exc_chain"] == ["RuntimeError", "ValueError"]
+
+
+def test_console_renderer_drops_the_message_too() -> None:
+    """LOG_JSON=false (local development) must be just as safe."""
+    stream = io.StringIO()
+    configure_logging("INFO", json=False, stream=stream)
+
+    try:
+        _raise_leaky()
+    except ValueError:
+        get_logger("formpilot.test").exception("something_failed")
+
+    output = stream.getvalue()
+    assert "something_failed" in output
+    assert "ValueError" in output
+    assert LEAKY_EMAIL not in output

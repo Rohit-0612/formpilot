@@ -92,12 +92,26 @@
   - FastAPI's default 422 body echoes each invalid `input` (e.g. the rejected password). A custom
     handler drops `input` and `url` from every validation error. This matters more in Phase 4,
     when Aadhaar/PAN values are validated.
-  - Unhandled exceptions: the request middleware logs `exc_type` and the stack frames, never the
-    exception message (an `IntegrityError` message contains `Key (email)=(...)`), and returns a
-    500 with the request id itself, so uvicorn does not log the full exception either.
+  - Unhandled exceptions: the request middleware logs them with `log.exception()` (sanitised by
+    the processor below) and returns a 500 with the request id itself, so uvicorn does not log
+    the exception a second time.
   - Auth logs carry `user_id` only; failed logins and duplicate registrations log no identifier.
 - **Duplicate registration is detected by the unique constraint**, not a pre-check query, so
   two concurrent registrations cannot both succeed.
+
+### Exception messages are never logged (after Step 3 review)
+- `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the
+  final formatter chain, so it runs for **every** event: our structlog loggers and stdlib
+  loggers (uvicorn, SQLAlchemy, arq), JSON and console output alike. It turns `exc_info`
+  (`True`, an exception instance or a tuple) into `exc_type`, `exc_chain` (types of the
+  `__cause__`/`__context__` chain, when there is one) and `stack` (frames from
+  `traceback.format_tb`: file, line, function, source line). Messages are never rendered.
+  `log.exception()` is therefore safe anywhere.
+- Stack frames show source lines, i.e. code such as an f-string template, not runtime values.
+- Alternative: redact known patterns (emails, 12-digit numbers) from messages — rejected, a
+  deny-list always misses some format; dropping the message entirely cannot miss.
+- Tests: structlog `.exception()`, stdlib `.exception()`, `exc_info=<exception>`, chained
+  exceptions, and console rendering all keep the type/stack and omit an email from the message.
 
 ## Known limitations
 
@@ -109,8 +123,9 @@
 - No rate limiting or lockout on login or register.
 - `POST /auth/register` returns 409 for an existing email, so registration reveals whether an
   email has an account (login does not).
-- Only request-level exception logging strips messages. Code that calls `log.exception()`
-  elsewhere would still log the message; app code must not do that with untrusted data.
+- Exception messages are dropped from every log event (enforced, see "Exception messages are
+  never logged"), but values a caller writes into the event text or passes as a log field are
+  not caught. The rule stays: log ids, names, timings and statuses only, never values.
 
 ## Open issues
 

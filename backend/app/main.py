@@ -2,7 +2,6 @@
 
 import re
 import time
-import traceback
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -47,17 +46,14 @@ async def log_requests(
     start = time.perf_counter()
     try:
         response = await call_next(request)
-    except Exception as exc:
-        # Log the exception type and stack frames only. Exception messages can carry values
-        # (e.g. an IntegrityError's "Key (email)=(...)"), so they are never logged. Returning a
-        # response here also stops uvicorn from logging the full exception itself.
-        log.error(
+    except Exception:
+        # The logging config drops exception messages (they can carry values) and keeps the
+        # type and stack. Returning a response here stops the error propagating to uvicorn.
+        log.exception(
             "request_failed",
             method=request.method,
             route=_route_template(request),
             duration_ms=round((time.perf_counter() - start) * 1000, 1),
-            exc_type=type(exc).__name__,
-            stack="".join(traceback.format_tb(exc.__traceback__)),
         )
         response = JSONResponse(
             status_code=500, content={"detail": "Internal server error", "request_id": request_id}

@@ -2,11 +2,16 @@
 
 All output (ours, uvicorn's, SQLAlchemy's) goes through one stdlib handler rendered by structlog,
 as JSON by default. Log ids, names, timings and statuses; never field values, emails or passwords.
+
+Exceptions are logged as type + stack frames only (see drop_exception_messages), so
+log.exception() is safe anywhere: exception messages often embed values.
 """
 
 import logging
 import sys
-from typing import TextIO
+import traceback
+from types import TracebackType
+from typing import Any, TextIO
 
 import structlog
 
@@ -19,6 +24,51 @@ _SHARED_PROCESSORS: list[structlog.types.Processor] = [
 ]
 
 _URL_LOGGING_LIBRARIES = ("httpx", "httpcore")
+
+_ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
+
+
+def _resolve_exc_info(value: Any) -> _ExcInfo | None:
+    if isinstance(value, BaseException):
+        return type(value), value, value.__traceback__
+    if isinstance(value, tuple) and len(value) == 3 and value[0] is not None:
+        return value  # type: ignore[return-value]
+    if value is True:
+        current = sys.exc_info()
+        return current if current[0] is not None else None  # type: ignore[return-value]
+    return None
+
+
+def _chain(exc: BaseException) -> list[str]:
+    """Types of the exception and everything it was raised from / during, outermost first."""
+    names: list[str] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        names.append(type(current).__qualname__)
+        current = current.__cause__ or current.__context__
+    return names
+
+
+def drop_exception_messages(
+    _logger: Any, _method_name: str, event_dict: structlog.types.EventDict
+) -> structlog.types.EventDict:
+    """Replace exc_info with the exception type, its chain and the stack frames, no messages.
+
+    Exception messages routinely embed values (e.g. psycopg's "Key (email)=(...) already
+    exists"). Stack frames only show file, line, function and source code.
+    """
+    resolved = _resolve_exc_info(event_dict.pop("exc_info", None))
+    if resolved is None:
+        return event_dict
+    exc_type, exc, tb = resolved
+    event_dict["exc_type"] = exc_type.__qualname__
+    chain = _chain(exc)
+    if len(chain) > 1:
+        event_dict["exc_chain"] = chain
+    event_dict["stack"] = "".join(traceback.format_tb(tb))
+    return event_dict
 
 
 def configure_logging(level: str = "INFO", json: bool = True, stream: TextIO | None = None) -> None:
@@ -39,7 +89,7 @@ def configure_logging(level: str = "INFO", json: bool = True, stream: TextIO | N
             foreign_pre_chain=_SHARED_PROCESSORS,
             processors=[
                 structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                structlog.processors.format_exc_info,
+                drop_exception_messages,  # instead of format_exc_info, which renders messages
                 renderer,
             ],
         )
