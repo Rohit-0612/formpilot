@@ -1,0 +1,65 @@
+"""Application configuration, loaded only from environment variables (and an optional .env)."""
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Annotated, Literal
+
+from pydantic import Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+# The repository root holds the single .env used by compose and by host-side tools.
+# Inside the container this path does not exist and only real env vars are used.
+_REPO_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
+JWT_SECRET_MIN_LENGTH = 32
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=_REPO_ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Connections
+    database_url: str
+    redis_url: str
+
+    # Auth
+    jwt_secret: SecretStr
+    jwt_ttl_minutes: int = Field(default=60, gt=0)
+    cookie_secure: bool = False
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    # Storage and retention
+    storage_root: Path
+    file_ttl_hours: int = Field(default=24, gt=0)
+
+    # Logging
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    log_json: bool = True
+
+    # Health checks
+    health_timeout_seconds: float = Field(default=2.0, gt=0)
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _jwt_secret_strong_enough(cls, value: SecretStr) -> SecretStr:
+        if len(value.get_secret_value()) < JWT_SECRET_MIN_LENGTH:
+            raise ValueError(
+                f"JWT_SECRET must be at least {JWT_SECRET_MIN_LENGTH} characters; "
+                "generate one with `openssl rand -hex 32`"
+            )
+        return value
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]  # required fields come from the environment
