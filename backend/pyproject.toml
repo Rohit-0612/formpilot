@@ -56,5 +56,11 @@ markers = [
     "unit: fast tests with no network, database or Redis (auto-applied under tests/unit)",
     "integration: needs Postgres and/or Redis (auto-applied under tests/integration)",
 ]
+filterwarnings = [
+    # Starlette 1.7 deprecates using httpx for its TestClient in favour of httpx2. We keep httpx
+    # (no new dependency; see docs/decisions/phase-1.md, known issues) and hide only this exact
+    # message from this exact class. Every other warning stays visible.
+    'ignore:Using `httpx` with `starlette\.testclient` is deprecated; install `httpx2` instead\.:starlette.exceptions.StarletteDeprecationWarning',
+]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

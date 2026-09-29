@@ -4,6 +4,7 @@ import logging
 
 from fastapi.testclient import TestClient
 
+from app.api import API_PREFIX
 from app.api.deps import get_health_service
 from app.config import Settings
 from app.logging import configure_logging, get_logger
@@ -91,3 +92,32 @@ def test_http_client_libraries_do_not_log_urls_at_info() -> None:
     logging.getLogger("httpcore").info("send_request_headers.started")
 
     assert _lines(stream) == []
+
+
+def test_request_log_route_includes_api_prefix(settings: Settings) -> None:
+    """Guards the router-level prefix workaround (docs/decisions/phase-1.md).
+
+    FastAPI 0.141 stopped baking include_router(prefix=...) into route.path, which made the
+    request log show "/health". If a FastAPI upgrade changes prefix handling again, this fails.
+    """
+    app = create_app(settings)
+    app.dependency_overrides[get_health_service] = _OkHealth
+    stream = io.StringIO()
+    configure_logging("INFO", json=True, stream=stream)
+
+    with TestClient(app) as client:
+        client.get("/api/v1/health")
+
+    (request_log,) = [entry for entry in _lines(stream) if entry["event"] == "request"]
+    assert request_log["route"] == "/api/v1/health"
+
+
+def test_every_api_route_template_carries_the_prefix(settings: Settings) -> None:
+    """A router added without prefix=API_PREFIX would serve and log the wrong path."""
+    app = create_app(settings)
+    framework_paths = {"/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
+
+    api_paths = [path for path in app.openapi()["paths"] if path not in framework_paths]
+
+    assert api_paths
+    assert all(path.startswith(API_PREFIX + "/") for path in api_paths), api_paths
