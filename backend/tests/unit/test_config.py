@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from app.config import Settings
+from app.config import DatabaseSettings, Settings
 
 VALID_SECRET = "a" * 64
 
@@ -82,3 +82,10 @@ def test_invalid_log_level_fails(base_env: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError, match="log_level"):
         Settings(_env_file=None)
+
+
+def test_database_settings_need_only_database_url(clean_env: pytest.MonkeyPatch) -> None:
+    """Alembic and DB tooling must not require JWT_SECRET, REDIS_URL, etc."""
+    clean_env.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/x")
+
+    assert DatabaseSettings(_env_file=None).database_url == "postgresql+psycopg://u:p@db:5432/x"

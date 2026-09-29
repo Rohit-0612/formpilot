@@ -8,6 +8,7 @@
 |---|---|---|
 | 0 | AGPL-3.0 license, README stub, `.env.example` (placeholders only), decisions folder | `LICENSE`, `README.md`, `.env.example` |
 | 1 | FastAPI app factory, pydantic-settings config, structlog JSON logging, request-logging middleware, `GET /api/v1/health` (Postgres + Redis probes with timeout, 503 when degraded) | `backend/app/{main,config,logging}.py`, `backend/app/api/`, `backend/app/services/health.py` |
+| 2 | SQLAlchemy 2.0 models for the six SPEC §7 tables, Alembic initial migration `0001`, async session dependency, integration test harness (savepoint sessions, truncate helper), compose `postgres` + `redis`, first Makefile targets | `backend/app/db/`, `backend/alembic.ini`, `backend/tests/integration/`, `docker-compose.yml`, `Makefile` |
 
 ## Key decisions and alternatives considered
 
@@ -45,6 +46,32 @@
   `make_engine()`, because the health check needs an engine. Sessions are added in step 2.
 - **`redis` as an explicit dependency.** It was approved as part of `arq`, but the health check
   imports it directly, so it is declared explicitly in `pyproject.toml`.
+
+### Step 2 decisions and deviations
+- **Compose and Makefile started in step 2, not step 6.** Integration tests need Postgres, so
+  `docker-compose.yml` (postgres + redis only) and `make services / test / test-int / lint /
+  down` landed now. The `.env` bootstrap from [A3] is implemented here too (generated
+  `JWT_SECRET`, file mode 600, never overwritten). Step 6 adds `api`, `worker` and the rest.
+- **`DatabaseSettings` split out of `Settings`.** Alembic and the test harness only need
+  `DATABASE_URL`; requiring `JWT_SECRET` to run a migration would be wrong. `Settings` extends it.
+- **Schema details beyond SPEC §7** (all within the approved interpretation):
+  `users.email` has a `CHECK (email = lower(email))` so lower-casing is enforced by the database,
+  not only by the service; `documents.sha256` must be 64 chars; `page_count` is NULL or > 0;
+  `form_ir_versions.version >= 1`; `documents.source_kind` is nullable until analysis runs.
+  Status columns have **server** defaults (`uploaded`, `queued`) so raw SQL inserts match ORM
+  inserts. Deterministic constraint names via a naming convention.
+- **No separate index on `form_ir_versions.document_id`.** The unique
+  `(document_id, version)` index already starts with it.
+- **`audit_events.document_id` is NOT NULL**, as in SPEC §7. Phase 5 may want audit events for
+  profile changes (no document); that would need a new migration and a decision.
+- **Test isolation [A1].** `savepoint_session()` = one connection + outer transaction +
+  `join_transaction_mode="create_savepoint"`; a test proves a `commit()` inside it leaves no row.
+  `truncate_all_tables()` is for code with its own engine (the worker test in step 5).
+  Integration tests use throwaway databases `formpilot_test` and `formpilot_test_migrations`,
+  never the dev database. Alternative: `pytest-postgresql` / testcontainers — extra dependencies.
+- **Drift check.** `compare_metadata` does not compare CHECK constraints, so a second test compares
+  CHECK constraint names between the models and the migrated database, and a third inserts
+  every Python enum value (catches a value added in code without a migration).
 
 ## Known limitations
 

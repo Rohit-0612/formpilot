@@ -13,7 +13,7 @@ from redis.asyncio import Redis
 
 from app.api.router import api_router
 from app.config import Settings, get_settings
-from app.db.session import make_engine
+from app.db.session import make_engine, make_sessionmaker
 from app.logging import configure_logging, get_logger
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -71,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Neither call connects yet; connections are opened lazily on first use.
         app.state.engine = make_engine(settings)
+        app.state.sessionmaker = make_sessionmaker(app.state.engine)
         app.state.redis = Redis.from_url(settings.redis_url)
         log.info("startup")
         try:

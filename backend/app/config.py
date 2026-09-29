@@ -14,15 +14,25 @@ _REPO_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 JWT_SECRET_MIN_LENGTH = 32
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=_REPO_ENV_FILE,
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+_SETTINGS_CONFIG = SettingsConfigDict(
+    env_file=_REPO_ENV_FILE,
+    env_file_encoding="utf-8",
+    extra="ignore",
+)
 
-    # Connections
+
+class DatabaseSettings(BaseSettings):
+    """Only what Alembic and database tooling need, so they do not require JWT_SECRET etc."""
+
+    model_config = _SETTINGS_CONFIG
+
     database_url: str
+
+
+class Settings(DatabaseSettings):
+    model_config = _SETTINGS_CONFIG
+
+    # Connections (database_url is inherited)
     redis_url: str
 
     # Auth
