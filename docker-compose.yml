@@ -29,5 +29,43 @@ services:
       timeout: 3s
       retries: 30
 
+  api:
+    build: ./backend
+    env_file: .env
+    environment: &backend-environment
+      # Inside compose, reach Postgres and Redis by service name (.env holds host-side URLs).
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-formpilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-formpilot}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_ROOT: /data/storage
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    volumes:
+      - storage:/data/storage
+    depends_on: &backend-depends-on
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Exits non-zero on connection errors and on a 503 (degraded) response.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    build: ./backend
+    command: ["arq", "app.jobs.worker.WorkerSettings"]
+    env_file: .env
+    environment: *backend-environment
+    volumes:
+      - storage:/data/storage
+    depends_on: *backend-depends-on
+
 volumes:
   pgdata:
+  storage:

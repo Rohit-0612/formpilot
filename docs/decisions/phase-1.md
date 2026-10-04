@@ -12,6 +12,7 @@
 | 3 | Auth: Argon2id password hashing, HS256 JWT in an `fp_session` httpOnly cookie, `POST /auth/register`, `/auth/login`, `/auth/logout`, `GET /auth/me`, `current_user` dependency, value-free 422 and 500 responses | `backend/app/security.py`, `backend/app/services/users.py`, `backend/app/api/routes/auth.py`, `backend/app/api/deps.py`, `backend/app/api/errors.py` |
 | 4 | `Storage` interface and `LocalStorage` (atomic writes, owner-only permissions, strict keys, traversal and symlink protection) | `backend/app/storage/base.py`, `backend/app/storage/local.py` |
 | 5 | Background jobs: `JobService` (create + enqueue), `JobStore` (status transitions), arq worker with a no-op `ping` task, `python -m app.jobs.cli ping [--wait N]` | `backend/app/services/jobs.py`, `backend/app/jobs/{tasks,worker,cli}.py` |
+| 6 | Backend Docker image, `api` and `worker` services in compose, `make up` / `migrate` / `ping` / `logs` | `backend/Dockerfile`, `backend/.dockerignore`, `docker-compose.yml`, `Makefile` |
 
 ## Key decisions and alternatives considered
 
@@ -152,6 +153,26 @@
   status); exit code 0 only when the job is `done`, 1 on `failed` or timeout.
 - **Tests:** Redis database 15 (flushed before and after), never the dev queue; worker tests use
   `truncate_all` [A1]. A unit `FakeJobStore` covers `run_tracked`'s paths without Postgres.
+
+### Step 6 decisions
+- **One backend image for api and worker** (`python:3.12-slim` + uv 0.12.2 from its official
+  image, `uv sync --frozen --no-dev`, dependencies installed before the code is copied so code
+  changes rebuild fast). The worker service only overrides the command
+  (`arq app.jobs.worker.WorkerSettings`). Tests and dev tools are not in the image.
+- **Non-root** user `formpilot` (uid 10001). `/data/storage` is created in the image and owned
+  by that user, so a new named `storage` volume inherits the ownership; both containers can write.
+- **Compose overrides the host-side URLs** in `.env` (`localhost:5433`, `localhost:6379`) with
+  service names for `DATABASE_URL`, `REDIS_URL` and `STORAGE_ROOT`. The API is published on
+  `127.0.0.1:${API_HOST_PORT:-8000}` only.
+- **api healthcheck** calls `/api/v1/health` with Python's `urllib` (no curl in the slim image);
+  a 503 counts as unhealthy. The worker has no healthcheck yet (arq's `--check` relies on a
+  health key written once an hour by default).
+- **`make up`** = create `.env` if missing → `docker compose up -d --build --wait` →
+  `make migrate` (`alembic upgrade head` in the api container). Migrations run after the API is
+  healthy; health does not depend on tables.
+- **`make ping`** runs the job CLI in the api container with `--wait 30`; exit code 1 unless the
+  job reaches `done`.
+- **`make types` moved to step 7**, because it generates TypeScript into `web/`.
 
 ### Exception messages are never logged (after Step 3 review)
 - `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the

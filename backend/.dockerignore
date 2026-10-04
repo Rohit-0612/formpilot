@@ -1,0 +1,10 @@
+# Only the app, its lockfile and Alembic config go into the image.
+.venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+tests/
+var/
+.env
+.env.*
