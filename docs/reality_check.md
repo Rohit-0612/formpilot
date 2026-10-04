@@ -65,3 +65,9 @@ By family:
 
 - Legacy non-Unicode Hindi fonts in #5 and #37: the text layer exists but extracts as garbage.
 - #6 is a securities nomination form, not a deposit-account one.
+- #1 (SBI) contains 122 odd Latin-extended letters (0.4% of its letters, e.g. "Tel. (Oģ)"),
+  below the script's garbled-text threshold; probably a few mis-mapped glyphs.
+- #31 (IIIT Allahabad) has a few mis-mapped characters in its Hindi heading (4 Latin-extended
+  letters mixed into the Devanagari), below the script's threshold.
+- #30 (Allahabad enrollment) uses real Unicode Devanagari, but some vowel signs extract wrong
+  (e.g. "वकए" where the form means "किए"); the script's heuristic cannot detect this.
