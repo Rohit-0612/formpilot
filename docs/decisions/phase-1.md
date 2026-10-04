@@ -14,6 +14,7 @@
 | 5 | Background jobs: `JobService` (create + enqueue), `JobStore` (status transitions), arq worker with a no-op `ping` task, `python -m app.jobs.cli ping [--wait N]` | `backend/app/services/jobs.py`, `backend/app/jobs/{tasks,worker,cli}.py` |
 | 6 | Backend Docker image, `api` and `worker` services in compose, `make up` / `migrate` / `ping` / `logs` | `backend/Dockerfile`, `backend/.dockerignore`, `docker-compose.yml`, `Makefile` |
 | 7 | Web shell: Next.js login, register and dashboard pages, typed API client generated from OpenAPI, `make types`, `web` image and compose service | `web/`, `backend/app/openapi_export.py`, `Makefile`, `docker-compose.yml` |
+| 8 | GitHub Actions CI: backend (ruff + unit + integration with Postgres/Redis services), web (generated types up to date, lint, typecheck, build), compose smoke (`make up`, health, `make ping`, web) | `.github/workflows/ci.yml` |
 
 ## Key decisions and alternatives considered
 
@@ -205,6 +206,21 @@
 - **`web/AGENTS.md` and `web/CLAUDE.md`** (created by `create-next-app`; they point coding agents
   at Next 16's bundled docs) are committed as they are, after the human read them. The root
   `CLAUDE.md` now says it wins over any nested instruction file that conflicts with it.
+
+### Step 8 decisions
+- **Three parallel jobs** on pushes to `main` and `phase-*` branches and on pull requests to
+  `main`; read-only token; a newer push cancels the running workflow for the same ref.
+- **backend:** Postgres 16 and Redis 7 as service containers; `uv sync --frozen`, ruff check +
+  format check, `pytest -m unit`, `pytest -m integration`. There is no `.env` in CI: service
+  URLs are set in the workflow and `JWT_SECRET` is generated per run with `openssl rand`, so no
+  secret is committed.
+- **web:** regenerates the API types with `make types` and fails if `web/openapi.json` or
+  `schema.d.ts` changed (stale types), then lint, `next typegen && tsc --noEmit`, build.
+- **compose-smoke:** the acceptance path from a clean checkout: `make up` (creates `.env`,
+  builds, waits for all healthchecks, migrates), API health, `make ping`, web `/login`; prints
+  the container logs on failure and always tears down with volumes.
+- Actions pinned to current majors: `actions/checkout@v7`, `actions/setup-node@v7`,
+  `astral-sh/setup-uv@v10` (uv 0.12.2, same as local). The workflow passes `actionlint`.
 
 ### Exception messages are never logged (after Step 3 review)
 - `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "phase-*"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (ruff, unit + integration tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: formpilot
+          POSTGRES_PASSWORD: formpilot
+          POSTGRES_DB: formpilot
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U formpilot -d formpilot"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      # CI-only service credentials (the containers above); no .env file exists in CI.
+      DATABASE_URL: postgresql+psycopg://formpilot:formpilot@localhost:5432/formpilot
+      REDIS_URL: redis://localhost:6379/0
+      STORAGE_ROOT: /tmp/formpilot-storage
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: "0.12.2"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Generate a throwaway JWT secret for this run
+        run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -m unit
+      - run: uv run pytest -m integration
+
+  web:
+    name: Web (types up to date, lint, typecheck, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: "0.12.2"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: uv sync --frozen
+        working-directory: backend
+      - name: Generated API types match the backend
+        run: |
+          make types
+          git diff --exit-code -- web/openapi.json web/src/lib/api/schema.d.ts \
+            || { echo "::error::Generated API types are stale. Run 'make types' and commit."; exit 1; }
+      - run: npm run lint
+        working-directory: web
+      - run: npm run typecheck
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+  compose-smoke:
+    name: Compose smoke (make up, health, ping)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: make up (creates .env with a generated JWT secret, builds, migrates)
+        run: make up
+      - name: API health is ok
+        run: curl -fsS http://localhost:8000/api/v1/health
+      - name: A ping job reaches done
+        run: make ping
+      - name: Web serves the login page
+        run: curl -fsS -o /dev/null http://localhost:3000/login
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
