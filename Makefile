@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs services test test-int lint
+.PHONY: up down migrate ping logs types services test test-int lint
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -32,6 +32,11 @@ ping:
 logs:
 	$(COMPOSE) logs -f --tail=100
 
+## Regenerate web/openapi.json and the web app's API types from the backend (no server needed)
+types:
+	$(BACKEND) uv run python -m app.openapi_export ../web/openapi.json
+	cd web && npm run --silent types
+
 ## Start only Postgres and Redis (for integration tests and host-side development)
 services: .env
 	$(COMPOSE) up -d --wait postgres redis
@@ -44,6 +49,7 @@ test:
 test-int: services
 	$(BACKEND) uv run pytest -m integration
 
-## Lint and format check
+## Lint, format check and type check (backend and web)
 lint:
 	$(BACKEND) uv run ruff check . && uv run ruff format --check .
+	cd web && npm run --silent lint && npm run --silent typecheck

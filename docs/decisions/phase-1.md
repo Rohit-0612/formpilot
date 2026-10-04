@@ -13,6 +13,7 @@
 | 4 | `Storage` interface and `LocalStorage` (atomic writes, owner-only permissions, strict keys, traversal and symlink protection) | `backend/app/storage/base.py`, `backend/app/storage/local.py` |
 | 5 | Background jobs: `JobService` (create + enqueue), `JobStore` (status transitions), arq worker with a no-op `ping` task, `python -m app.jobs.cli ping [--wait N]` | `backend/app/services/jobs.py`, `backend/app/jobs/{tasks,worker,cli}.py` |
 | 6 | Backend Docker image, `api` and `worker` services in compose, `make up` / `migrate` / `ping` / `logs` | `backend/Dockerfile`, `backend/.dockerignore`, `docker-compose.yml`, `Makefile` |
+| 7 | Web shell: Next.js login, register and dashboard pages, typed API client generated from OpenAPI, `make types`, `web` image and compose service | `web/`, `backend/app/openapi_export.py`, `Makefile`, `docker-compose.yml` |
 
 ## Key decisions and alternatives considered
 
@@ -181,6 +182,29 @@
   job reaches `done`.
 - **`make types` moved to step 7**, because it generates TypeScript into `web/`.
 
+### Step 7 decisions
+- **Versions** (exact pins in `package.json`): Next.js 16.3.8, React 19.2.8, TanStack Query
+  5.104.1, openapi-fetch 0.17.0, openapi-typescript 7.13.0 (dev). Tailwind 4, ESLint 9 and
+  `eslint-config-next` come with `create-next-app`.
+- **Generated API types.** `python -m app.openapi_export` builds the app with placeholder
+  settings (`Settings.model_construct`, no environment, nothing connects) and writes
+  `web/openapi.json`; `openapi-typescript` turns it into `web/src/lib/api/schema.d.ts`. Both are
+  committed so API changes show up in diffs; `make types` regenerates them reproducibly (checked:
+  no diff on regeneration). Request/response types in the web app come only from that file.
+- **The browser calls the API directly** (CORS with credentials, origin allowlist), not through
+  a Next.js proxy. `NEXT_PUBLIC_API_URL` is inlined at build time, so the web image takes it as a
+  build argument; changing it needs a rebuild.
+- **Session checks happen in the browser.** The dashboard asks `GET /auth/me` and redirects to
+  `/login` on 401. No Next.js middleware: verifying the JWT there would need `JWT_SECRET` in the
+  web app. Consequence: a protected page shows "Loading…" briefly before redirecting.
+- **Login page** is a small server component that reads `?registered=1` (shown after sign-up)
+  and renders a client form; this makes `/login` a dynamic route.
+- **Web image:** multi-stage `node:22-alpine`, Next.js standalone output, runs as the `node`
+  user; healthcheck fetches `/login`. `web/public/` is kept (empty) for later static files.
+- **`make lint`** now also runs the web lint and `next typegen && tsc --noEmit`.
+- **`web/AGENTS.md` and `web/CLAUDE.md` (created by `create-next-app`) are not committed** —
+  pending the human's decision. `next dev` only re-creates them when it detects a coding agent.
+
 ### Exception messages are never logged (after Step 3 review)
 - `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the
   final formatter chain, so it runs for **every** event: our structlog loggers and stdlib
@@ -203,6 +227,8 @@
   expires (`JWT_TTL_MINUTES`, default 60). Revocation would need a server-side denylist or
   session table.
 - No rate limiting or lockout on login or register.
+- The web app has no automated UI tests yet (Playwright arrives in Phase 5); Step 7 was checked
+  by build, lint, type check, an HTTP-level CORS/cookie check and the human's browser check.
 - A worker killed hard (e.g. SIGKILL, OOM) mid-job leaves its row `running`; there is no reaper
   for stale `running` jobs yet. Scheduled for Phase 2 (see "Notes for the next phase").
 - arq keeps each job's return value in Redis for an hour (`"done"`, `"failed"`, `"skipped"`;
@@ -216,6 +242,11 @@
 ## Open issues
 
 ### Known issues
+- **npm audit: 5 "high" findings in the dev-only lint toolchain.** `eslint-config-next` →
+  `@next/eslint-plugin-next` → `fast-glob` → `micromatch` → `braces` 3.0.3 (stack exhaustion on
+  deeply nested glob patterns). npm's only suggested fix is downgrading `eslint-config-next` to
+  14.2.35, two majors behind Next 16, so it is not applied. None of it is in the production web
+  image (standalone build). Revisit when `eslint-config-next` updates its `fast-glob`.
 - **arq 0.28 `DeprecationWarning` (suppressed).** `arq.worker.Worker.close()` calls redis-py's
   deprecated `close()` instead of `aclose()`. It is inside arq and harmless. A pytest
   `filterwarnings` entry in `backend/pyproject.toml` ignores only that message, as a

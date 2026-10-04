@@ -75,6 +75,27 @@ services:
       start_period: 30s
       start_interval: 2s
 
+  web:
+    build:
+      context: ./web
+      args:
+        # Inlined into the browser bundle at build time; the browser calls the API directly.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
   pgdata:
   storage:
