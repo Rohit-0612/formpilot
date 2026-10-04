@@ -22,3 +22,6 @@ class WorkerSettings:
     # The jobs row is the source of truth; a failed or interrupted job is not silently re-run.
     max_tries = 1
     retry_jobs = False
+    # The worker refreshes a Redis key this often (TTL = interval + 1 s); `arq --check` (the
+    # compose healthcheck) passes only while the key exists. arq's default is one hour.
+    health_check_interval = 30

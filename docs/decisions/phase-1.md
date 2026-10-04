@@ -165,8 +165,15 @@
   service names for `DATABASE_URL`, `REDIS_URL` and `STORAGE_ROOT`. The API is published on
   `127.0.0.1:${API_HOST_PORT:-8000}` only.
 - **api healthcheck** calls `/api/v1/health` with Python's `urllib` (no curl in the slim image);
-  a 503 counts as unhealthy. The worker has no healthcheck yet (arq's `--check` relies on a
-  health key written once an hour by default).
+  a 503 counts as unhealthy.
+- **worker healthcheck** (follow-up to step 6): `WorkerSettings.health_check_interval = 30`
+  (arq's default is one hour), so the worker refreshes its Redis health key every 30 s with a
+  31 s TTL and deletes it on a clean shutdown. Compose runs `arq --check
+  app.jobs.worker.WorkerSettings`, which passes only while that key exists, so `make up` (`up
+  --wait`) waits for a working worker. Verified: healthy after start, `--check` exits 1 with the
+  worker stopped, healthy again after a restart; an integration test checks the same behaviour.
+  Limitation: the check proves the worker loop is polling Redis, not that a job can run end to
+  end (`make ping` does that).
 - **`make up`** = create `.env` if missing → `docker compose up -d --build --wait` →
   `make migrate` (`alembic upgrade head` in the api container). Migrations run after the API is
   healthy; health does not depend on tables.

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from arq import func
 from arq.connections import RedisSettings
-from arq.worker import Worker
+from arq.worker import Worker, async_check_health
 
 from app.config import Settings
 from app.db.models import Job
@@ -39,6 +39,7 @@ def _worker(
         job_timeout=WorkerSettings.job_timeout,
         max_tries=WorkerSettings.max_tries,
         retry_jobs=WorkerSettings.retry_jobs,
+        health_check_interval=WorkerSettings.health_check_interval,
         redis_settings=RedisSettings.from_dsn(settings.redis_url),
         ctx={"settings": settings},
         burst=burst,
@@ -62,6 +63,29 @@ def test_worker_settings_do_not_retry_and_use_our_queue() -> None:
     assert WorkerSettings.max_tries == 1
     assert WorkerSettings.retry_jobs is False
     assert "ping" in {function.__name__ for function in WorkerSettings.functions}
+    assert WorkerSettings.health_check_interval == 30
+
+
+async def test_health_check_passes_while_the_worker_runs(live_settings: Settings) -> None:
+    """What the compose healthcheck (`arq --check app.jobs.worker.WorkerSettings`) relies on."""
+    redis_settings = RedisSettings.from_dsn(live_settings.redis_url)
+    assert await async_check_health(redis_settings, queue_name=QUEUE_NAME) == 1  # no worker yet
+
+    worker = _worker(live_settings, burst=False)
+    worker_task = asyncio.create_task(worker.main())
+    try:
+        for _ in range(50):  # the key is written on the worker's first poll
+            if await async_check_health(redis_settings, queue_name=QUEUE_NAME) == 0:
+                break
+            await asyncio.sleep(0.1)
+        assert await async_check_health(redis_settings, queue_name=QUEUE_NAME) == 0
+    finally:
+        worker_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker_task
+        await worker.close()
+
+    assert await async_check_health(redis_settings, queue_name=QUEUE_NAME) == 1  # key removed
 
 
 async def test_ping_job_goes_from_queued_to_done(live_settings: Settings) -> None:

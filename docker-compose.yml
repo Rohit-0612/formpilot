@@ -65,6 +65,15 @@ services:
     volumes:
       - storage:/data/storage
     depends_on: *backend-depends-on
+    healthcheck:
+      # Passes while the worker's health key exists in Redis (refreshed every 30 s, see
+      # WorkerSettings.health_check_interval), so `up --wait` waits for a working worker.
+      test: ["CMD", "arq", "--check", "app.jobs.worker.WorkerSettings"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
 
 volumes:
   pgdata:
