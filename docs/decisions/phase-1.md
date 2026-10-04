@@ -220,7 +220,8 @@
   builds, waits for all healthchecks, migrates), API health, `make ping`, web `/login`; prints
   the container logs on failure and always tears down with volumes.
 - Actions pinned to current majors: `actions/checkout@v7`, `actions/setup-node@v7`,
-  `astral-sh/setup-uv@v10` (uv 0.12.2, same as local). The workflow passes `actionlint`.
+  `astral-sh/setup-uv@v10.2.0` (exact tag: setup-uv publishes no floating major tags; uv
+  0.12.2, same as local). The workflow passes `actionlint`.
 
 ### Exception messages are never logged (after Step 3 review)
 - `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the
