@@ -202,8 +202,9 @@
 - **Web image:** multi-stage `node:22-alpine`, Next.js standalone output, runs as the `node`
   user; healthcheck fetches `/login`. `web/public/` is kept (empty) for later static files.
 - **`make lint`** now also runs the web lint and `next typegen && tsc --noEmit`.
-- **`web/AGENTS.md` and `web/CLAUDE.md` (created by `create-next-app`) are not committed** —
-  pending the human's decision. `next dev` only re-creates them when it detects a coding agent.
+- **`web/AGENTS.md` and `web/CLAUDE.md`** (created by `create-next-app`; they point coding agents
+  at Next 16's bundled docs) are committed as they are, after the human read them. The root
+  `CLAUDE.md` now says it wins over any nested instruction file that conflicts with it.
 
 ### Exception messages are never logged (after Step 3 review)
 - `drop_exception_messages` in `app/logging.py` replaces structlog's `format_exc_info` in the

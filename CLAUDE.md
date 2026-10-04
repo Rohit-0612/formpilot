@@ -14,6 +14,8 @@ filled PDF.
 If anything in a request conflicts with SPEC.md or PLAN.md, stop and ask. Do not silently
 "improve" the spec.
 
+If a nested instruction file (e.g. web/CLAUDE.md) conflicts with this file, this file wins.
+
 ---
 
 ## 1. Working agreement
