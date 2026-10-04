@@ -27,9 +27,14 @@ harness gated in CI.*
 
 ## 2. Scope
 
-**v1 (Phases 1–5):** fillable PDFs (AcroForm) end to end.
-**v2 (Phases 6–7):** flat (text-layer) and scanned PDFs, provider comparison, CI eval gate, deploy.
+**v1 (Phases 1–5):** flat (text-layer) PDFs end to end. The fillable (AcroForm) path is kept as a
+small secondary path, tested on synthetic fixtures.
+**v2 (Phases 6–7):** scanned PDFs and pages with unusable text layers, via OCR; provider
+comparison, CI eval gate, deploy.
 **Stretch (Phase 8):** photo of a paper form (perspective correction + numbered guide), MCP server.
+
+Scope set after the Phase 0 reality check: 0 of 20 collected real forms were fillable (17 flat,
+3 scanned). See `docs/decisions/phase-0.md`.
 
 **Non-goals:** auto-submitting web forms, handwriting recognition, legal drafting,
 "works for every form" claims. MVP targets 2–3 form families chosen in Phase 0.
@@ -175,19 +180,26 @@ Initial list (extend only via a decision record):
 widgets present → `FILLABLE`; else meaningful text layer on most pages → `FLAT_TEXT`;
 else → `SCANNED`.
 
-**acroform.py (v1).** Read widgets with PyMuPDF. Map widget types to `FieldKind`; for checkboxes
-record on/off export values; for radio groups and choice fields record `options`. Label text:
-the widget's tooltip/alternate name if present, else the nearest text span to the left or above
-within a distance threshold. Convert rects to top-left origin.
+**Text-layer quality check.** A page's text layer is used only if it looks like real text. If it
+looks garbled (e.g. legacy non-Unicode Hindi fonts, whose glyphs extract as Latin-extended letters
+or as ASCII letters mixed with punctuation), that page is treated like a scanned page and routed
+to OCR.
 
-**flat.py (v2).** Extract words with coordinates (PyMuPDF). Detect entry areas:
+**acroform.py (v1, secondary path; tested on synthetic fixtures).** Read widgets with PyMuPDF.
+Map widget types to `FieldKind`; for checkboxes record on/off export values; for radio groups and
+choice fields record `options`. Label text: the widget's tooltip/alternate name if present, else
+the nearest text span to the left or above within a distance threshold. Convert rects to top-left
+origin.
+
+**flat.py (v1, primary path).** Extract words with coordinates (PyMuPDF). Detect entry areas:
 underscore runs (`____`), horizontal drawing lines, empty rectangles, small squares (checkboxes)
 using PyMuPDF drawings, with an OpenCV fallback on a rasterized page. Associate each entry area
 with the nearest label (same row to the left, else directly above). Sanity checks: entry boxes
 must not overlap each other; boxes smaller than the minimum font height are flagged.
 
-**scanned.py (v2).** Rasterize at 300 DPI, OCR with Tesseract (`eng`, optionally `hin`) to get
+**scanned.py (v2).** Rasterize at 300 DPI, OCR with Tesseract (`eng` + `hin`) to get
 words with boxes, detect lines/boxes with OpenCV, then reuse the flat.py association logic.
+Also used for pages whose text layer fails the quality check.
 
 **photo.py (stretch).** Detect the page quadrilateral, apply perspective correction, then treat as
 a scanned page.
@@ -255,9 +267,10 @@ and scanned forms the user can drag/resize a box (`USER_EDIT` recorded in trace)
 
 ### 6.9 Rendering (backends)
 
-- `acroform_fill.py`: write values into widgets (checkbox → its on-value), regenerate appearances,
-  optional flatten.
-- `overlay.py`: draw text inside the bbox with the fit-pass font size; checkboxes get an "X".
+- `overlay.py` (primary renderer in v1): draw text inside the bbox with the fit-pass font size;
+  checkboxes get an "X".
+- `acroform_fill.py` (secondary): write values into widgets (checkbox → its on-value), regenerate
+  appearances, optional flatten.
 - `guide.py` (stretch): numbered markers on the page image plus a list "Box 3: write ...".
 Only `CONFIRMED` fields are rendered.
 
@@ -302,7 +315,7 @@ Upload limits (config): 20 MB, 50 pages, PDF magic-bytes check (images in stretc
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic | |
 | Jobs | Redis + arq | async, lighter than Celery |
 | PDF | PyMuPDF | read widgets, words with coordinates, drawings, rendering. **AGPL-3.0**: the repo is public and licensed AGPL-3.0 |
-| OCR (v2) | Tesseract via pytesseract | `hin` language pack optional |
+| OCR (v2) | Tesseract via pytesseract | `eng` + `hin` language packs, both required |
 | Vision (v2) | OpenCV | lines, boxes, perspective |
 | LLM | `LLMProvider` interface: `OllamaProvider` (default, local), `GroqProvider` (optional API), `FakeProvider` (tests) | model name from config; start with a 7–8B instruct model, fall back to 3B on low-RAM machines |
 | LLM cache | recorded responses keyed by hash(provider, model, prompt, schema) | makes CI eval deterministic and free |
@@ -333,7 +346,7 @@ Metrics:
 | Detection precision / recall | predicted vs labelled fields, match if IoU ≥ 0.5 on the same page |
 | Semantic accuracy | share of matched fields with the correct semantic type |
 | Fill correctness | render with a persona, read back values, compare to expected |
-| Placement IoU (v2) | mean IoU of rendered text box vs labelled entry box |
+| Placement IoU (v1) | mean IoU of rendered text box vs labelled entry box |
 | Validator catch rate | share of `invalid_inputs.json` rejected; plus false-reject rate on persona values |
 | Questions per form | number of questions vs number of fields needing input |
 | Latency / cost | per form, per provider |
