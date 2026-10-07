@@ -1,6 +1,7 @@
 # Phase 1 — Skeleton and infrastructure: decision record
 
-> Status: **draft, in progress.** Updated after each step; finalised with `/end-phase 1`.
+> Status: **finalised with `/end-phase 1` on 2026-10-07.** Gate 1 is not ticked; the human
+> decides. Branch `phase-1-skeleton`, 20 commits ahead of `main` at `050c8e2`.
 
 ## What was built
 
@@ -15,6 +16,29 @@
 | 6 | Backend Docker image, `api` and `worker` services in compose, `make up` / `migrate` / `ping` / `logs` | `backend/Dockerfile`, `backend/.dockerignore`, `docker-compose.yml`, `Makefile` |
 | 7 | Web shell: Next.js login, register and dashboard pages, typed API client generated from OpenAPI, `make types`, `web` image and compose service | `web/`, `backend/app/openapi_export.py`, `Makefile`, `docker-compose.yml` |
 | 8 | GitHub Actions CI: backend (ruff + unit + integration with Postgres/Redis services), web (generated types up to date, lint, typecheck, build), compose smoke (`make up`, health, `make ping`, web) | `.github/workflows/ci.yml` |
+
+Also on this branch, outside Phase 1 scope: the Phase 0 helper (`scripts/classify_forms.py`,
+`docs/reality_check.md`, `eval/incoming/sources.md`) and the v1 re-scope to flat PDFs
+(`docs/SPEC.md`, `docs/PLAN.md`, `docs/decisions/phase-0.md`).
+
+**Against the PLAN deliverables:** all are in place. The monorepo layout from SPEC §12 exists
+for everything Phase 1 uses; folders that later phases fill (`backend/app/ir`, `frontends`,
+`passes`, `validators`, `backends`, `llm`, `vault`, `eval/labels`, `eval/personas`,
+`eval/reports`) are created when their phase starts, not as empty placeholders.
+
+### Verification at close-out (2026-10-07)
+
+| Check | Command | Result |
+|---|---|---|
+| Lint, format, web lint + type check | `make lint` | exit 0 (ruff: all checks passed, 54 files formatted) |
+| Unit tests | `make test` | 93 passed, 50 deselected |
+| Integration tests (Postgres + Redis) | `make test-int` | 50 passed, 93 deselected |
+| `make up` from a fresh GitHub clone of `050c8e2` (isolated compose project) | `make up` | `.env` created, migration `-> 0001`, api/worker/postgres/redis/web healthy |
+| API health | `curl localhost:8000/api/v1/health` | `{"status":"ok","db":"ok","redis":"ok"}` HTTP 200 |
+| Ping job | `make ping` | exit 0; jobs row `ping`, `done`, `finished_at` set |
+| Web | `curl localhost:3000/login` | HTTP 200 |
+| CI on the branch head | GitHub Actions run 37203465755 | success (backend, web, compose-smoke) |
+| Register → login → dashboard in a browser | human, 2026-10-04 (Step 7) | passed, all five steps (reported by the human) |
 
 ## Key decisions and alternatives considered
 
@@ -253,11 +277,27 @@
   no values).
 - `POST /auth/register` returns 409 for an existing email, so registration reveals whether an
   email has an account (login does not).
+- Local development credentials: `.env.example` ships `POSTGRES_PASSWORD=formpilot` (bound to
+  127.0.0.1); it must be changed for any deployment. `JWT_SECRET` is always generated.
+- `GET /jobs/{id}` (SPEC §8) is not implemented yet; deferred to Phase 2, when jobs belong to
+  documents and ownership can be checked.
 - Exception messages are dropped from every log event (enforced, see "Exception messages are
   never logged"), but values a caller writes into the event text or passes as a log field are
   not caught. The rule stays: log ids, names, timings and statuses only, never values.
 
 ## Open issues
+
+### Acceptance checks not ticked by Claude
+- **"Register → login → dashboard works in the browser."** Passed in the human's browser check
+  on 2026-10-04 (Step 7); Claude cannot run a browser, so it is left for the human to tick.
+  Automated coverage: API flow in `tests/integration/test_auth_api.py`, HTTP-level CORS/cookie
+  check, web build/lint/type check.
+- **"CI is green on the main branch."** CI is green on `phase-1-skeleton` (run 37203465755).
+  It can only be green on `main` after the Phase 1 pull request is merged, which happens after
+  the human passes Gate 1 (CLAUDE.md §8).
+
+### For the human
+- Gate 1, the teach-back answers (PLAN Phase 1) and "In my own words" below.
 
 ### Known issues
 - **npm audit: 5 "high" findings in the dev-only lint toolchain.** `eslint-config-next` →
@@ -281,6 +321,22 @@
 
 ## Notes for the next phase
 
+- **Phase 0 is not closed.** MVP form families and the dev/test split are still open in
+  `docs/reality_check.md`. The Phase 2 detection eval needs `eval/dataset/dev/` and labelled
+  entry boxes, so these come first.
+- **Phase 2 starts with a Form IR decision.** Per-page OCR routing (proposal: replace
+  `page_sizes` with per-page `width`, `height`, text-layer quality `ok`/`garbled`/`none`) needs
+  a decision record and approval before `ir/models.py` is written (`docs/decisions/phase-0.md`).
+- **PyMuPDF is only a dev dependency** (for `scripts/classify_forms.py`). Phase 2 frontends
+  need it at runtime, so it moves to the main dependencies (AGPL-3.0, already the repo licence).
+- **Storage is not wired into the API yet:** no factory or FastAPI dependency. Uploads in
+  Phase 2 add both; keys look like `documents/<uuid>/original.pdf`.
+- **Jobs:** add `analyze` to `app/jobs/tasks.FUNCTIONS` using `run_tracked`; arguments are ids
+  only and tasks never raise to arq. `GET /jobs/{id}` arrives with documents (ownership check).
+- **API changes → `make types`**; CI fails on stale generated types.
+- **Logging rule holds:** log ids, never values; exception messages are dropped automatically,
+  values written into log text or fields are not.
+
 - **Phase 4 — audit events without a document.** The profile vault arrives in Phase 4, and
   profile changes are user actions with no document. `audit_events.document_id` is NOT NULL
   (SPEC §7), so Phase 4 must decide how these events are stored (e.g. make `document_id`
@@ -293,7 +349,6 @@
   `started_at` yet (only `created_at` / `finished_at`), so this likely needs a migration adding
   it, set by `JobStore.mark_running`. Tracked as a Phase 2 deliverable in `docs/PLAN.md`.
 
-_The rest is written at the end of Phase 1._
 
 ## In my own words
 

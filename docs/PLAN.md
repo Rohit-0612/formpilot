@@ -44,9 +44,9 @@ Deliverables
 - GitHub Actions: ruff, pytest (with Postgres + Redis services), web type-check and build.
 
 Acceptance
-- [ ] `make up` from a fresh clone brings everything up; `/api/v1/health` returns ok.
+- [x] `make up` from a fresh clone brings everything up; `/api/v1/health` returns ok.
 - [ ] Register → login → dashboard works in the browser.
-- [ ] Enqueuing `ping` updates the job row to `done`.
+- [x] Enqueuing `ping` updates the job row to `done`.
 - [ ] CI is green on the main branch.
 
 Teach-back questions (human answers in `phase-1.md`)
