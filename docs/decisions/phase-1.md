@@ -1,7 +1,8 @@
 # Phase 1 — Skeleton and infrastructure: decision record
 
-> Status: **finalised with `/end-phase 1` on 2026-10-07.** Gate 1 is not ticked; the human
-> decides. Branch `phase-1-skeleton`, 20 commits ahead of `main` at `050c8e2`.
+> Status: **finalised with `/end-phase 1` on 2026-10-07.** Gate 1 passed by the human's
+> decision on 2026-10-11 (teach-back pending). Branch `phase-1-skeleton` goes to `main` through
+> the Phase 0 + 1 pull request.
 
 ## What was built
 
@@ -289,15 +290,16 @@ for everything Phase 1 uses; folders that later phases fill (`backend/app/ir`, `
 
 ### Acceptance checks not ticked by Claude
 - **"Register → login → dashboard works in the browser."** Passed in the human's browser check
-  on 2026-10-04 (Step 7); Claude cannot run a browser, so it is left for the human to tick.
+  on 2026-10-04 (Step 7); ticked in PLAN on the human's behalf on 2026-10-11.
   Automated coverage: API flow in `tests/integration/test_auth_api.py`, HTTP-level CORS/cookie
   check, web build/lint/type check.
 - **"CI is green on the main branch."** CI is green on `phase-1-skeleton` (run 37203465755).
   It can only be green on `main` after the Phase 1 pull request is merged, which happens after
-  the human passes Gate 1 (CLAUDE.md §8).
+  the human passes Gate 1 (CLAUDE.md §8). After the merge it is checked on `main` and ticked,
+  with the run id, as the first commit of the Phase 2 branch.
 
 ### For the human
-- Gate 1, the teach-back answers (PLAN Phase 1) and "In my own words" below.
+- The teach-back answers (PLAN Phase 1) and "In my own words" below; deferred by the human.
 
 ### Known issues
 - **npm audit: 5 "high" findings in the dev-only lint toolchain.** `eslint-config-next` →
@@ -321,9 +323,9 @@ for everything Phase 1 uses; folders that later phases fill (`backend/app/ir`, `
 
 ## Notes for the next phase
 
-- **Phase 0 is not closed.** MVP form families and the dev/test split are still open in
-  `docs/reality_check.md`. The Phase 2 detection eval needs `eval/dataset/dev/` and labelled
-  entry boxes, so these come first.
+- **Phase 0 is closed (Gate 0, 2026-10-11).** MVP families and the 14/6 dev/test split are in
+  `docs/reality_check.md`, but the PDFs are not moved yet: moving them into
+  `eval/dataset/dev/` and `eval/dataset/test/` is the first step of Phase 2, before labelling.
 - **Phase 2 starts with a Form IR decision.** Per-page OCR routing (proposal: replace
   `page_sizes` with per-page `width`, `height`, text-layer quality `ok`/`garbled`/`none`) needs
   a decision record and approval before `ir/models.py` is written (`docs/decisions/phase-0.md`).
@@ -352,3 +354,4 @@ for everything Phase 1 uses; folders that later phases fill (`backend/app/ir`, `
 
 ## In my own words
 
+Teach-back: pending (deferred by the human, to be done before the project goes on the resume).

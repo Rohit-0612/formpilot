@@ -14,17 +14,20 @@ Goal: know what forms we are actually dealing with before building detection.
 
 - [ ] Collect 30 real **blank** forms you or friends actually fill (scholarship, college,
       internship/onboarding, bank/KYC, government). Blank only — no personal data.
-- [ ] For each: fillable (AcroForm) / flat text / scanned. Record in `docs/reality_check.md`
+      (20 collected; Phase 0 closed with 20 by the human's decision on 2026-10-11.)
+- [x] For each: fillable (AcroForm) / flat text / scanned. Record in `docs/reality_check.md`
       (name, source URL, pages, type, notes).
-- [ ] Pick 2–3 form families for the MVP.
+- [x] Pick 2–3 form families for the MVP. (Bank / KYC, College / Education; human, 2026-10-11)
 - [ ] Split the forms into `eval/dataset/dev/` (≈ 70%) and `eval/dataset/test/` (≈ 30%).
-- [ ] Decide v2 priority: if most forms are flat/scanned, Phase 6 is the most important phase.
+      (Split decided in `docs/reality_check.md`, 14 dev / 6 test; moving the PDFs is the first
+      step of Phase 2.)
+- [x] Decide v2 priority: if most forms are flat/scanned, Phase 6 is the most important phase.
 
-**Gate 0:** `docs/reality_check.md` exists with counts per type. — [ ] passed
+**Gate 0:** `docs/reality_check.md` exists with counts per type. — [x] passed (verified by the human on 2026-10-11)
 
 ---
 
-## Phase 1 — Skeleton and infrastructure  ← CURRENT
+## Phase 1 — Skeleton and infrastructure
 
 Goal: an empty but real product skeleton that runs with one command.
 
@@ -45,7 +48,7 @@ Deliverables
 
 Acceptance
 - [x] `make up` from a fresh clone brings everything up; `/api/v1/health` returns ok.
-- [ ] Register → login → dashboard works in the browser.
+- [x] Register → login → dashboard works in the browser. (verified by the human on 2026-10-04)
 - [x] Enqueuing `ping` updates the job row to `done`.
 - [ ] CI is green on the main branch.
 
@@ -53,11 +56,11 @@ Teach-back questions (human answers in `phase-1.md`)
 1. Why does analysis run in a worker instead of inside the HTTP request?
 2. What would break if we edited an already-applied Alembic migration?
 
-**Gate 1:** — [ ] passed
+**Gate 1:** — [x] passed (teach-back pending)
 
 ---
 
-## Phase 2 — Form IR and flat-PDF frontend
+## Phase 2 — Form IR and flat-PDF frontend  ← CURRENT
 
 Goal: upload a flat (text-layer) PDF and see its detected fields as a Form IR.
 
