@@ -93,13 +93,23 @@ class SourceKind(str, Enum):
     SCANNED = "scanned"          # image-only pages
     PHOTO = "photo"              # camera image (stretch)
 
+class TextLayer(str, Enum):      # per page (decision D1, docs/decisions/phase-2.md)
+    OK = "ok"                    # usable text layer
+    GARBLED = "garbled"          # text present but extracts as garbage -> OCR (Phase 6)
+    NONE = "none"                # < 50 non-space chars AND mostly image -> OCR (Phase 6)
+
 class FieldKind(str, Enum):
     TEXT = "text"; CHECKBOX = "checkbox"; RADIO = "radio"
     CHOICE = "choice"; DATE = "date"; SIGNATURE = "signature"; UNKNOWN = "unknown"
 
 class BBox(BaseModel):
     page: int                     # 0-based
-    x0: float; y0: float; x1: float; y1: float   # PDF points, origin TOP-LEFT
+    x0: float; y0: float; x1: float; y1: float   # PDF points, origin TOP-LEFT of the displayed page
+                                  # validated: page >= 0, x0 < x1, y0 < y1, finite
+
+class PageInfo(BaseModel):
+    width: float; height: float   # points, displayed page (after /Rotate)
+    text_layer: TextLayer
 
 class Option(BaseModel):          # for checkbox / radio / choice
     value: str                    # value to write into the PDF (e.g. "/On", export value)
@@ -143,19 +153,27 @@ class FormIR(BaseModel):
     schema_version: int = 1
     document_id: UUID
     source_kind: SourceKind
-    page_sizes: list[tuple[float, float]]   # (width, height) in points
+    pages: list[PageInfo]         # index in this list == BBox.page
     fields: list[Field]
     trace: list[TraceEvent] = []
 ```
 
 Rules: field ids are never reused within a document; passes never delete fields (they may mark
-them `SKIPPED`); every change is appended to `trace`.
+them `SKIPPED`); every change is appended to `trace`. A `FormIR` validates that field ids are
+unique and that every box refers to an existing page; IR models reject unknown keys.
+
+`pages` replaced the original `page_sizes: list[tuple[float, float]]` (decision D1 in
+`docs/decisions/phase-2.md`) so that text-layer quality can be recorded per page.
 
 ## 5. Semantic types
 
 Defined in `backend/app/ir/semantic_types.py` as `SemanticType(str, Enum)`, each entry with:
 a description (used in the LLM prompt), keyword patterns (English and common Hindi transliterations
 such as "pita ka naam"), the profile key it maps to, a `sensitive` flag, and default validators.
+
+Sensitive types (masked in API responses, saved to the vault only on opt-in; CLAUDE.md §3 plus
+`voter_id`, decision D2 in `docs/decisions/phase-2.md`): `aadhaar`, `pan`, `bank_account_number`,
+`passport_number`, `voter_id`.
 
 Initial list (extend only via a decision record):
 
@@ -165,8 +183,8 @@ Initial list (extend only via a decision record):
 - Contact: `email`, `phone_mobile`, `phone_alternate`
 - Address (current and permanent variants): `address_line1`, `address_line2`, `city`,
   `district`, `state`, `pincode`, `country` — as `current_*` and `permanent_*`
-- IDs (sensitive): `pan`, `aadhaar`, `passport_number`, `voter_id`
-- Bank (sensitive): `bank_name`, `bank_account_number`, `ifsc`, `bank_branch`
+- IDs: `pan`, `aadhaar`, `passport_number`, `voter_id`
+- Bank: `bank_name`, `bank_account_number`, `ifsc`, `bank_branch`
 - Education: `institution_name`, `course`, `enrollment_number`, `year_of_study`,
   `percentage_or_cgpa`, `passing_year`
 - Form-local: `date_of_filling`, `place`, `signature`, `declaration_checkbox`
@@ -178,12 +196,14 @@ Initial list (extend only via a decision record):
 
 `frontends/detect.py` decides `SourceKind`:
 widgets present → `FILLABLE`; else meaningful text layer on most pages → `FLAT_TEXT`;
-else → `SCANNED`.
+else → `SCANNED`. "Most pages" means more than half of the pages have `text_layer = ok`.
 
-**Text-layer quality check.** A page's text layer is used only if it looks like real text. If it
-looks garbled (e.g. legacy non-Unicode Hindi fonts, whose glyphs extract as Latin-extended letters
-or as ASCII letters mixed with punctuation), that page is treated like a scanned page and routed
-to OCR.
+**Text-layer quality check.** Each page gets a `TextLayer` (SPEC §4). A page's text layer is used
+only if it looks like real text. If it looks garbled (e.g. legacy non-Unicode Hindi fonts, whose
+glyphs extract as Latin-extended letters or as ASCII letters mixed with punctuation), the page is
+`garbled`. A page is `none` only if it has fewer than 50 non-space characters **and** images cover
+most of its area; a sparse page without significant images (e.g. a signature page) stays `ok`.
+`garbled` and `none` pages are treated like scanned pages and routed to OCR.
 
 **acroform.py (v1, secondary path; tested on synthetic fixtures).** Read widgets with PyMuPDF.
 Map widget types to `FieldKind`; for checkboxes record on/off export values; for radio groups and
