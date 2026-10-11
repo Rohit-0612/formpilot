@@ -18,9 +18,10 @@ Goal: know what forms we are actually dealing with before building detection.
 - [x] For each: fillable (AcroForm) / flat text / scanned. Record in `docs/reality_check.md`
       (name, source URL, pages, type, notes).
 - [x] Pick 2–3 form families for the MVP. (Bank / KYC, College / Education; human, 2026-10-11)
-- [ ] Split the forms into `eval/dataset/dev/` (≈ 70%) and `eval/dataset/test/` (≈ 30%).
-      (Split decided in `docs/reality_check.md`, 14 dev / 6 test; moving the PDFs is the first
-      step of Phase 2.)
+- [x] Split the forms into `eval/dataset/dev/` (≈ 70%) and `eval/dataset/test/` (≈ 30%).
+      (Split decided in `docs/reality_check.md`, 14 dev / 6 test. PDFs moved 2026-10-11, SHA-256
+      verified against the original downloads. Known test-split gaps recorded in the
+      Observations of `docs/reality_check.md`.)
 - [x] Decide v2 priority: if most forms are flat/scanned, Phase 6 is the most important phase.
 
 **Gate 0:** `docs/reality_check.md` exists with counts per type. — [x] passed (verified by the human on 2026-10-11)
