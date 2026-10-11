@@ -50,7 +50,8 @@ Acceptance
 - [x] `make up` from a fresh clone brings everything up; `/api/v1/health` returns ok.
 - [x] Register → login → dashboard works in the browser. (verified by the human on 2026-10-04)
 - [x] Enqueuing `ping` updates the job row to `done`.
-- [ ] CI is green on the main branch.
+- [x] CI is green on the main branch. (GitHub Actions run 38124539394 on merge commit `710abc3`:
+      backend, web and compose-smoke all passed; checked 2026-10-11.)
 
 Teach-back questions (human answers in `phase-1.md`)
 1. Why does analysis run in a worker instead of inside the HTTP request?
