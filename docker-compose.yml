@@ -1,0 +1,101 @@
+# FormPilot local stack. Reads variables from .env (created by `make up` / `make services`).
+# Ports are bound to 127.0.0.1 only.
+name: formpilot
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-formpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-formpilot}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ./backend
+    env_file: .env
+    environment: &backend-environment
+      # Inside compose, reach Postgres and Redis by service name (.env holds host-side URLs).
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-formpilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-formpilot}
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_ROOT: /data/storage
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+    volumes:
+      - storage:/data/storage
+    depends_on: &backend-depends-on
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Exits non-zero on connection errors and on a 503 (degraded) response.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    build: ./backend
+    command: ["arq", "app.jobs.worker.WorkerSettings"]
+    env_file: .env
+    environment: *backend-environment
+    volumes:
+      - storage:/data/storage
+    depends_on: *backend-depends-on
+    healthcheck:
+      # Passes while the worker's health key exists in Redis (refreshed every 30 s, see
+      # WorkerSettings.health_check_interval), so `up --wait` waits for a working worker.
+      test: ["CMD", "arq", "--check", "app.jobs.worker.WorkerSettings"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+
+  web:
+    build:
+      context: ./web
+      args:
+        # Inlined into the browser bundle at build time; the browser calls the API directly.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
+  storage:

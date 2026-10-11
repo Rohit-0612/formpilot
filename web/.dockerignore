@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+# Agent instruction files are not part of the app.
+AGENTS.md
+CLAUDE.md
