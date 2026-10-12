@@ -191,6 +191,47 @@ human's decision).
   other 11 forms `ok`. #3's 43 images cover less than 30 % of any page. Consequence of D1: #37
   is now source kind `scanned` (Phase 0 called it "flat"), because its only page is garbled.
 
+## Step 4 — Flat frontend (`app/frontends/flat.py`)
+
+- **Entry areas** (PyMuPDF only): leader runs from per-character boxes (underscores; dots and
+  ellipses, where 1–3 dots stay part of the text, e.g. "No.", "e.g.", "true."); horizontal
+  lines, including thin rectangles and lines drawn in pieces; stroked rectangles and axis-aligned
+  quads; table cells rebuilt from horizontal and vertical lines; comb rows (D8); checkboxes
+  (squares of 5–16 pt). A line touched by two or more vertical lines is a table rule, a line
+  under printed text is an underline, a box with text inside is not an entry, and a box that
+  contains other boxes is a frame.
+- **Overlaps** are resolved by priority (checkbox, comb, box, drawn line, leader). Line entries
+  on different writing lines are trimmed, not dropped, so dense rows keep every line; one under
+  a box starts at the box's bottom edge. Every drop is a trace event. Output boxes never overlap
+  (tested on every fixture).
+- **Labels**: same row to the left (bounded by the previous field on the row, nearest phrase),
+  checkboxes to the right first; otherwise the nearest text line directly above. Trailing ":"
+  removed; a "label" without letters or digits (e.g. "/") is no label. **Context**: the nearest
+  heading above (bold, larger than the page's median font, or an all-caps line of 2+ words).
+- Boxes lower than 6 pt get `ValidationResult("min_box_height", ok=False)`. Ids are
+  `p{page}_f{nnn}` in reading order. Pages that are not `ok` get one trace event and no fields.
+- All thresholds are first guesses checked on the synthetic fixtures only; tuning is Step 11,
+  against the human labels on dev.
+- **Two bugs found on the dev overlays (visual sanity check) and fixed**, each with a regression
+  test; nothing was tuned:
+  1. Segment merging grouped by a rounded position and kept the earlier segment's start, so a
+     comb divider on form #3 was swallowed by a short segment at almost the same x further down
+     the page; comb rows came out fragmented. Now segments are clustered by position, then
+     merged in order of start.
+  2. Form #3 draws its checkboxes as quads whose corners start at the top right; PyMuPDF's
+     `Quad.is_rectangular` is False for that order, so all 16 were ignored. Now any axis-aligned
+     quad counts as a rectangle.
+- **Detector output on the dev forms** (2026-10-12, after the fixes; detector counts, not
+  ground truth): 942 fields on the 27 `ok` pages of 11 forms — 622 text (251 of them comb rows)
+  and 320 checkboxes. Per form: #1 427, #2 42, #3 197, #6 27, #21 28, #23 47, #25 115, #30 15,
+  #32 16, #39 8, #41 20. #1 (9 pages) takes about 1 s.
+- **Seen on the overlays, left for Step 11** (questions for the labels, not clear bugs):
+  cells with printed grey hints (`F I R S T N A M E`, `D D M M Y Y Y Y`) count as "text inside",
+  so comb rows split around them and hinted date rows are missed; rows of wide cells (about
+  40 pt, e.g. #25 date of birth and Aadhaar) are separate boxes, not combs; cells with their
+  label printed inside are not entries.
+- Overlays for visual checks go to `eval/overlays/` (gitignored, like the PDFs).
+
 ## Known issues
 
 - **PyMuPDF SWIG `DeprecationWarning` on import (suppressed in pytest).** PyMuPDF 1.28.2's

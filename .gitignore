@@ -110,3 +110,5 @@ $RECYCLE.BIN/
 # ---------- Evaluation forms ----------
 # Blank forms are downloaded locally and never committed (licensing; keeps the repo small).
 eval/**/*.pdf
+# Renders of those forms (e.g. detector overlays for visual checks) are never committed either.
+eval/overlays/
