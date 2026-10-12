@@ -131,7 +131,7 @@ human's decision).
 
 - **PyMuPDF moved to the main dependencies (D5)**, same version 1.28.2; `uv.lock` only moves it
   out of the dev group.
-- **Fixture generator** `backend/tests/fixtures/pdfs.py`: 17 fixtures built in memory, each with
+- **Fixture generator** `backend/tests/fixtures/pdfs.py`: 18 fixtures built in memory, each with
   its ground truth (source kind, text layer per page, expected fields). Byte-deterministic
   (`tobytes(no_new_id=True, deflate=True)`), except the encrypted one (random salt).
   `python -m tests.fixtures.pdfs --out DIR` writes them with JSON ground truth for inspection.
@@ -142,11 +142,23 @@ human's decision).
   mojibake text, an image-only page, a sparse signature page without images (D1 amendment: `ok`),
   a sparse page with a small logo (`ok`), two mixed documents, an AcroForm document, 51 pages,
   and an encrypted file.
-- **Ground-truth box convention for line-type entries** (proposed here; it must match the
-  labelling guide in Step 5): the line's x-span, and vertically from the writing line up by one
-  row height = 1.2 × the label's font size. The writing line is the text baseline for
-  underscores and dots, and the stroke centre for drawn lines. Rectangles, table cells and
-  checkboxes use the drawn rectangle; comb rows use the union of their cells.
+- **Box convention for entry areas** (confirmed by the human on 2026-10-12; goes into the
+  labelling README in Step 5):
+  - Line-type entries: the line's x-span, and vertically from the writing line up by one row
+    height = 1.2 × the label's font size. The writing line is the text baseline for
+    underscores and dots, and the stroke centre for drawn lines.
+  - Rectangles, table cells and checkboxes: the drawn rectangle. Comb rows: the union of their
+    cells.
+  - **Labeller instruction:** "Draw from the start to the end of the line, and from the line up
+    to a little above the height of the label's capital letters." The IoU ≥ 0.5 match tolerates
+    this: with the x-span right, a box of 1.0× or 1.5× the font height matches the 1.2× box
+    (IoU 0.83 and 0.80), and any height from 0.6× to 2.4× matches
+    (`tests/unit/test_geometry.py`).
+  - **Multi-line entries** (e.g. an address on two or three writing lines): each writing line is
+    its own box and its own field. Grouping lines into one logical field is out of scope for
+    Phase 2. Fixture `flat_multiline`.
+- `app/ir/geometry.py` holds `iou()` and `MATCH_IOU = 0.5`, shared by the flat frontend (Step 4)
+  and the detection eval (Step 6).
 - **Ellipsis leaders.** On the dev forms, runs of "…" (U+2026) are the most common leader: 158
   runs vs 32 runs of plain dots (counted 2026-10-12). PyMuPDF's `insert_text` writes base-14
   fonts with its own Latin encoding, which has no ellipsis (it came out as "·" with the wrong

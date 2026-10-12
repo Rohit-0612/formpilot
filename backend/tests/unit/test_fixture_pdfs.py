@@ -214,6 +214,24 @@ def test_comb_ground_truth_is_the_union_of_its_cells() -> None:
     assert len(separators) == 2  # DD / MM / YYYY
 
 
+def test_multiline_entries_are_one_field_per_writing_line() -> None:
+    fixture = pdfs.get("flat_multiline")
+    with _open("flat_multiline") as doc:
+        runs = _leader_runs(doc[0])
+        lines = [i for d in doc[0].get_drawings() for i in d["items"] if i[0] == "l"]
+
+    underscore_fields = [f for f in fixture.fields if f.bbox[2] != 500]
+    drawn_fields = [f for f in fixture.fields if f.bbox[2] == 500]
+    assert len(underscore_fields) == len(runs) == 3
+    assert len(drawn_fields) == len(lines) == 3
+    for field in underscore_fields:
+        x0, _, x1, y1 = field.bbox
+        assert (round(x0, 2), round(x1, 2), round(y1, 2)) in runs
+    writing_lines = sorted(f.bbox[3] for f in drawn_fields)
+    assert writing_lines == sorted(round(line[1].y, 2) for line in lines)
+    assert [f.label for f in fixture.fields].count(None) == 4  # continuation lines
+
+
 def test_rotated_fixture() -> None:
     with _open("flat_rotated") as doc:
         page = doc[0]

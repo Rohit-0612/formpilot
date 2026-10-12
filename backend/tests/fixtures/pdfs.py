@@ -17,6 +17,12 @@ Ground-truth conventions (the flat frontend and the labelling guide follow the s
 - Rectangles, table cells and checkbox squares: the drawn rectangle.
 - Comb rows: the union of the cells, max_chars = number of cells; a row is split where the gap
   between cells is wider than one cell or a printed separator sits between cells (decision D8).
+- Multi-line entries (e.g. an address on three writing lines): each writing line is its own box
+  and its own field. Grouping lines into one logical field is out of scope for Phase 2.
+- A human labeller draws line-type boxes "from the start to the end of the line, and from the line
+  up to a little above the height of the label's capital letters". With the x-span right, any
+  height from 0.6x to 2.4x the font size still matches the convention box at IoU >= 0.5
+  (tests/unit/test_geometry.py).
 - Expected labels have a trailing ":" removed. `label=None` means "not asserted".
 
 The fillable fixture is written as raw PDF objects rather than with PyMuPDF's widget API: PyMuPDF
@@ -450,6 +456,37 @@ def flat_comb() -> PdfFixture:
     )
 
 
+def flat_multiline() -> PdfFixture:
+    """Entries spanning several writing lines: one field per line (Phase 2 convention)."""
+    doc = _new_doc(A4)
+    page = doc[0]
+    fields: list[ExpectedField] = []
+
+    # Underscore runs: label on the first line, continuation lines aligned beneath it.
+    first = _labelled_leader(page, 0, 72, 120, "Permanent address:", "_" * 50)
+    fields.append(first)
+    x0, _, x1, _ = first.bbox
+    for baseline in (144.0, 168.0):
+        _text(page, x0, baseline, "_" * 50)
+        fields.append(ExpectedField(0, _line_box(x0, x1, baseline), FieldKind.TEXT, None))
+
+    # Drawn lines: label above, three writing lines.
+    _text(page, 72, 220, "Correspondence address")
+    for i, y in enumerate((244.0, 268.0, 292.0)):
+        _line(page, 72, y, 500, y)
+        label = "Correspondence address" if i == 0 else None
+        fields.append(ExpectedField(0, _line_box(72, 500, y), FieldKind.TEXT, label))
+
+    return PdfFixture(
+        "flat_multiline",
+        "Multi-line address entries (underscores and drawn lines): one field per writing line",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
 def flat_rotated() -> PdfFixture:
     """A page with /Rotate 90; ground truth is mapped with PyMuPDF's rotation matrix."""
     doc = _new_doc(A4)
@@ -740,6 +777,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_boxes,
         flat_checkboxes,
         flat_comb,
+        flat_multiline,
         flat_rotated,
         text_layer_garbled_kruti,
         text_layer_garbled_mojibake,
