@@ -127,6 +127,40 @@ human's decision).
     the 20 collected forms has a `/Rotate`, but the conversion handles 0/90/180/270 and is
     tested against PyMuPDF.
 
+## Step 2 — PyMuPDF at runtime, synthetic PDF fixtures
+
+- **PyMuPDF moved to the main dependencies (D5)**, same version 1.28.2; `uv.lock` only moves it
+  out of the dev group.
+- **Fixture generator** `backend/tests/fixtures/pdfs.py`: 17 fixtures built in memory, each with
+  its ground truth (source kind, text layer per page, expected fields). Byte-deterministic
+  (`tobytes(no_new_id=True, deflate=True)`), except the encrypted one (random salt).
+  `python -m tests.fixtures.pdfs --out DIR` writes them with JSON ground truth for inspection.
+  Covered: underscore runs (label left, attached, two per row, label above), dot and ellipsis
+  leaders, drawn lines and thin filled rectangles, empty rectangles, a framed notice (negative),
+  a table with an entry column, checkboxes, comb rows (contiguous, small spacing, split by a wide
+  gap, split by `DD / MM / YYYY` separators — D8), a rotated page, Kruti Dev-style and Latin-1
+  mojibake text, an image-only page, a sparse signature page without images (D1 amendment: `ok`),
+  a sparse page with a small logo (`ok`), two mixed documents, an AcroForm document, 51 pages,
+  and an encrypted file.
+- **Ground-truth box convention for line-type entries** (proposed here; it must match the
+  labelling guide in Step 5): the line's x-span, and vertically from the writing line up by one
+  row height = 1.2 × the label's font size. The writing line is the text baseline for
+  underscores and dots, and the stroke centre for drawn lines. Rectangles, table cells and
+  checkboxes use the drawn rectangle; comb rows use the union of their cells.
+- **Ellipsis leaders.** On the dev forms, runs of "…" (U+2026) are the most common leader: 158
+  runs vs 32 runs of plain dots (counted 2026-10-12). PyMuPDF's `insert_text` writes base-14
+  fonts with its own Latin encoding, which has no ellipsis (it came out as "·" with the wrong
+  width), so the fixture writes that line with a WinAnsi-encoded Helvetica resource; a test
+  checks that it extracts as U+2026.
+- **The AcroForm fixture is written as raw PDF objects.** PyMuPDF 1.28.2 cannot create a real
+  radio group (two widgets with the same name become two separate fields, both with on-state
+  `Yes`, and a radio with a value other than Off fails in `Widget._checker`). Raw objects give a
+  real parent field with `/Male` and `/Female` kids, a checkbox on-state `/Agreed`, a combo box
+  with export-value pairs, `/MaxLen`, and an offset CropBox — with every `/Rect` known exactly for
+  the Step 9 coordinate test. PyMuPDF reads it back as intended (tested).
+- Not verified locally: the Docker daemon was not running, so the slim image with PyMuPDF was
+  not built here; the CI compose-smoke job builds it from scratch.
+
 ## Known issues
 
 - **PyMuPDF SWIG `DeprecationWarning` on import (suppressed in pytest).** PyMuPDF 1.28.2's
