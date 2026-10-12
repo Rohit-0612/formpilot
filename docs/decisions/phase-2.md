@@ -173,6 +173,24 @@ human's decision).
 - Not verified locally: the Docker daemon was not running, so the slim image with PyMuPDF was
   not built here; the CI compose-smoke job builds it from scratch.
 
+## Step 3 — Source kind and per-page text layer (`app/frontends/detect.py`)
+
+- Implements D1 as amended: `none` needs both fewer than 50 non-space characters **and** image
+  coverage above 0.5 of the page ("most of the page area"); exactly half is not most. A blank
+  page with no image is `ok` (nothing to OCR).
+- Garbled-text heuristics and thresholds are ported unchanged from the Phase 0 classifier, but
+  applied per page instead of per document. The Phase 0 script keeps its own copy; it is a
+  one-off helper and is not imported by the app.
+- Image coverage is the exact union area of image boxes (placed and inline images), clipped to
+  the page, so overlapping images count once. PyMuPDF reports image boxes on the unrotated page;
+  coverage is computed against the unrotated page rect (tested with a rotated page).
+- `detect()` also returns per-page diagnostics (character count, coverage, reasons) — counts
+  only, never text — for trace events and the eval report.
+- **Dev forms (printed 2026-10-12, not asserted in CI):** #37 `garbled` (354 Latin-extended
+  letters); #38 and #42 `none` on every page (0 characters, 100 % image); all 27 pages of the
+  other 11 forms `ok`. #3's 43 images cover less than 30 % of any page. Consequence of D1: #37
+  is now source kind `scanned` (Phase 0 called it "flat"), because its only page is garbled.
+
 ## Known issues
 
 - **PyMuPDF SWIG `DeprecationWarning` on import (suppressed in pytest).** PyMuPDF 1.28.2's
@@ -182,6 +200,15 @@ human's decision).
   `filterwarnings` entry in `backend/pyproject.toml` cannot be scoped by module; it matches only
   these three exact messages as `DeprecationWarning`. Revisit when PyMuPDF ships bindings built
   with a SWIG version that sets `__module__`.
+
+## Known limitations
+
+- **Searchable scans.** A scanned page with an OCR text layer (invisible text over a full-page
+  image) has enough characters, so it is `ok`, but its entry boxes are part of the image, not
+  vector drawings; the Phase 2 flat frontend will find few or no fields there. None of the dev
+  forms is like this. To revisit with OCR in Phase 6.
+- **Undetected garbling.** Unicode Devanagari with wrongly extracted vowel signs (form #30) is
+  not detected by the heuristics and stays `ok`.
 
 ## In my own words
 
