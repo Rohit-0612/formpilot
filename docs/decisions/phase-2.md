@@ -227,10 +227,62 @@ human's decision).
   #32 16, #39 8, #41 20. #1 (9 pages) takes about 1 s.
 - **Seen on the overlays, left for Step 11** (questions for the labels, not clear bugs):
   cells with printed grey hints (`F I R S T N A M E`, `D D M M Y Y Y Y`) count as "text inside",
-  so comb rows split around them and hinted date rows are missed; rows of wide cells (about
-  40 pt, e.g. #25 date of birth and Aadhaar) are separate boxes, not combs; cells with their
-  label printed inside are not entries.
+  so comb rows split around them and hinted date rows are missed; rows of wide cells (26–27 pt,
+  wider than the 20 pt comb-cell limit, e.g. #25 date of birth and Aadhaar) are separate boxes,
+  not combs; cells with their label printed inside are not entries. (Correction 2026-10-16: the
+  cell width was first estimated as "about 40 pt" from overlay pixels; measured, it is 26–27 pt.)
+  The human's labelling rules for these cases are in the Step 5 section.
 - Overlays for visual checks go to `eval/overlays/` (gitignored, like the PDFs).
+
+## Step 5 — Label Studio tooling (`eval/labelling/`)
+
+- **Labelling rules (human, 2026-10-16)**, written into `eval/labelling/README.md` and the
+  target for Step 11 tuning. Top rule: *draw a box where a person would write, split into the
+  parts a person would write separately.* From it:
+  1. cells with printed grey hints are entry areas, not labels: a hinted name row is one comb
+     field; a hinted date row follows D8 (`DD` / `MM` / `YYYY` as separate fields);
+  2. rows of wide cells: one character per cell → one comb row; one group per cell (`DD`, `MM`)
+     → each cell its own field (D8). The dev forms only have the first case;
+  3. a cell with its label printed inside: the box covers only the empty writable part.
+- Proposed by Claude in the README, to be confirmed by the human: no box for areas where nothing
+  is handwritten (photo boxes); signature/thumb areas are `text` boxes; "for office use" fields
+  are boxed like any other.
+- **Partial labelling (human, 2026-10-16):** label files record `labelled_pages`; the converter
+  accepts partially labelled forms (a page counts once its annotation is submitted; skipped or
+  untouched pages are unlabelled; a form with no labelled page gets no file). The Step 6 eval
+  scores only labelled pages and lists the others.
+- **Labelling order:** #21 and #41 from scratch (no pre-annotations; anchoring check), then the
+  medium forms, then #1 and #3. Tasks are exported in this order.
+- **One task per page**, only `ok` pages (27 tasks on dev; #37, #38, #42 have none), rendered at
+  150 DPI; pre-annotations are the flat detector's boxes as Label Studio predictions (894 boxes;
+  none on #21 and #41). Box kinds: `text`, `comb` (a text field with `comb: true` in the label
+  file), `checkbox`. Boxes travel as percent of the page, so the conversion to points does not
+  depend on the DPI; an accepted pre-annotation converts back to the detector box exactly
+  (tested).
+- **Label file** (`eval/labelling/schema.py`, validated on read and write): form, PDF SHA-256,
+  `verified_by_human`, `prefilled_from` (detector commit, or null for from-scratch forms),
+  source, `labelled_pages`, every page's size, fields (id `p{page}_l{nnn}` in reading order,
+  bbox in points, kind, `comb`, `max_chars` (unused for now), `semantic_type` (Phase 3)).
+  The converter refuses: two submitted annotations on one page, rotated or unlabelled boxes,
+  boxes under 1 pt, a PDF whose SHA-256 differs, a JSON-MIN export, and overwriting label files
+  without `--overwrite`. Claude never runs it on a real export.
+- **Label Studio 1.23.2** (latest release, 2026-09-29), image `heartexlabs/label-studio:1.23.2`
+  (0.36 GB, not the "~1 GB" estimated in the plan). Not a project dependency; runs in Docker
+  with the page images served as local files.
+- **Verified end to end on 2026-10-16** with a throwaway container and synthetic fixture PDFs:
+  the labelling config is accepted, the local-files storage and the task import work, the page
+  images are served, predictions appear only on pre-filled forms, and the JSON export converts
+  to the expected label files. That export is kept as a test fixture
+  (`backend/tests/fixtures/labelstudio_export_1.23.2.json`; synthetic, no personal data) so
+  the converter is tested against the real export format. Not verified: the exact click path in
+  the web UI (the README follows the 1.23.2 docs); legacy API tokens are disabled by default in
+  1.23.2, which only matters for scripts, not for labelling in the browser.
+- **Tooling layout:** the code lives in `eval/` (SPEC §10) and runs with the backend's
+  environment (`PYTHONPATH=backend`, Makefile targets `label-tasks`, `label-convert`,
+  `label-examples`); ruff and pytest cover it (`make lint` and CI lint `../eval`; pytest has the
+  repo root on its path).
+- The README's example images are rendered from the dev forms into the gitignored
+  `eval/labelling/examples/` and not committed, like the forms and overlays.
 
 ## Known issues
 
