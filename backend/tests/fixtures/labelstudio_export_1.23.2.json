@@ -1,0 +1,500 @@
+[
+ {
+  "id": 1,
+  "annotations": [
+   {
+    "id": 1,
+    "completed_by": 1,
+    "result": [
+     {
+      "id": "h0",
+      "type": "rectanglelabels",
+      "from_name": "kind",
+      "to_name": "page",
+      "original_width": 1240,
+      "original_height": 1754,
+      "image_rotation": 0,
+      "value": {
+       "x": 23.5,
+       "y": 12.8,
+       "width": 30.0,
+       "height": 1.5,
+       "rotation": 0,
+       "rectanglelabels": [
+        "text"
+       ]
+      }
+     },
+     {
+      "id": "h1",
+      "type": "rectanglelabels",
+      "from_name": "kind",
+      "to_name": "page",
+      "original_width": 1240,
+      "original_height": 1754,
+      "image_rotation": 0,
+      "value": {
+       "x": 20.0,
+       "y": 27.6,
+       "width": 30.0,
+       "height": 1.5,
+       "rotation": 0,
+       "rectanglelabels": [
+        "text"
+       ]
+      }
+     }
+    ],
+    "was_cancelled": false,
+    "ground_truth": false,
+    "created_at": "2026-10-16T16:37:45.089397Z",
+    "updated_at": "2026-10-16T16:37:45.089406Z",
+    "draft_created_at": null,
+    "lead_time": null,
+    "prediction": {},
+    "result_count": 2,
+    "unique_id": "07c3c560-fca0-43a1-8e57-4b2b70bb6d99",
+    "import_id": null,
+    "last_action": null,
+    "bulk_created": false,
+    "task": 1,
+    "project": 1,
+    "updated_by": 1,
+    "parent_prediction": null,
+    "parent_annotation": null,
+    "last_created_by": null
+   }
+  ],
+  "drafts": [],
+  "predictions": [],
+  "data": {
+   "image": "/data/local-files/?d=formpilot/images/21_flat_underscores/page-01.png",
+   "form": "21_flat_underscores",
+   "page": 0,
+   "page_label": "#21 21_flat_underscores: page 1 of 1 (from scratch)",
+   "pdf_sha256": "3049ea5a34faae9f551b2bd4307314826c1cf793829a70413d97ef16b3451f54",
+   "page_width_pt": 595.0,
+   "page_height_pt": 842.0,
+   "prefilled_from": null
+  },
+  "meta": {},
+  "created_at": "2026-10-16T16:37:44.894136Z",
+  "updated_at": "2026-10-16T16:37:45.108307Z",
+  "allow_skip": true,
+  "inner_id": 1,
+  "total_annotations": 1,
+  "cancelled_annotations": 0,
+  "total_predictions": 0,
+  "comment_count": 0,
+  "unresolved_comment_count": 0,
+  "last_comment_updated_at": null,
+  "project": 1,
+  "updated_by": 1,
+  "comment_authors": []
+ },
+ {
+  "id": 2,
+  "annotations": [
+   {
+    "id": 2,
+    "completed_by": 1,
+    "result": [
+     {
+      "id": "p0_f000",
+      "type": "rectanglelabels",
+      "from_name": "kind",
+      "to_name": "page",
+      "original_width": 1240,
+      "original_height": 1755,
+      "image_rotation": 0,
+      "value": {
+       "x": 26.89075630252101,
+       "y": 13.776722090261282,
+       "width": 48.739495798319325,
+       "height": 2.137767220902613,
+       "rotation": 0,
+       "rectanglelabels": [
+        "text"
+       ]
+      }
+     },
+     {
+      "id": "p0_f001",
+      "type": "rectanglelabels",
+      "from_name": "kind",
+      "to_name": "page",
+      "original_width": 1240,
+      "original_height": 1755,
+      "image_rotation": 0,
+      "value": {
+       "x": 12.100840336134453,
+       "y": 21.140142517814727,
+       "width": 75.29411764705883,
+       "height": 7.1258907363420425,
+       "rotation": 0,
+       "rectanglelabels": [
+        "text"
+       ]
+      }
+     },
+     {
+      "id": "p0_f002",
+      "type": "rectanglelabels",
+      "from_name": "kind",
+      "to_name": "page",
+      "original_width": 1240,
+      "original_height": 1755,
+      "image_rotation": 0,
+      "value": {
+       "x": 33.61344537815126,
+       "y": 38.00475059382423,
+       "width": 42.016806722689076,
+       "height": 2.375296912114014,
+       "rotation": 0,
+       "rectanglelabels": [
+        "text"
+       ]
+      }
+     },
+     {
+      "id": "p0_f003",
+      "type": "rectanglelabels",
+      "from_name": "kind",
+      "to_name": "page",
+      "original_width": 1240,
+      "original_height": 1755,
+      "image_rotation": 0,
+      "value": {
+       "x": 33.61344537815126,
+       "y": 40.38004750593824,
+       "width": 42.016806722689076,
+       "height": 2.375296912114014,
+       "rotation": 0,
+       "rectanglelabels": [
+        "text"
+       ]
+      }
+     },
+     {
+      "id": "p0_f004",
+      "type": "rectanglelabels",
+      "from_name": "kind",
+      "to_name": "page",
+      "original_width": 1240,
+      "original_height": 1755,
+      "image_rotation": 0,
+      "value": {
+       "x": 33.61344537815126,
+       "y": 42.75534441805225,
+       "width": 42.016806722689076,
+       "height": 2.375296912114014,
+       "rotation": 0,
+       "rectanglelabels": [
+        "text"
+       ]
+      }
+     }
+    ],
+    "was_cancelled": false,
+    "ground_truth": false,
+    "created_at": "2026-10-16T16:37:45.192438Z",
+    "updated_at": "2026-10-16T16:37:45.192446Z",
+    "draft_created_at": null,
+    "lead_time": null,
+    "prediction": {
+     "id": 1,
+     "result": [
+      {
+       "id": "p0_f000",
+       "type": "rectanglelabels",
+       "from_name": "kind",
+       "to_name": "page",
+       "original_width": 1240,
+       "original_height": 1755,
+       "image_rotation": 0,
+       "value": {
+        "x": 26.89075630252101,
+        "y": 13.776722090261282,
+        "width": 48.739495798319325,
+        "height": 2.137767220902613,
+        "rotation": 0,
+        "rectanglelabels": [
+         "text"
+        ]
+       }
+      },
+      {
+       "id": "p0_f001",
+       "type": "rectanglelabels",
+       "from_name": "kind",
+       "to_name": "page",
+       "original_width": 1240,
+       "original_height": 1755,
+       "image_rotation": 0,
+       "value": {
+        "x": 12.100840336134453,
+        "y": 21.140142517814727,
+        "width": 75.29411764705883,
+        "height": 7.1258907363420425,
+        "rotation": 0,
+        "rectanglelabels": [
+         "text"
+        ]
+       }
+      },
+      {
+       "id": "p0_f002",
+       "type": "rectanglelabels",
+       "from_name": "kind",
+       "to_name": "page",
+       "original_width": 1240,
+       "original_height": 1755,
+       "image_rotation": 0,
+       "value": {
+        "x": 33.61344537815126,
+        "y": 38.00475059382423,
+        "width": 42.016806722689076,
+        "height": 2.375296912114014,
+        "rotation": 0,
+        "rectanglelabels": [
+         "text"
+        ]
+       }
+      },
+      {
+       "id": "p0_f003",
+       "type": "rectanglelabels",
+       "from_name": "kind",
+       "to_name": "page",
+       "original_width": 1240,
+       "original_height": 1755,
+       "image_rotation": 0,
+       "value": {
+        "x": 33.61344537815126,
+        "y": 40.38004750593824,
+        "width": 42.016806722689076,
+        "height": 2.375296912114014,
+        "rotation": 0,
+        "rectanglelabels": [
+         "text"
+        ]
+       }
+      },
+      {
+       "id": "p0_f004",
+       "type": "rectanglelabels",
+       "from_name": "kind",
+       "to_name": "page",
+       "original_width": 1240,
+       "original_height": 1755,
+       "image_rotation": 0,
+       "value": {
+        "x": 33.61344537815126,
+        "y": 42.75534441805225,
+        "width": 42.016806722689076,
+        "height": 2.375296912114014,
+        "rotation": 0,
+        "rectanglelabels": [
+         "text"
+        ]
+       }
+      }
+     ],
+     "model_version": "flat@f8762e1",
+     "created_ago": "0\u00a0minutes",
+     "score": null,
+     "cluster": null,
+     "neighbors": null,
+     "mislabeling": 0.0,
+     "created_at": "2026-10-16T16:37:44.898286Z",
+     "updated_at": "2026-10-16T16:37:44.898295Z",
+     "model": null,
+     "model_run": null,
+     "task": 2,
+     "project": 1
+    },
+    "result_count": 5,
+    "unique_id": "8849383c-c652-4b5a-a980-083e5c5b78bd",
+    "import_id": null,
+    "last_action": null,
+    "bulk_created": false,
+    "task": 2,
+    "project": 1,
+    "updated_by": 1,
+    "parent_prediction": null,
+    "parent_annotation": null,
+    "last_created_by": null
+   }
+  ],
+  "drafts": [],
+  "predictions": [
+   1
+  ],
+  "data": {
+   "image": "/data/local-files/?d=formpilot/images/02_flat_boxes/page-01.png",
+   "form": "02_flat_boxes",
+   "page": 0,
+   "page_label": "#2 02_flat_boxes: page 1 of 1",
+   "pdf_sha256": "5fba4e37ad88bacf8c4ef4d7f61b776453ea505009a8ebddb72e554c566770b1",
+   "page_width_pt": 595.0,
+   "page_height_pt": 842.0,
+   "prefilled_from": "flat@f8762e1"
+  },
+  "meta": {},
+  "created_at": "2026-10-16T16:37:44.894175Z",
+  "updated_at": "2026-10-16T16:37:45.211751Z",
+  "allow_skip": true,
+  "inner_id": 2,
+  "total_annotations": 1,
+  "cancelled_annotations": 0,
+  "total_predictions": 1,
+  "comment_count": 0,
+  "unresolved_comment_count": 0,
+  "last_comment_updated_at": null,
+  "project": 1,
+  "updated_by": 1,
+  "comment_authors": []
+ },
+ {
+  "id": 3,
+  "annotations": [
+   {
+    "id": 3,
+    "completed_by": 1,
+    "result": [],
+    "was_cancelled": true,
+    "ground_truth": false,
+    "created_at": "2026-10-16T16:37:45.279822Z",
+    "updated_at": "2026-10-16T16:37:45.279830Z",
+    "draft_created_at": null,
+    "lead_time": null,
+    "prediction": {
+     "id": 2,
+     "result": [
+      {
+       "id": "p0_f000",
+       "type": "rectanglelabels",
+       "from_name": "kind",
+       "to_name": "page",
+       "original_width": 1240,
+       "original_height": 1755,
+       "image_rotation": 0,
+       "value": {
+        "x": 17.517646340762866,
+        "y": 12.826603325415677,
+        "width": 28.033603700269172,
+        "height": 1.4251781472684086,
+        "rotation": 0,
+        "rectanglelabels": [
+         "text"
+        ]
+       }
+      },
+      {
+       "id": "p0_f001",
+       "type": "rectanglelabels",
+       "from_name": "kind",
+       "to_name": "page",
+       "original_width": 1240,
+       "original_height": 1755,
+       "image_rotation": 0,
+       "value": {
+        "x": 17.98487302635898,
+        "y": 16.389548693586697,
+        "width": 18.689067423844538,
+        "height": 1.4251781472684086,
+        "rotation": 0,
+        "rectanglelabels": [
+         "text"
+        ]
+       }
+      }
+     ],
+     "model_version": "flat@f8762e1",
+     "created_ago": "0\u00a0minutes",
+     "score": null,
+     "cluster": null,
+     "neighbors": null,
+     "mislabeling": 0.0,
+     "created_at": "2026-10-16T16:37:44.898318Z",
+     "updated_at": "2026-10-16T16:37:44.898322Z",
+     "model": null,
+     "model_run": null,
+     "task": 3,
+     "project": 1
+    },
+    "result_count": 0,
+    "unique_id": "9110837d-7985-46e8-8dcc-9be103b99c82",
+    "import_id": null,
+    "last_action": null,
+    "bulk_created": false,
+    "task": 3,
+    "project": 1,
+    "updated_by": 1,
+    "parent_prediction": null,
+    "parent_annotation": null,
+    "last_created_by": null
+   }
+  ],
+  "drafts": [],
+  "predictions": [
+   2
+  ],
+  "data": {
+   "image": "/data/local-files/?d=formpilot/images/01_mixed_mostly_flat/page-01.png",
+   "form": "01_mixed_mostly_flat",
+   "page": 0,
+   "page_label": "#1 01_mixed_mostly_flat: page 1 of 3",
+   "pdf_sha256": "cb23c35222e01e033b911702aa36d02b7eb48fcafa6e7856f69d3f687b9d3972",
+   "page_width_pt": 595.0,
+   "page_height_pt": 842.0,
+   "prefilled_from": "flat@f8762e1"
+  },
+  "meta": {},
+  "created_at": "2026-10-16T16:37:44.894203Z",
+  "updated_at": "2026-10-16T16:37:45.297658Z",
+  "allow_skip": true,
+  "inner_id": 3,
+  "total_annotations": 0,
+  "cancelled_annotations": 1,
+  "total_predictions": 1,
+  "comment_count": 0,
+  "unresolved_comment_count": 0,
+  "last_comment_updated_at": null,
+  "project": 1,
+  "updated_by": 1,
+  "comment_authors": []
+ },
+ {
+  "id": 4,
+  "annotations": [],
+  "drafts": [],
+  "predictions": [
+   3
+  ],
+  "data": {
+   "image": "/data/local-files/?d=formpilot/images/01_mixed_mostly_flat/page-02.png",
+   "form": "01_mixed_mostly_flat",
+   "page": 1,
+   "page_label": "#1 01_mixed_mostly_flat: page 2 of 3",
+   "pdf_sha256": "cb23c35222e01e033b911702aa36d02b7eb48fcafa6e7856f69d3f687b9d3972",
+   "page_width_pt": 595.0,
+   "page_height_pt": 842.0,
+   "prefilled_from": "flat@f8762e1"
+  },
+  "meta": {},
+  "created_at": "2026-10-16T16:37:44.894230Z",
+  "updated_at": "2026-10-16T16:37:44.894234Z",
+  "allow_skip": true,
+  "inner_id": 4,
+  "total_annotations": 0,
+  "cancelled_annotations": 0,
+  "total_predictions": 1,
+  "comment_count": 0,
+  "unresolved_comment_count": 0,
+  "last_comment_updated_at": null,
+  "project": 1,
+  "updated_by": null,
+  "comment_authors": []
+ }
+]

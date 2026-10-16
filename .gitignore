@@ -112,3 +112,6 @@ $RECYCLE.BIN/
 eval/**/*.pdf
 # Renders of those forms (e.g. detector overlays for visual checks) are never committed either.
 eval/overlays/
+# Label Studio work folder (page renders, tasks, its database) and README example renders.
+eval/labelling/work/
+eval/labelling/examples/

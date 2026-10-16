@@ -1,0 +1,10 @@
+<View>
+  <!-- FormPilot entry-box labelling (eval/labelling/README.md). One task = one page. -->
+  <Header value="$page_label" size="5"/>
+  <RectangleLabels name="kind" toName="page" canRotate="false" strokeWidth="1">
+    <Label value="text" background="#1f6feb" hotkey="1"/>
+    <Label value="comb" background="#c000c0" hotkey="2"/>
+    <Label value="checkbox" background="#1a7f37" hotkey="3"/>
+  </RectangleLabels>
+  <Image name="page" value="$image" zoom="true" zoomControl="true" rotateControl="false"/>
+</View>

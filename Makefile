@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -51,5 +51,22 @@ test-int: services
 
 ## Lint, format check and type check (backend and web)
 lint:
-	$(BACKEND) uv run ruff check . && uv run ruff format --check .
+	$(BACKEND) uv run ruff check . ../eval && uv run ruff format --check . ../eval
 	cd web && npm run --silent lint && npm run --silent typecheck
+
+# ---------- Labelling (eval/labelling/README.md) ----------
+# Run from the repo root: eval/ is importable from here, app/ through PYTHONPATH.
+EVAL_PY := PYTHONPATH=backend uv run --project backend python -m
+
+## Render the dev pages and write Label Studio tasks (with detector pre-annotations)
+label-tasks:
+	$(EVAL_PY) eval.labelling.tasks
+
+## Convert a Label Studio JSON export into eval/labels/<form>.json (run by the human labeller)
+label-convert:
+	@test -n "$(EXPORT)" || (echo "usage: make label-convert EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
+	$(EVAL_PY) eval.labelling.convert "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
+
+## Render the annotated example images used by eval/labelling/README.md
+label-examples:
+	$(EVAL_PY) eval.labelling.examples

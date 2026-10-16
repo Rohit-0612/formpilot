@@ -52,8 +52,8 @@ jobs:
       - name: Generate a throwaway JWT secret for this run
         run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      - run: uv run ruff check . ../eval
+      - run: uv run ruff format --check . ../eval
       - run: uv run pytest -m unit
       - run: uv run pytest -m integration
 
