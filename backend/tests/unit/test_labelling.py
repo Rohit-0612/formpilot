@@ -6,6 +6,7 @@ read or written.
 
 import copy
 import json
+import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -398,3 +399,29 @@ def test_invalid_label_files(overrides: dict[str, Any]) -> None:
 def test_invalid_label_fields(values: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         LabelField(id="p0_l000", page=0, **values)
+
+
+# --- README images ------------------------------------------------------------------------
+
+
+def test_committed_readme_images_match_the_fixtures(tmp_path: Path) -> None:
+    """eval/labelling/images/ must be re-rendered (make label-images) when a fixture changes."""
+    from eval.labelling import examples
+
+    written = examples.render_synthetic(tmp_path, dpi=144)
+
+    committed = examples.IMAGES_DIR
+    assert sorted(p.name for p in written) == sorted(p.name for p in committed.glob("*.png"))
+    for path in written:
+        assert path.read_bytes() == (committed / path.name).read_bytes(), path.name
+
+
+def test_readme_uses_only_committed_images() -> None:
+    from eval.labelling import examples
+
+    readme = (examples.REPO_ROOT / "eval" / "labelling" / "README.md").read_text()
+    referenced = set(re.findall(r"\]\((images/[^)]+\.png)\)", readme))
+    assert referenced == {
+        f"images/{name}.png" for _, ex in examples.SYNTHETIC for name in [ex.name]
+    }
+    assert "](examples/" not in readme  # dev-form crops are local only

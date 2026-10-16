@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples label-images
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -67,6 +67,10 @@ label-convert:
 	@test -n "$(EXPORT)" || (echo "usage: make label-convert EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
 	$(EVAL_PY) eval.labelling.convert "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
 
-## Render the annotated example images used by eval/labelling/README.md
+## Render the README example images from the synthetic fixtures (committed)
+label-images:
+	$(EVAL_PY) eval.labelling.examples --synthetic
+
+## Render the same examples on the dev forms (local only, never committed)
 label-examples:
 	$(EVAL_PY) eval.labelling.examples

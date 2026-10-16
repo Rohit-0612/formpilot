@@ -103,8 +103,12 @@ def _text(
     text: str,
     font: str = FONT,
     size: float = FONT_SIZE,
+    color: tuple[float, float, float] | None = None,
 ) -> None:
-    page.insert_text((x, baseline), text, fontname=font, fontsize=size)
+    # Black text is written without a colour, so fixtures from before the colour option keep
+    # their bytes (the recorded Label Studio export pins their SHA-256).
+    extra = {"color": color} if color is not None else {}
+    page.insert_text((x, baseline), text, fontname=font, fontsize=size, **extra)
 
 
 def _line_box(x0: float, x1: float, writing_line: float) -> Box:
@@ -487,6 +491,152 @@ def flat_multiline() -> PdfFixture:
     )
 
 
+GREY = (0.6, 0.6, 0.6)
+HINT_SIZE = 7.0
+
+
+def _hinted_row(page: pymupdf.Page, x: float, top: float, hints: str) -> list[Box]:
+    """A contiguous comb row; each character of `hints` is one cell ("." = no hint)."""
+    width, height = COMB_CELL
+    cells: list[Box] = []
+    for i, hint in enumerate(hints):
+        cell = (x + i * width, top, x + (i + 1) * width, top + height)
+        _rect(page, cell)
+        if hint != ".":
+            hx = cell[0] + (width - _width(hint, HINT_SIZE)) / 2
+            _text(page, hx, top + height - 5, hint, size=HINT_SIZE, color=GREY)
+        cells.append(cell)
+    return cells
+
+
+def _union(cells: list[Box]) -> Box:
+    return (cells[0][0], cells[0][1], cells[-1][2], cells[-1][3])
+
+
+def flat_hinted_comb() -> PdfFixture:
+    """Rule 1 (Step 5): grey hints inside cells are entry areas, one field per hinted part.
+
+    Parts are split halfway through the empty cells between two hints, an odd middle cell going
+    to the earlier part (proposed rule, docs/decisions/phase-2.md, Step 5).
+    """
+    doc = _new_doc(A4)
+    page = doc[0]
+    fields: list[ExpectedField] = []
+
+    _text(page, 72, 134, "Name")
+    name = _hinted_row(page, 160, 120, "..FIRSTNAME..MIDDLENAME..")  # 2 + 9 + 2 + 10 + 2
+    first, middle = name[:12], name[12:]  # the two blank cells between the hints are split 1 + 1
+    fields += [
+        ExpectedField(0, _union(first), FieldKind.TEXT, "Name", max_chars=len(first)),
+        ExpectedField(0, _union(middle), FieldKind.TEXT, None, max_chars=len(middle)),
+    ]
+
+    _text(page, 72, 174, "Surname")
+    surname = _hinted_row(page, 160, 160, "...LASTNAME...")
+    fields.append(ExpectedField(0, _union(surname), FieldKind.TEXT, "Surname", max_chars=14))
+
+    # A hinted date row follows D8: DD / MM / YYYY.
+    _text(page, 72, 214, "Date of birth")
+    date = _hinted_row(page, 160, 200, "DDMMYYYY")
+    for cells, label in ((date[:2], "Date of birth"), (date[2:4], None), (date[4:], None)):
+        fields.append(ExpectedField(0, _union(cells), FieldKind.TEXT, label, max_chars=len(cells)))
+
+    return PdfFixture(
+        "flat_hinted_comb",
+        "Rule 1: comb rows with grey hints; one field per hinted part; hinted date as D8",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
+WIDE_CELL = (26.0, 18.0)
+
+
+def flat_wide_cells() -> PdfFixture:
+    """Rule 2 (Step 5): wide cells, one character each = comb; one group each = one field each."""
+    doc = _new_doc(A4)
+    page = doc[0]
+    fields: list[ExpectedField] = []
+    width, height = WIDE_CELL
+
+    _text(page, 72, 134, "Date of birth")
+    cells = [(160 + i * width, 120.0, 160 + (i + 1) * width, 120 + height) for i in range(8)]
+    for cell in cells:
+        _rect(page, cell)
+    fields.append(ExpectedField(0, _union(cells), FieldKind.TEXT, "Date of birth", max_chars=8))
+
+    _text(page, 72, 174, "Date of joining")
+    x = 160.0
+    for group, cell_width, label in (
+        ("DD", 40.0, "Date of joining"),
+        ("MM", 40.0, None),
+        ("YYYY", 60.0, None),
+    ):
+        cell = (x, 160.0, x + cell_width, 160 + height)
+        _rect(page, cell)
+        hx = x + (cell_width - _width(group, HINT_SIZE)) / 2
+        _text(page, hx, 160 + height - 5, group, size=HINT_SIZE, color=GREY)
+        fields.append(ExpectedField(0, cell, FieldKind.TEXT, label))
+        x += cell_width
+
+    return PdfFixture(
+        "flat_wide_cells",
+        "Rule 2: wide one-character cells form a comb; group cells (DD | MM | YYYY) are fields",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
+SIGNATURE_BOX = (72.0, 110.0, 300.0, 180.0)
+NAME_CELL = (72.0, 200.0, 400.0, 220.0)
+PHOTO_BOX = (420.0, 110.0, 520.0, 220.0)
+THUMB_BOX = (420.0, 240.0, 520.0, 300.0)
+
+
+def flat_label_inside() -> PdfFixture:
+    """Rule 3 (Step 5): a label printed inside a cell; the box covers only the empty part.
+
+    Photo and thumb-impression boxes get no box: nothing is written there.
+    """
+    doc = _new_doc(A4)
+    page = doc[0]
+    ascender = pymupdf.Font("helv").ascender * FONT_SIZE
+
+    _rect(page, SIGNATURE_BOX)
+    caption = "(Signature of the applicant)"
+    caption_baseline = SIGNATURE_BOX[3] - 5
+    _text(
+        page, (SIGNATURE_BOX[0] + SIGNATURE_BOX[2] - _width(caption)) / 2, caption_baseline, caption
+    )
+    signature = (*SIGNATURE_BOX[:3], caption_baseline - ascender)
+
+    _rect(page, NAME_CELL)
+    _text(page, NAME_CELL[0] + 4, NAME_CELL[3] - 6, "Name:")
+    name = (NAME_CELL[0] + 4 + _width("Name:"), NAME_CELL[1], NAME_CELL[2], NAME_CELL[3])
+
+    _rect(page, PHOTO_BOX)
+    _text(page, PHOTO_BOX[0] + 8, PHOTO_BOX[1] + 50, "Affix recent")
+    _text(page, PHOTO_BOX[0] + 8, PHOTO_BOX[1] + 64, "photograph")
+    _rect(page, THUMB_BOX)
+    _text(page, THUMB_BOX[0] + 8, THUMB_BOX[3] - 8, "Thumb impression")
+
+    return PdfFixture(
+        "flat_label_inside",
+        "Rule 3: labels printed inside cells; photo and thumb-impression boxes get no box",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        (
+            ExpectedField(0, signature, FieldKind.TEXT, None),
+            ExpectedField(0, name, FieldKind.TEXT, None),
+        ),
+    )
+
+
 def flat_rotated() -> PdfFixture:
     """A page with /Rotate 90; ground truth is mapped with PyMuPDF's rotation matrix."""
     doc = _new_doc(A4)
@@ -778,6 +928,9 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_checkboxes,
         flat_comb,
         flat_multiline,
+        flat_hinted_comb,
+        flat_wide_cells,
+        flat_label_inside,
         flat_rotated,
         text_layer_garbled_kruti,
         text_layer_garbled_mojibake,

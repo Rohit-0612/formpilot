@@ -59,7 +59,23 @@ def _line(page: pymupdf.Page, x0: float, y: float, x1: float) -> None:
 # --- against the fixtures' ground truth ---------------------------------------------------
 
 
-@pytest.mark.parametrize("name", FLAT_FIXTURES)
+# Labelling rules 1-3 (Step 5): the detector learns them in Step 11. Strict xfail, so the test
+# fails loudly once a rule is implemented and the marker must be removed.
+STEP_11_RULES = {"flat_hinted_comb", "flat_wide_cells", "flat_label_inside"}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(
+            name,
+            marks=pytest.mark.xfail(strict=True, reason="labelling rule not implemented (Step 11)"),
+        )
+        if name in STEP_11_RULES
+        else name
+        for name in FLAT_FIXTURES
+    ],
+)
 def test_detected_fields_match_ground_truth(name: str) -> None:
     fixture = pdfs.get(name)
     fields = list(_run_fixture(name).fields)

@@ -24,7 +24,7 @@ write the case down for the decision record.
 and from the line up to a little above the height of the label's capital letters.
 
 ![Line entries: from the start to the end of the dots, from the dots up to a little above the
-capital letters](examples/line-entries.png)
+capital letters](images/line-entries.png)
 
 The match tolerates hand-drawn heights: with the start and end right, any height from 0.6× to
 2.4× the font size still matches (the detector uses 1.2×).
@@ -35,34 +35,46 @@ The match tolerates hand-drawn heights: with the start and end right, any height
 between cells is clearly larger than the normal spacing (more than one cell width), or where
 printed text or a separator sits between cells (for example `DD / MM / YYYY`).
 
+![Comb rows: one box per row; split at a wide gap and at printed separators](images/comb-rows.png)
+
 **Multi-line entries** (an address on two or three lines): one box per writing line. Do not
 group lines into one box; that is out of scope for Phase 2.
 
-**Rule 1 — cells with printed grey hints are entry areas, not labels.** A hinted name row
-(`F I R S T N A M E`) is one comb field. A hinted date row follows D8: `DD`, `MM` and `YYYY`
-are separate fields.
+![Multi-line entries: one box per writing line](images/multi-line.png)
 
-![Rule 1: each hinted name row is one comb box; the hinted date row is three boxes, DD / MM /
-YYYY](examples/rule1-hinted-cells.png)
+**Rule 1 — cells with printed grey hints are entry areas, not labels.** Draw one comb box per
+hinted part: in a row hinted `F I R S T N A M E … M I D D L E N A M E`, the first name and the
+middle name are separate boxes (people write them separately, and Phase 3 gives them different
+semantic types). A hinted date row follows D8: `DD`, `MM` and `YYYY` are separate boxes.
+When the form does not show where one part ends, split halfway through the empty cells between
+the two hints (an odd middle cell goes to the earlier part); empty cells before the first hint
+belong to the first part, those after the last hint to the last part.
+
+![Rule 1: one comb box per hinted part; the hinted date row is three boxes, DD / MM /
+YYYY](images/rule1-hinted-cells.png)
 
 **Rule 2 — rows of wide cells.** If each cell takes one character, the row is a comb (one box).
 If each cell takes a group (`DD` in one cell, `MM` in the next), each cell is its own field, as
-in D8. The dev forms only have the first case; the example below is #25's date of birth (eight
-wide cells, one digit each).
+in D8. (The dev forms only have the first case, e.g. #25's date of birth.)
 
-![Rule 2: eight wide cells, one character each, are one comb box](examples/rule2-wide-cells.png)
+![Rule 2: wide cells with one character each are one comb box; group cells are one box
+each](images/rule2-wide-cells.png)
 
 **Rule 3 — a cell with its label printed inside.** The box covers only the empty, writable part
 of the cell, not the label.
 
-![Rule 3: only the empty part above the printed caption](examples/rule3-label-inside.png)
+![Rule 3: only the empty part of a cell with a printed label; no box for photo and thumb
+impression areas](images/rule3-label-inside.png)
 
-**Do not box:** printed labels, headings, instructions, and areas where nothing is written by
-hand (e.g. a box to paste a photograph). **Do box:** signature and thumb-impression areas
-(as `text`), and "for office use" fields — a person writes there too.
+**Do not box:** printed labels, headings, instructions, and areas where nothing is written —
+a box to paste a photograph, a thumb-impression area. **Do box:** signature areas (as `text`),
+and "for office use" fields — a person writes there too (Phase 3 marks them so FormPilot never
+fills them).
 
-The example images are rendered from the dev forms and are not committed (like the forms
-themselves). Create them with `make label-examples` (from the repo root).
+In the images, green is a box you draw and red dashed is an area that gets no box. They are
+rendered from synthetic test forms (`make label-images`). The same examples on the dev forms
+can be rendered locally with `make label-examples` (into `eval/labelling/examples/`, never
+committed, like the forms themselves).
 
 ## Labelling order
 
@@ -164,4 +176,4 @@ delete `eval/labelling/work/` until the labels are converted and committed.
 | `tasks.py` | `make label-tasks`: renders the `ok` dev pages at 150 DPI, one task per page, with the detector's boxes as predictions (none for #21 and #41) |
 | `convert.py` | `make label-convert`: Label Studio JSON export → `eval/labels/<form>.json` |
 | `schema.py` | the label file format, validated on every read and write |
-| `examples.py` | `make label-examples`: the example images above |
+| `examples.py` | `make label-images`: the images above, from synthetic fixtures (committed in `images/`); `make label-examples`: the same on the dev forms (local only) |
