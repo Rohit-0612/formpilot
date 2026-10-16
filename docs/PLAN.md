@@ -121,6 +121,10 @@ Deliverables
 - `passes/understand.py`: rule matcher, then batched LLM per page with JSON-schema output,
   Pydantic validation, one retry, fallback `unknown`; review threshold from config.
 - Prompt files in `llm/prompts/` (versioned, never inline strings).
+- Office-use fields ("For office use", "For bank use only", …) are boxed in the labels like any
+  other field (Phase 2 labelling rules), but must be marked during understanding so FormPilot
+  never fills them (not asked, not matched, not rendered). How they are marked in the Form IR
+  is decided in Phase 3 (an IR change needs a decision record); covered by a test.
 - `eval/run_eval.py` with `--split`, `--mode rules|llm|hybrid`, `--provider`, `--record/--replay`;
   metrics: detection P/R, semantic accuracy; JSON + Markdown report.
 - `make eval` target.

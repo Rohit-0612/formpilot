@@ -244,9 +244,23 @@ human's decision).
   2. rows of wide cells: one character per cell → one comb row; one group per cell (`DD`, `MM`)
      → each cell its own field (D8). The dev forms only have the first case;
   3. a cell with its label printed inside: the box covers only the empty writable part.
-- Proposed by Claude in the README, to be confirmed by the human: no box for areas where nothing
-  is handwritten (photo boxes); signature/thumb areas are `text` boxes; "for office use" fields
-  are boxed like any other.
+- **Rule 1 refined (human, 2026-10-16):** one comb box per hinted part (e.g. FIRST NAME and
+  MIDDLE NAME are separate boxes), because people write them separately and Phase 3 gives them
+  different semantic types. The detector change belongs to Step 11. Where the form does not show
+  where one part ends (form #1: uniform cells, hints placed differently in every row), Claude
+  proposed: split halfway through the empty cells between two hints, an odd middle cell going to
+  the earlier part — **awaiting the human's confirmation**; the README and the fixture use it.
+- **No-box areas (human, 2026-10-16):** photo boxes and thumb-impression areas get no box
+  (nothing is written there); signature areas are `text` boxes; "for office use" fields are boxed
+  like any other field, and Phase 3 must mark them so FormPilot never fills them (added to the
+  Phase 3 deliverables in PLAN.md).
+- **README images (human, 2026-10-16):** no crops of dev forms are committed. The README images
+  are rendered from three new synthetic fixtures (`flat_hinted_comb`, `flat_wide_cells`,
+  `flat_label_inside`, one per rule) plus existing ones, committed in `eval/labelling/images/`
+  (`make label-images`); a test checks they match the fixtures byte for byte. The dev-form
+  crops stay local (`make label-examples`, gitignored). The three rule fixtures carry the
+  rules' ground truth; the flat detector does not follow them yet, so their ground-truth test is
+  a strict xfail until Step 11.
 - **Partial labelling (human, 2026-10-16):** label files record `labelled_pages`; the converter
   accepts partially labelled forms (a page counts once its annotation is submitted; skipped or
   untouched pages are unlabelled; a form with no labelled page gets no file). The Step 6 eval
@@ -281,8 +295,9 @@ human's decision).
   environment (`PYTHONPATH=backend`, Makefile targets `label-tasks`, `label-convert`,
   `label-examples`); ruff and pytest cover it (`make lint` and CI lint `../eval`; pytest has the
   repo root on its path).
-- The README's example images are rendered from the dev forms into the gitignored
-  `eval/labelling/examples/` and not committed, like the forms and overlays.
+- Fixture text in black is written without a colour operator, so adding the grey-hint option
+  did not change the bytes of existing fixtures (the recorded Label Studio export pins their
+  SHA-256; the converter rejected the export when they changed, as it should).
 
 ## Known issues
 
