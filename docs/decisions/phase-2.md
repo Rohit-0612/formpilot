@@ -299,6 +299,29 @@ human's decision).
   did not change the bytes of existing fixtures (the recorded Label Studio export pins their
   SHA-256; the converter rejected the export when they changed, as it should).
 
+## Step 6 — Detection eval (`eval/detection.py`, `make eval-detect`)
+
+- **What it computes** (before the full Phase 3 harness): for every dev PDF with a label file,
+  run `detect` + `flat.run` (pure functions, no database or worker) and, per labelled page whose
+  text layer is `ok`, match predicted and labelled boxes one-to-one, greedily by descending IoU,
+  keeping pairs with IoU ≥ 0.5 on the same page (SPEC §10; ties broken by index, so results are
+  deterministic). TP = matched pairs, FP = unmatched predictions, FN = unmatched labels;
+  precision and recall are micro-averaged over pages and forms. No scipy: greedy matching, not
+  an optimal assignment (with one-to-one IoU ≥ 0.5 the two rarely differ).
+- **Also reported:** per form; recall by labelled kind and precision by predicted kind (text,
+  comb, checkbox); predicted → labelled kind on matched pairs; the same counts at IoU ≥ 0.3 as a
+  diagnostic only; the **anchoring check** — from-scratch forms (`prefilled_from: null`, i.e.
+  #21 and #41) against pre-filled forms; and what was not scored: labelled pages that need OCR,
+  unlabelled `ok` pages, forms without a label file, forms with no `ok` page (#37, #38, #42).
+  Every report ends with the dataset notes (the two test-split gaps).
+- **Safeguards:** only `--split dev` is accepted (CLAUDE.md §6); a label file whose PDF SHA-256
+  or page count differs from the PDF, or a label file without a PDF, stops the run.
+- **Output:** `eval/reports/phase2-detection-dev-<date>-<commit>.{json,md}`. No report is
+  committed until there are label files; the first real report comes in Step 11. A smoke run on
+  the dev split without labels (2026-10-16, written outside the repo) listed all 14 forms as
+  not scored, as expected.
+- The matching functions are plain and importable, for reuse by Phase 3's `run_eval.py`.
+
 ## Known issues
 
 - **PyMuPDF SWIG `DeprecationWarning` on import (suppressed in pytest).** PyMuPDF 1.28.2's

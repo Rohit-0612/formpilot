@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples label-images
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples label-images eval-detect
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -74,3 +74,7 @@ label-images:
 ## Render the same examples on the dev forms (local only, never committed)
 label-examples:
 	$(EVAL_PY) eval.labelling.examples
+
+## Detection eval on the dev split: detector boxes vs eval/labels -> eval/reports/ (Phase 2)
+eval-detect:
+	$(EVAL_PY) eval.detection --split dev
