@@ -336,13 +336,20 @@ human's decision).
   ids and logs them (ids and a count only). A job that waited in the queue longer than the
   timeout is not stale once it has started: `started_at` decides, `created_at` only for rows
   from before `0002`.
-- **Worker startup** calls it once with `JOB_TIMEOUT_SECONDS`. **Detail not in the plan:** it is
-  best effort — an error is logged (`stale_jobs_check_failed`, exception type only) and the
-  worker still starts. Reason: `make up` starts the worker before it runs the migrations, so on
-  a fresh database the `jobs` table (or the `started_at` column) does not exist yet; a worker
-  that refused to start would fail `up --wait` and the CI compose-smoke job. Alternative
-  considered: run the migrations before the worker starts (a compose / Makefile change), left
-  for later if the best-effort reaper is not enough.
+- **Worker startup** calls it once with `JOB_TIMEOUT_SECONDS`.
+- **Migrations run before api and worker (human, 2026-10-17).** First version: `make up` started
+  the stack and only then ran `alembic upgrade head` in the api container, so on a fresh
+  database the worker started before the `jobs` table existed; the reaper was made best effort
+  so the worker would not crash. The human chose to fix the order instead: compose has a
+  one-shot `migrate` service (same image, `alembic upgrade head`, after Postgres is healthy),
+  and `api` and `worker` depend on it with `condition: service_completed_successfully`.
+  `make up` is now only `docker compose up -d --build --wait`; `make migrate` stays for
+  applying a new migration to a running stack. The reaper keeps the log-and-continue fallback
+  as a safety net, logged at **ERROR** (`stale_jobs_check_failed`, exception type and stack
+  only), because after this change it can only fail on a real problem (database down, schema
+  behind). Verified 2026-10-17 on a throwaway compose project with a fresh database: `up
+  --wait` exits 0, `migrate` exits 0 (`0002 (head)`), the worker starts without the error,
+  health is ok, a ping job reaches `done`.
 - **Storage:** `app.storage.make_storage(settings)` → `LocalStorage(settings.storage_root)`;
   created once in the API lifespan (`app.state.storage`, dependency `get_storage`) and in the
   worker (`ctx["storage"]`). Nothing uses it yet; uploads (Step 8) will.

@@ -1,5 +1,6 @@
 import asyncio
 import io
+import json
 import uuid
 
 import pytest
@@ -135,17 +136,22 @@ async def test_startup_fails_stale_jobs_with_the_job_timeout_and_provides_storag
 async def test_startup_survives_a_failing_stale_job_check(
     settings: Settings, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """On a fresh database the worker starts before the migrations (`make up`)."""
+    """A safety net: the check fails only on a real problem, which is logged as an error."""
 
-    async def missing_table(self: JobStore, timeout_seconds: int) -> list[uuid.UUID]:
-        raise RuntimeError('relation "jobs" does not exist')
+    message = f"could not reach the database for {LEAKY_EMAIL}"
 
-    monkeypatch.setattr(JobStore, "fail_stale", missing_table)
+    async def failing_check(self: JobStore, timeout_seconds: int) -> list[uuid.UUID]:
+        raise RuntimeError(message)  # the log's stack shows this source line, not the message
+
+    monkeypatch.setattr(JobStore, "fail_stale", failing_check)
     ctx: dict = {"settings": settings}
 
     await startup(ctx)  # does not raise
     await shutdown(ctx)
 
-    output = capsys.readouterr().out
-    assert '"event": "stale_jobs_check_failed"' in output
-    assert '"event": "worker_started"' in output
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    failure = next(e for e in events if e["event"] == "stale_jobs_check_failed")
+    assert failure["level"] == "error"
+    assert failure["exc_type"] == "RuntimeError"
+    assert LEAKY_EMAIL not in json.dumps(failure)  # exception messages are never logged
+    assert any(e["event"] == "worker_started" for e in events)

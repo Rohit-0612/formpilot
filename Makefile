@@ -11,16 +11,16 @@ BACKEND := cd backend &&
 	@sed -i.bak "s/^JWT_SECRET=$$/JWT_SECRET=$$(openssl rand -hex 32)/" .env && rm -f .env.bak
 	@echo "Created .env with a generated JWT_SECRET"
 
-## Build and start everything, wait until healthy, then apply migrations
+## Build and start everything and wait until healthy (the one-shot migrate service applies the
+## migrations before api and worker start)
 up: .env
 	$(COMPOSE) up -d --build --wait
-	$(MAKE) migrate
 
 ## Stop all containers (data volumes are kept)
 down:
 	$(COMPOSE) down
 
-## Apply Alembic migrations inside the api container
+## Apply Alembic migrations inside the api container (e.g. a new migration on a running stack)
 migrate:
 	$(COMPOSE) exec -T api alembic upgrade head
 

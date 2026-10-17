@@ -74,15 +74,16 @@ async def startup(ctx: dict[str, Any]) -> None:
 
 
 async def _fail_stale_jobs(store: JobStore, timeout_seconds: int) -> None:
-    """Once per worker start (decision D6). Best effort: a failure is logged, not raised.
+    """Once per worker start (decision D6). A failure is logged at ERROR, not raised.
 
-    `make up` starts the worker before it applies the migrations, so on a fresh database the
-    jobs table may not exist yet; a worker that refused to start would fail `up --wait`.
+    Compose runs the migrations before the worker starts, so a failure here means a real
+    problem (database down, schema behind). It is a safety net: the worker still starts, queued
+    jobs can run, and the check runs again on the next start.
     """
     try:
         await store.fail_stale(timeout_seconds)
     except Exception:
-        log.exception("stale_jobs_check_failed")
+        log.exception("stale_jobs_check_failed")  # structlog: level "error"
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
