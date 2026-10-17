@@ -1,7 +1,7 @@
 # Phase 2 — Form IR and flat-PDF frontend: decision record
 
-> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–7 are
-> done; **next is Step 8**. A fresh session continues from the "Remaining plan" section below.
+> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–8 are
+> done; **next is Step 9**. A fresh session continues from the "Remaining plan" section below.
 > Decisions are recorded here as they are taken; the close-out sections are filled in at the end
 > of the phase.
 
@@ -356,6 +356,75 @@ human's decision).
 - **Limitation:** only `analyzing` documents are moved to `failed`. A stale `render` job (Phase
   5) would leave its document `rendering`; to revisit when the render job exists.
 
+## Step 8 — Upload, analyze job, read endpoints (D3, D4, D7)
+
+Plan approved by the human on 2026-10-18, with the four proposals below and three additions.
+
+- **Endpoints** (D7): `POST /documents` (multipart `file`) → 202 `{document_id, job_id}`;
+  `GET /documents/{id}` (with the latest job and a readable `error_message`);
+  `GET /documents/{id}/ir`; `GET /documents/{id}/pages/{n}.png` (0-based); `GET /jobs/{id}`.
+  Another user's document or job, and a job without a document (ping), answer 404.
+- **Size cap while reading** (approved proposal): Starlette parses the whole multipart body
+  before a route sees the file, so `app/api/uploads.py` reads the body itself: a declared
+  `Content-Length` over `MAX_UPLOAD_MB` + 64 KiB framing is refused before reading; the received
+  bytes are counted and reading stops past that cap (catches a missing or false length); the file
+  part is checked against the exact limit. The multipart schema is declared in the OpenAPI
+  document by hand (`openapi_extra`), so the generated web types still have it.
+- **New dependency** `python-multipart` 0.0.32 (D4, approved): Starlette's form parser needs it.
+- **Job queue connected on first use** (approved proposal): arq pings Redis with retries when a
+  pool is created, so the API creates it on the first upload (one pool, behind a lock) instead
+  of at startup; an unreachable Redis is a 503 and nothing is stored. Closed at shutdown.
+- **Upload service** (`app/services/documents.py`): file name reduced to its base name without
+  control characters, at most 255 characters (display only, never logged); original stored
+  first, then the row committed (a failed commit deletes the file); an enqueue failure marks the
+  document `failed` and answers 503.
+- **Analyze job** (`app/services/analysis.py`, task `analyze`): document `uploaded → analyzing`
+  (conditional update), PDF opened in a thread so the event loop and arq's health check stay
+  responsive. **PyMuPDF is not thread-safe**, also across documents, so a process-wide lock
+  allows one PDF at a time per worker. Errors: `EncryptedPdf` (needs a password),
+  `UnreadablePdf`, `TooManyPages` (more than `MAX_PAGES`); their class names are the job error
+  codes (D3), so they keep names without the usual `Error` suffix (scoped `noqa`, and a test
+  pins the names). **Scanned documents go through `flat.run` too** (approved proposal): fields on
+  usable pages, a "needs OCR" trace event for the others. Fillable documents get an IR without
+  fields and a trace event until Step 9. Page PNGs (`PAGE_IMAGE_DPI`, default 144; the displayed
+  page, so IR boxes scale by dpi / 72) go to `documents/<id>/pages/<n>.png`; then IR version 1
+  and the document (`ready`, source kind, page count) are written in one transaction. Any
+  failure, cancellation included, moves the document `analyzing → failed`.
+- **Readable job errors** for `GET /documents/{id}` and `GET /jobs/{id}`: `TooManyPages`,
+  `EncryptedPdf`, `UnreadablePdf`, `Stale`, `Cancelled`, `EnqueueFailed:*` have their own
+  messages; any other error is "The analysis failed." (internal errors are not explained).
+- **Masking** (proposal approved, plus the human's additions 1 and 3): `app/services/masking.py`
+  and the response type `MaskedFormIR` (`app/api/schemas/ir.py`), which masks whenever it is
+  built, from a model, a dict or stored JSON. Format `XXXX` + last 4 characters (separators
+  removed) for values of 8+ characters, else `XXXX`; fixed prefix, so the length is not
+  revealed; idempotent. **Defence in depth (addition 1):** a value that looks like a D2
+  identifier is masked whatever the field's semantic type — Aadhaar `[2-9]` + 11 digits (no
+  checksum required), PAN, Indian passport (`A1234567`), voter ID (`ABC1234567`), bank account
+  9–18 digits — matched on the whole value with spaces and hyphens removed. **One exception,
+  Claude's detail for the human to confirm:** a 10-digit mobile number matches the bank account
+  pattern, so in a field understood as `phone_mobile` / `phone_alternate`, a value in the phone
+  format (SPEC §6.6) is not masked for that reason alone (still masked if it matches another
+  pattern, e.g. an Aadhaar). In any other field a phone-shaped value is masked. Not covered: an
+  identifier inside a longer free text (e.g. in an address) — only whole values are matched.
+  **Rule (addition 3):** every Form IR returned to the client is masked — written into SPEC §8;
+  enforced by a test that walks the OpenAPI document and fails if any response, at any depth,
+  contains a plain `FormIR` (with a test that the check catches a nested one). The check uses
+  the OpenAPI document because FastAPI 0.141 keeps included routers lazily, so `app.routes`
+  does not list the API routes.
+- **Page images** (addition 2): `Cache-Control: private, no-store`.
+- **Config:** `MAX_UPLOAD_MB=20`, `MAX_PAGES=50`, `PAGE_IMAGE_DPI=144` (`.env.example`).
+- Tests: unit — masking (formats, every sensitive type, defence-in-depth values in other
+  fields, phone exception, stored IR untouched, the OpenAPI rule), upload reading (exact limit,
+  limit + 1, declared length over the cap refused before reading, false or missing length caught
+  while reading, malformed bodies), magic bytes, file names, error messages, `analyze_pdf` on the
+  fixtures (flat, scanned, fillable, 51 pages, encrypted, unreadable), page image size on a
+  rotated page, the lazy queue (no connection at startup, one pool for concurrent first uses,
+  503). Integration — upload → real worker → IR v1, PNG and job read back; 415 and 413 store
+  nothing; 422 without a file; 51 pages and encrypted fail with readable messages; enqueue
+  failure → document `failed` + 503; other user 404 and anonymous 401 on all four GET
+  endpoints; masked IR response with the database unchanged; no file name or value in the logs.
+  The test worker helper moved to `tests/integration/workers.py`.
+
 ## Labelling subset and no-box areas (human, 2026-10-17)
 
 - **Subset scored by the detection eval** (1-based pages): forms #2, #6, #21, #23, #25, #30,
@@ -457,8 +526,8 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 
 ### Where things stand
 
-- Branch `phase-2-flat-frontend`; Steps 0–7 committed and pushed (Step 7: see its section
-  above). CI green on every pushed head up to Step 6 (run 38937110232 on `63ba5e2`).
+- Branch `phase-2-flat-frontend`; Steps 0–8 committed and pushed (Steps 7 and 8: see their
+  sections above). CI green on every pushed head up to Step 6 (run 38937110232 on `63ba5e2`).
 - Built: Form IR (`app/ir/`), `detect.py`, `flat.py`, synthetic fixtures
   (`backend/tests/fixtures/pdfs.py`), Label Studio tooling (`eval/labelling/`), detection eval
   (`eval/detection.py`, `make eval-detect`).
@@ -584,9 +653,8 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 
 - Human: labelling (above); Phase 1 teach-back and the "In my own words" sections of
   `phase-0.md`, `phase-1.md` and this file.
-- Step 8: the masking format for sensitive values in `GET /documents/{id}/ir` is not decided
-  yet (Phase 2 IRs have no values, but the path is built and tested now) — propose it in the
-  Step 8 plan.
+- Step 8 (done): masking decided and built (Step 8 section). Open for the human: the phone
+  exception in the defence-in-depth masking.
 - The recorded Label Studio export (`backend/tests/fixtures/labelstudio_export_1.23.2.json`)
   pins the SHA-256 of fixtures `flat_underscores`, `flat_boxes` and `mixed_mostly_flat`;
   changing those fixtures means re-recording the export with a throwaway Label Studio.

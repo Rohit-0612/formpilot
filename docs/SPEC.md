@@ -330,6 +330,24 @@ Files (uploads, rendered outputs) live in a `Storage` interface; v1 uses a local
 
 Upload limits (config): 20 MB, 50 pages, PDF magic-bytes check (images in stretch phase).
 
+**Upload step** (decision D3, `docs/decisions/phase-2.md`). The API never opens a PDF (§11). It
+checks the size while reading the body (`MAX_UPLOAD_MB`; a declared `Content-Length` over the
+cap is refused before reading, and reading stops once the body passes the cap) → `413`, and the
+magic bytes (`%PDF-` within the first 1024 bytes) → `415`; then it stores the original, inserts
+the document and enqueues the `analyze` job → `202`. The worker enforces the page limit
+(`MAX_PAGES`; document `failed`, job error `TooManyPages`), runs detection and the frontend,
+renders the page images (`PAGE_IMAGE_DPI`) and stores IR version 1. Job errors are shown by
+`GET /documents/{id}` as readable messages. Another user's document or job answers `404`.
+Page images are sent with `Cache-Control: private, no-store`.
+
+**Masking rule.** Every Form IR returned to the client is masked, in any endpoint and at any
+nesting depth; the stored IR keeps the real values. A field value is masked when its semantic
+type is sensitive (§5) or, as defence in depth, when the value itself looks like one of those
+identifiers (Aadhaar, PAN, passport, voter ID, bank account number), whatever the field's type.
+Mask: `XXXX` + the last 4 characters for values of 8 or more characters, else `XXXX`. Enforced by
+the response type `MaskedFormIR` (masks on construction) and a test over the OpenAPI document
+that no response contains a plain `FormIR`.
+
 ## 9. Tech stack
 
 | Layer | Choice | Note |
