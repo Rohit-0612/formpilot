@@ -218,9 +218,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     configure_logging("INFO", json=False)
 
+    # zsh passes `make label-convert EXPORT=~/...` through with a literal "~".
+    export_path: Path = args.export.expanduser()
     try:
-        export = json.loads(args.export.read_text(encoding="utf-8"))
-        files = convert_export(export, args.dataset, f"{SOURCE_TOOL}, {args.export.name}")
+        export = json.loads(export_path.read_text(encoding="utf-8"))
+        files = convert_export(export, args.dataset, f"{SOURCE_TOOL}, {export_path.name}")
         written = write_label_files(files, args.labels, args.overwrite)
     except ConversionError as exc:
         log.error("conversion_failed", reason=str(exc))

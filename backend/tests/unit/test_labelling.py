@@ -345,6 +345,24 @@ def test_real_label_studio_export(tmp_path: Path) -> None:
     assert json.loads(REAL_EXPORT.read_text())[0]["data"]["prefilled_from"] is None
 
 
+def test_export_path_with_a_tilde_is_expanded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """zsh does not expand `~` in `make label-convert EXPORT=~/...`; the converter does."""
+    dataset = _dataset(tmp_path / "dataset", {f: s for f, s in REAL_EXPORT_DATASET.items()})
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "export.json").write_bytes(REAL_EXPORT.read_bytes())
+    monkeypatch.setenv("HOME", str(home))
+
+    code = convert.main(
+        ["~/export.json", "--dataset", str(dataset), "--labels", str(tmp_path / "labels")]
+    )
+
+    assert code == 0
+    assert len(list((tmp_path / "labels").glob("*.json"))) == 2
+
+
 # --- schema -------------------------------------------------------------------------------
 
 
