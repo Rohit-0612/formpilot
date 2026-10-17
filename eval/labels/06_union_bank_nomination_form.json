@@ -1,0 +1,416 @@
+{
+  "schema_version": 1,
+  "form": "06_union_bank_nomination_form",
+  "pdf_sha256": "70dadce5706fb140d67e71a1b7080a9bed299e4f140abcd25f142137f5fbe31a",
+  "verified_by_human": true,
+  "prefilled_from": "flat@5fe80d0",
+  "source": "label-studio 1.23.2, formpilot-dev-boxes-20261018-011720.json",
+  "labelled_pages": [
+    0,
+    1
+  ],
+  "pages": [
+    {
+      "width": 612.0,
+      "height": 792.0
+    },
+    {
+      "width": 612.0,
+      "height": 792.0
+    }
+  ],
+  "fields": [
+    {
+      "id": "p0_l000",
+      "page": 0,
+      "bbox": [
+        105.21469552649931,
+        97.19833777209935,
+        215.43961464949857,
+        112.22900856159924
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l001",
+      "page": 0,
+      "bbox": [
+        113.66000366210942,
+        214.05198669433582,
+        285.5493798224712,
+        227.2999877929686
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l002",
+      "page": 0,
+      "bbox": [
+        85.70399475097656,
+        350.45001220703125,
+        174.8599853515625,
+        380.4500122070313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l003",
+      "page": 0,
+      "bbox": [
+        174.8599853515625,
+        350.45001220703125,
+        238.489990234375,
+        380.4500122070313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l004",
+      "page": 0,
+      "bbox": [
+        238.489990234375,
+        350.45001220703125,
+        332.8299865722656,
+        380.4500122070313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l005",
+      "page": 0,
+      "bbox": [
+        332.8299865722656,
+        350.45001220703125,
+        440.59002685546875,
+        380.4500122070313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l006",
+      "page": 0,
+      "bbox": [
+        440.59002685546875,
+        350.45001220703125,
+        548.3800048828125,
+        380.4500122070313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l007",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        424.96997070312494,
+        549.3399658203125,
+        454.8699951171875
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l008",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        454.8699951171875,
+        549.3399658203125,
+        484.75000000000006
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l009",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        484.75000000000006,
+        549.3399658203125,
+        514.6300048828126
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l010",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        514.6300048828124,
+        549.3399658203125,
+        544.5100097656249
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l011",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        544.510009765625,
+        549.3399658203125,
+        574.3900146484375
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l012",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        574.3900146484375,
+        549.3399658203125,
+        609.2200317382812
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l013",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        609.2200317382812,
+        549.3399658203125,
+        639.0999755859375
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l014",
+      "page": 0,
+      "bbox": [
+        319.72998046875,
+        639.0999755859375,
+        549.3399658203125,
+        667.4200439453125
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l000",
+      "page": 1,
+      "bbox": [
+        319.72998046875,
+        75.84002685546875,
+        549.7000732421875,
+        105.739990234375
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l001",
+      "page": 1,
+      "bbox": [
+        319.72998046875,
+        105.739990234375,
+        549.7000732421875,
+        135.6199951171875
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l002",
+      "page": 1,
+      "bbox": [
+        319.72998046875,
+        135.6199951171875,
+        549.7000732421875,
+        165.5
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l003",
+      "page": 1,
+      "bbox": [
+        319.72998046875,
+        165.5,
+        549.7000732421875,
+        224.780029296875
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l004",
+      "page": 1,
+      "bbox": [
+        84.26400756835938,
+        313.84997558593756,
+        220.73001098632812,
+        381.4099731445313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l005",
+      "page": 1,
+      "bbox": [
+        220.73001098632812,
+        313.84997558593756,
+        421.75,
+        381.4099731445313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l006",
+      "page": 1,
+      "bbox": [
+        421.75,
+        313.84997558593756,
+        547.7799682617188,
+        381.4099731445313
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l007",
+      "page": 1,
+      "bbox": [
+        108.74000549316406,
+        470.469970703125,
+        220.73001098632812,
+        520.8699951171875
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l008",
+      "page": 1,
+      "bbox": [
+        220.73001098632812,
+        470.469970703125,
+        421.75,
+        520.8699951171875
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l009",
+      "page": 1,
+      "bbox": [
+        421.75,
+        470.469970703125,
+        544.7799682617188,
+        520.8699951171875
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l010",
+      "page": 1,
+      "bbox": [
+        108.74000549316406,
+        520.8699951171875,
+        220.73001098632812,
+        571.3900146484375
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l011",
+      "page": 1,
+      "bbox": [
+        220.73001098632812,
+        520.8699951171875,
+        421.75,
+        571.3900146484375
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l012",
+      "page": 1,
+      "bbox": [
+        421.75,
+        520.8699951171875,
+        544.7799682617188,
+        571.3900146484375
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    }
+  ]
+}

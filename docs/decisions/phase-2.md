@@ -369,6 +369,50 @@ human's decision).
   `text` label; photograph and thumb-impression areas get no box. Written into
   `eval/labelling/README.md` (table under "Do not box").
 
+### One label edit made by Claude Code (human request, 2026-10-18)
+
+The only label change not made by the human by hand. CLAUDE.md §6 says Claude never creates
+or edits labels; the human made an exception for this one edit, asked for it explicitly and checks
+it visually.
+
+- **What:** form #25, page 1 (Label Studio task 10, annotation 10). The date-of-birth row (8
+  cells, about 27 pt wide, one character each, no hints or separators) and the Aadhaar row (12
+  cells) were labelled as one `text` box per cell. Labelling rule 2 (one character per cell →
+  one comb box) makes each row one `comb` box. Replaced: the 8 boxes later converted as
+  `p0_l005`–`p0_l012` by one `comb` box over their outer edge (x 120.9–336.0, y 106.9–123.0 pt),
+  and the 12 boxes `p0_l026`–`p0_l037` by one `comb` box (x 127.6–425.6, y 289.6–309.1 pt).
+  The new boxes are the exact union of the replaced ones; their Label Studio ids are
+  `claude_dob_comb` and `claude_aadhaar_comb`.
+- **How:** the existing annotation was edited in place (no new annotation) through Label
+  Studio's own data model (`Annotation.save()` in the container's Django shell), after a
+  consistent backup of the Label Studio database; the edit refused to run if the annotation had
+  changed since the backup. Checked afterwards against the backup: only annotation 10 changed
+  (87 → 69 boxes; the other 67 boxes identical), still one annotation per task, no task data,
+  pre-annotation or other annotation changed.
+- **Verified by the human (2026-10-18):** both comb boxes checked visually in task 10, nothing
+  else changed. The human also re-checked #6 page 2 and #32 page 1 (every detector box kept
+  unchanged) and confirmed them as correct.
+
+### Export and conversion run by Claude Code (human request, 2026-10-18)
+
+After the human had verified the labels by hand, Claude Code ran the export and the conversion
+at the human's request (the hand-off rule "Claude never runs the converter on a real export"
+was lifted for this run).
+
+- **Export:** `label-studio export 1 JSON` (the CLI in the container; JSON, not JSON-MIN) →
+  `~/Downloads/formpilot-dev-boxes-20261018-011720.json`, outside the repo. Cross-checks: against
+  the human's earlier export, only task 10 differs (87 → 69 boxes); against the human's own
+  export of the same state (`forms27-2.json`), annotations, boxes and task data are identical
+  (the only difference is how `completed_by` is serialised: the CLI writes the user object, the
+  UI only the user id). 27 tasks, one annotation each.
+- **Conversion:** `make label-convert EXPORT=~/Downloads/formpilot-dev-boxes-20261018-011720.json
+  OVERWRITE=1`. Compared with the previous label files: #25 lost the 20 cell boxes and gained the
+  two comb boxes (101 other boxes unchanged; 62 of their ids renumbered, because ids follow
+  reading order); the other 10 files differ only in `source` (the export's file name). The
+  human chose to keep all 11 files as converted (option A). All 11 validate against the schema,
+  match their PDF's SHA-256 and page count, have `verified_by_human: true`, and #21 / #41 have
+  `prefilled_from: null`. No email address or other personal data is in the label files.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
@@ -393,9 +437,8 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 - Built: Form IR (`app/ir/`), `detect.py`, `flat.py`, synthetic fixtures
   (`backend/tests/fixtures/pdfs.py`), Label Studio tooling (`eval/labelling/`), detection eval
   (`eval/detection.py`, `make eval-detect`).
-- **2026-10-17:** labelling of the subset (section above) finished in Label Studio; all 27
-  tasks have a submitted annotation, none skipped. The export and `make label-convert` are the
-  human's next step; no label file is in the repo yet.
+- **2026-10-18:** labelling finished and verified; the 11 label files are committed in
+  `eval/labels/` (sections above).
 - **Human task (was in progress):** labelling the dev boxes in Label Studio (container
   `formpilot-labelstudio`, data in `eval/labelling/work/`; tasks generated at `flat@5fe80d0`).
   Order: #21 and #41 from scratch, then the medium forms, then #1 and #3. The human runs

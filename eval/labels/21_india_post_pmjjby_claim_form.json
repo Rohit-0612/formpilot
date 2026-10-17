@@ -1,0 +1,654 @@
+{
+  "schema_version": 1,
+  "form": "21_india_post_pmjjby_claim_form",
+  "pdf_sha256": "394cfea2341c993cc0a72cf37bfd7ef5ce593c5682ebab2bbb22f4134da2f7b5",
+  "verified_by_human": true,
+  "prefilled_from": null,
+  "source": "label-studio 1.23.2, formpilot-dev-boxes-20261018-011720.json",
+  "labelled_pages": [
+    0,
+    1
+  ],
+  "pages": [
+    {
+      "width": 612.0,
+      "height": 792.0
+    },
+    {
+      "width": 612.0,
+      "height": 792.0
+    }
+  ],
+  "fields": [
+    {
+      "id": "p0_l000",
+      "page": 0,
+      "bbox": [
+        299.7241889909024,
+        135.43092984033305,
+        505.6780003216173,
+        146.53182572888497
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l001",
+      "page": 0,
+      "bbox": [
+        298.61409940204703,
+        158.74281120629266,
+        509.5311212845338,
+        168.7336175059894
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l002",
+      "page": 0,
+      "bbox": [
+        297.50400981319183,
+        178.72442380568614,
+        511.75130046224416,
+        188.7152301053829
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l003",
+      "page": 0,
+      "bbox": [
+        297.50400981319183,
+        197.59594681622445,
+        511.75130046224416,
+        206.47666352706597
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l004",
+      "page": 0,
+      "bbox": [
+        297.50400981319183,
+        217.57755941561794,
+        511.75130046224416,
+        227.56836571531466
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l005",
+      "page": 0,
+      "bbox": [
+        298.61409940204703,
+        235.33899283730102,
+        509.5311212845338,
+        246.43988872585294
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l006",
+      "page": 0,
+      "bbox": [
+        297.50400981319183,
+        256.4306950255497,
+        509.5311212845338,
+        265.3114117363913
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l007",
+      "page": 0,
+      "bbox": [
+        299.7241889909022,
+        276.4123076249431,
+        507.3109421068234,
+        286.40311392463985
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l008",
+      "page": 0,
+      "bbox": [
+        298.61409940204703,
+        297.5040098131919,
+        506.2008525179682,
+        309.714995290599
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l009",
+      "page": 0,
+      "bbox": [
+        301.94436816861264,
+        317.4856224125853,
+        505.09076292911305,
+        327.476428712282
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l010",
+      "page": 0,
+      "bbox": [
+        299.7241889909022,
+        336.35714542312354,
+        508.42103169567855,
+        346.3479517228203
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l011",
+      "page": 0,
+      "bbox": [
+        298.61409940204703,
+        354.1185788448067,
+        505.09076292911305,
+        364.10938514450345
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l012",
+      "page": 0,
+      "bbox": [
+        299.7241889909022,
+        374.10019144420016,
+        506.2008525179682,
+        384.09099774389693
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l013",
+      "page": 0,
+      "bbox": [
+        298.61409940204703,
+        394.08180404359365,
+        506.2008525179682,
+        406.29278952100077
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l014",
+      "page": 0,
+      "bbox": [
+        158.74281120629266,
+        458.4670001971949,
+        250.88024708127372,
+        467.3477169080365
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l015",
+      "page": 0,
+      "bbox": [
+        390.7515352770281,
+        459.5770897860501,
+        508.42103169567855,
+        466.2376273191812
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l016",
+      "page": 0,
+      "bbox": [
+        392.97171445473845,
+        475.11834403002285,
+        503.98067334025785,
+        485.1091503297195
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l017",
+      "page": 0,
+      "bbox": [
+        392.97171445473845,
+        492.8797774517059,
+        505.09076292911305,
+        499.5403149848371
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l018",
+      "page": 0,
+      "bbox": [
+        328.0114918941104,
+        577.7582597988919,
+        497.92735481223065,
+        586.6234352554894
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l019",
+      "page": 0,
+      "bbox": [
+        326.53396265134415,
+        647.2021342089063,
+        424.0508926739174,
+        653.1122511799714
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l020",
+      "page": 0,
+      "bbox": [
+        143.3203365483275,
+        672.3201313359328,
+        255.6125589985635,
+        678.2302483069977
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l021",
+      "page": 0,
+      "bbox": [
+        138.88774882002875,
+        687.0954237635952,
+        214.24174020110812,
+        693.0055407346605
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l022",
+      "page": 0,
+      "bbox": [
+        376.769956905397,
+        729.943771803817,
+        460.9891237430741,
+        744.7190642314796
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l000",
+      "page": 1,
+      "bbox": [
+        101.92784512937914,
+        115.07982514607322,
+        393.46340216609786,
+        122.75181348914475
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l001",
+      "page": 1,
+      "bbox": [
+        115.07982514607323,
+        127.13580682804279,
+        189.6077119073397,
+        133.71179683638994
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l002",
+      "page": 1,
+      "bbox": [
+        432.9193422161817,
+        150.1517718572574,
+        516.2152156552435,
+        157.82376020032927
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l003",
+      "page": 1,
+      "bbox": [
+        70.14389342236844,
+        156.72776186560446,
+        158.9197585350535,
+        162.207753539227
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l004",
+      "page": 1,
+      "bbox": [
+        116.17582348079773,
+        181.93572356426813,
+        178.6477285600946,
+        189.6077119073397
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l005",
+      "page": 1,
+      "bbox": [
+        202.75969192403375,
+        184.12772023371716,
+        253.1756153213611,
+        189.6077119073397
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l006",
+      "page": 1,
+      "bbox": [
+        291.5355570367188,
+        181.93572356426813,
+        358.39145545491374,
+        189.6077119073397
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l007",
+      "page": 1,
+      "bbox": [
+        112.88782847662421,
+        206.0476869282073,
+        201.66369358930922,
+        215.91167194072784
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l008",
+      "page": 1,
+      "bbox": [
+        112.88782847662421,
+        222.48766194907486,
+        200.56769525458472,
+        231.25564862687094
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l009",
+      "page": 1,
+      "bbox": [
+        363.87144712853626,
+        250.98361865191205,
+        526.0792006677632,
+        267.42359367277965
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l010",
+      "page": 1,
+      "bbox": [
+        74.52788676126647,
+        283.86356869364727,
+        532.6551906761102,
+        293.72755370616784
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l011",
+      "page": 1,
+      "bbox": [
+        107.40783680300167,
+        314.5515220659334,
+        217.00767027545234,
+        322.223510409005
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l012",
+      "page": 1,
+      "bbox": [
+        129.3278034974918,
+        328.799500417352,
+        237.83163863521798,
+        335.37549042569907
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l013",
+      "page": 1,
+      "bbox": [
+        405.5193838480675,
+        329.89549875207655,
+        537.0391840150085,
+        338.6634854298726
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l014",
+      "page": 1,
+      "bbox": [
+        207.14368526293174,
+        355.1034604507402,
+        371.54343547160784,
+        363.87144712853626
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l015",
+      "page": 1,
+      "bbox": [
+        188.51171357261515,
+        369.3514388021587,
+        337.5674870951481,
+        378.1194254799548
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l016",
+      "page": 1,
+      "bbox": [
+        161.1117552045025,
+        381.40742048412835,
+        266.3275953380551,
+        389.07940882719987
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l017",
+      "page": 1,
+      "bbox": [
+        400.03939217444497,
+        381.40742048412835,
+        511.8312223163446,
+        390.1754071619244
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l018",
+      "page": 1,
+      "bbox": [
+        116.17582348079773,
+        394.55940050082245,
+        418.6713638647617,
+        403.32738717861855
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l019",
+      "page": 1,
+      "bbox": [
+        478.9512722746095,
+        396.75139717027145,
+        576.4951240650905,
+        405.51938384806755
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l020",
+      "page": 1,
+      "bbox": [
+        72.33589009181745,
+        408.80737885224096,
+        236.7356403004935,
+        418.6713638647616
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p1_l021",
+      "page": 1,
+      "bbox": [
+        340.8554820993216,
+        447.1673205675987,
+        546.9031690275289,
+        455.9353072453948
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    }
+  ]
+}
