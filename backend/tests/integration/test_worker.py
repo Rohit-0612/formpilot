@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 from arq import func
 from arq.connections import RedisSettings
-from arq.worker import Worker, async_check_health
+from arq.worker import async_check_health
 
 from app.config import Settings
 from app.db.models import Document, Job, User
@@ -22,31 +22,11 @@ from app.jobs.cli import enqueue_ping, run
 from app.jobs.tasks import run_tracked
 from app.jobs.worker import WorkerSettings
 from app.services.jobs import QUEUE_NAME, JobStore, create_queue
+from tests.integration.workers import make_worker
 
 pytestmark = pytest.mark.usefixtures("truncate_all")
 
 LEAKY_EMAIL = "asha.verma@example.com"
-
-
-def _worker(
-    settings: Settings, *, burst: bool = True, extra_functions: list | None = None
-) -> Worker:
-    """A Worker configured exactly like WorkerSettings, but on the test Redis and database."""
-    return Worker(
-        functions=[*WorkerSettings.functions, *(extra_functions or [])],
-        queue_name=WorkerSettings.queue_name,
-        on_startup=WorkerSettings.on_startup,
-        on_shutdown=WorkerSettings.on_shutdown,
-        job_timeout=WorkerSettings.job_timeout,
-        max_tries=WorkerSettings.max_tries,
-        retry_jobs=WorkerSettings.retry_jobs,
-        health_check_interval=WorkerSettings.health_check_interval,
-        redis_settings=RedisSettings.from_dsn(settings.redis_url),
-        ctx={"settings": settings},
-        burst=burst,
-        handle_signals=False,
-        poll_delay=0.05,
-    )
 
 
 async def _job(settings: Settings, job_id: uuid.UUID) -> Job:
@@ -72,7 +52,7 @@ async def test_health_check_passes_while_the_worker_runs(live_settings: Settings
     redis_settings = RedisSettings.from_dsn(live_settings.redis_url)
     assert await async_check_health(redis_settings, queue_name=QUEUE_NAME) == 1  # no worker yet
 
-    worker = _worker(live_settings, burst=False)
+    worker = make_worker(live_settings, burst=False)
     worker_task = asyncio.create_task(worker.main())
     try:
         for _ in range(50):  # the key is written on the worker's first poll
@@ -93,7 +73,7 @@ async def test_ping_job_goes_from_queued_to_done(live_settings: Settings) -> Non
     job_id = await enqueue_ping(live_settings)
     assert (await _job(live_settings, job_id)).status == "queued"
 
-    worker = _worker(live_settings)
+    worker = make_worker(live_settings)
     try:
         await worker.main()
     finally:
@@ -128,7 +108,7 @@ async def test_failing_job_is_recorded_and_arq_never_sees_the_exception(
     await queue.enqueue_job("explode", str(job_id), _job_id=str(job_id))
     await queue.aclose()
 
-    worker = _worker(live_settings, extra_functions=[func(explode, name="explode")])
+    worker = make_worker(live_settings, extra_functions=[func(explode, name="explode")])
     try:
         await worker.main()
     finally:
@@ -142,8 +122,8 @@ async def test_failing_job_is_recorded_and_arq_never_sees_the_exception(
     assert '"event": "job_failed"' in output.out
 
 
-async def test_cli_ping_waits_for_the_worker(live_settings: Settings) -> None:
-    worker = _worker(live_settings, burst=False)
+async def test_cli_ping_waits_for_themake_worker(live_settings: Settings) -> None:
+    worker = make_worker(live_settings, burst=False)
     worker_task = asyncio.create_task(worker.main())
     try:
         exit_code = await run(["ping", "--wait", "15"], live_settings)
@@ -164,7 +144,7 @@ async def test_cli_ping_without_wait_only_enqueues(live_settings: Settings) -> N
     assert await run(["ping"], live_settings) == 0
 
 
-async def test_worker_startup_fails_jobs_left_running_by_a_crashed_worker(
+async def test_worker_startup_fails_jobs_left_running_by_a_crashedmake_worker(
     live_settings: Settings,
 ) -> None:
     """Decision D6: the document does not stay `analyzing` forever."""
@@ -194,7 +174,7 @@ async def test_worker_startup_fails_jobs_left_running_by_a_crashed_worker(
         await session.commit()
         job_id, document_id = row.id, document.id
 
-    worker = _worker(live_settings)  # burst: starts, finds an empty queue, stops
+    worker = make_worker(live_settings)  # burst: starts, finds an empty queue, stops
     try:
         await worker.main()
     finally:

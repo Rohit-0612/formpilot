@@ -52,6 +52,11 @@ class Settings(DatabaseSettings, QueueSettings):
     storage_root: Path
     file_ttl_hours: int = Field(default=24, gt=0)
 
+    # Uploads (SPEC §8, decision D3): size and magic bytes checked by the API, pages by the worker
+    max_upload_mb: int = Field(default=20, gt=0)
+    max_pages: int = Field(default=50, gt=0)
+    page_image_dpi: int = Field(default=144, ge=36, le=600)
+
     # Logging
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_json: bool = True

@@ -89,10 +89,186 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Document */
+        post: operations["upload_document_api_v1_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Document */
+        get: operations["get_document_api_v1_documents__document_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/ir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ir */
+        get: operations["get_ir_api_v1_documents__document_id__ir_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/pages/{page}.png": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Page Image */
+        get: operations["get_page_image_api_v1_documents__document_id__pages__page__png_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job */
+        get: operations["get_job_api_v1_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BBox */
+        BBox: {
+            /** Page */
+            page: number;
+            /** X0 */
+            x0: number;
+            /** Y0 */
+            y0: number;
+            /** X1 */
+            x1: number;
+            /** Y1 */
+            y1: number;
+        };
+        /** DocumentResponse */
+        DocumentResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Original Filename */
+            original_filename: string;
+            status: components["schemas"]["DocumentStatus"];
+            source_kind: components["schemas"]["SourceKind"] | null;
+            /** Page Count */
+            page_count: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            job: components["schemas"]["JobSummary"] | null;
+        };
+        /**
+         * DocumentStatus
+         * @enum {string}
+         */
+        DocumentStatus: "uploaded" | "analyzing" | "ready" | "rendering" | "done" | "failed";
+        /** Field */
+        Field: {
+            /** Id */
+            id: string;
+            kind: components["schemas"]["FieldKind"];
+            /** Native Name */
+            native_name: string | null;
+            /** Label Text */
+            label_text: string | null;
+            /** Context Text */
+            context_text: string | null;
+            bbox: components["schemas"]["BBox"];
+            /** Max Chars */
+            max_chars?: number | null;
+            /** Options */
+            options?: components["schemas"]["Option"][];
+            /** @default unknown */
+            semantic_type: components["schemas"]["SemanticType"];
+            /**
+             * Semantic Confidence
+             * @default 0
+             */
+            semantic_confidence: number;
+            /**
+             * Semantic Method
+             * @default none
+             * @enum {string}
+             */
+            semantic_method: "rule" | "llm" | "user" | "none";
+            /** Value */
+            value?: string | null;
+            /** @default none */
+            value_source: components["schemas"]["ValueSource"];
+            /** Validations */
+            validations?: components["schemas"]["ValidationResult"][];
+            /** @default detected */
+            status: components["schemas"]["FieldStatus"];
+        };
+        /**
+         * FieldKind
+         * @enum {string}
+         */
+        FieldKind: "text" | "checkbox" | "radio" | "choice" | "date" | "signature" | "unknown";
+        /**
+         * FieldStatus
+         * @enum {string}
+         */
+        FieldStatus: "detected" | "filled" | "needs_input" | "needs_review" | "confirmed" | "skipped";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -116,6 +292,48 @@ export interface components {
              */
             redis: "ok" | "error";
         };
+        /** JobResponse */
+        JobResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            type: components["schemas"]["JobType"];
+            status: components["schemas"]["JobStatus"];
+            /** Document Id */
+            document_id: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+        };
+        /**
+         * JobStatus
+         * @enum {string}
+         */
+        JobStatus: "queued" | "running" | "done" | "failed";
+        /** JobSummary */
+        JobSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["JobStatus"];
+            /** Error Message */
+            error_message: string | null;
+        };
+        /**
+         * JobType
+         * @enum {string}
+         */
+        JobType: "analyze" | "render" | "ping";
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -126,6 +344,51 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * MaskedFormIR
+         * @description The only form in which a Form IR leaves the API (SPEC §8): values are masked whenever an
+         *     instance is built, from a FormIR, a dict or stored JSON alike (app/services/masking.py).
+         *
+         *     A test checks that no route's response model contains a plain FormIR.
+         */
+        MaskedFormIR: {
+            /**
+             * Schema Version
+             * @default 1
+             */
+            schema_version: number;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            source_kind: components["schemas"]["SourceKind"];
+            /** Pages */
+            pages: components["schemas"]["PageInfo"][];
+            /** Fields */
+            fields?: components["schemas"]["Field"][];
+            /** Trace */
+            trace?: components["schemas"]["TraceEvent"][];
+        };
+        /**
+         * Option
+         * @description One choice of a checkbox, radio group or choice field.
+         */
+        Option: {
+            /** Value */
+            value: string;
+            /** Label */
+            label?: string | null;
+            bbox?: components["schemas"]["BBox"] | null;
+        };
+        /** PageInfo */
+        PageInfo: {
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            text_layer: components["schemas"]["TextLayer"];
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /**
@@ -135,6 +398,48 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /**
+         * SemanticType
+         * @enum {string}
+         */
+        SemanticType: "full_name" | "first_name" | "middle_name" | "last_name" | "father_name" | "mother_name" | "guardian_name" | "spouse_name" | "date_of_birth" | "age" | "gender" | "nationality" | "category" | "marital_status" | "email" | "phone_mobile" | "phone_alternate" | "current_address_line1" | "current_address_line2" | "current_city" | "current_district" | "current_state" | "current_pincode" | "current_country" | "permanent_address_line1" | "permanent_address_line2" | "permanent_city" | "permanent_district" | "permanent_state" | "permanent_pincode" | "permanent_country" | "pan" | "aadhaar" | "passport_number" | "voter_id" | "bank_name" | "bank_account_number" | "ifsc" | "bank_branch" | "institution_name" | "course" | "enrollment_number" | "year_of_study" | "percentage_or_cgpa" | "passing_year" | "date_of_filling" | "place" | "signature" | "declaration_checkbox" | "other" | "unknown";
+        /**
+         * SourceKind
+         * @enum {string}
+         */
+        SourceKind: "fillable" | "flat_text" | "scanned" | "photo";
+        /**
+         * TextLayer
+         * @enum {string}
+         */
+        TextLayer: "ok" | "garbled" | "none";
+        /** TraceEvent */
+        TraceEvent: {
+            /** Pass Name */
+            pass_name: string;
+            /** Field Id */
+            field_id: string | null;
+            /** Change */
+            change: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+        };
+        /** UploadResponse */
+        UploadResponse: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
         };
         /** UserResponse */
         UserResponse: {
@@ -159,6 +464,20 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** ValidationResult */
+        ValidationResult: {
+            /** Validator */
+            validator: string;
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message?: string | null;
+        };
+        /**
+         * ValueSource
+         * @enum {string}
+         */
+        ValueSource: "profile" | "user_answer" | "llm_inferred" | "user_edit" | "none";
     };
     responses: never;
     parameters: never;
@@ -319,6 +638,215 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    upload_document_api_v1_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
+                };
+            };
+            /** @description The file is too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file is not a PDF */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No single file in field 'file' */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The analysis could not be started */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_document_api_v1_documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ir_api_v1_documents__document_id__ir_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaskedFormIR"];
+                };
+            };
+            /** @description Not found or not analysed yet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_page_image_api_v1_documents__document_id__pages__page__png_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                /** @description 0-based, like BBox.page */
+                page: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                };
+            };
+            /** @description Not found, no such page, or not rendered */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_api_v1_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobResponse"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

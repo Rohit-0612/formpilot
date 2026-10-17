@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 
+from app.api.deps import new_queue_state
 from app.api.errors import register_error_handlers
 from app.api.router import api_router
 from app.config import Settings, get_settings
@@ -83,10 +84,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.sessionmaker = make_sessionmaker(app.state.engine)
         app.state.redis = Redis.from_url(settings.redis_url)
         app.state.storage = make_storage(settings)
+        app.state.queue, app.state.queue_lock = new_queue_state()  # connected on first use
         log.info("startup")
         try:
             yield
         finally:
+            if app.state.queue is not None:
+                await app.state.queue.aclose()
             await app.state.redis.aclose()
             await app.state.engine.dispose()
             log.info("shutdown")
