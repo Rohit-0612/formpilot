@@ -76,5 +76,6 @@ label-examples:
 	$(EVAL_PY) eval.labelling.examples
 
 ## Detection eval on the dev split: detector boxes vs eval/labels -> eval/reports/ (Phase 2)
+## Optional TAG=<name> names the run, e.g. make eval-detect TAG=pre-step11-tuning
 eval-detect:
-	$(EVAL_PY) eval.detection --split dev
+	$(EVAL_PY) eval.detection --split dev $(if $(TAG),--tag $(TAG),)

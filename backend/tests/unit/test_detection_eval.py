@@ -376,6 +376,26 @@ def test_cli_writes_reports(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert json.loads(report.read_text())["subset_pages_1based"] == {"02_boxes": "all"}
 
 
+def test_tag_names_the_report_files_and_title(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset, labels = _setup(
+        tmp_path, {"02_boxes": ("flat_boxes", _label_file("flat_boxes", "02_boxes"))}
+    )
+    monkeypatch.setattr(detection, "DEV_SUBSET", {"02_boxes": ALL})
+    args = ["--dataset-root", str(dataset.parent), "--labels", str(labels)]
+
+    code = detection.main([*args, "--out", str(tmp_path / "r"), "--tag", "pre-step11-tuning"])
+
+    assert code == 0
+    (md,) = (tmp_path / "r").glob("phase2-detection-dev-pre-step11-tuning-*.md")
+    assert md.read_text().startswith("# Detection eval — dev split — pre-step11-tuning")
+    (js,) = (tmp_path / "r").glob("phase2-detection-dev-pre-step11-tuning-*.json")
+    assert json.loads(js.read_text())["tag"] == "pre-step11-tuning"
+    with pytest.raises(SystemExit):
+        detection.main([*args, "--out", str(tmp_path / "r"), "--tag", "../escape"])
+
+
 def test_cli_stops_when_the_subset_does_not_match_the_dataset(tmp_path: Path) -> None:
     dataset, labels = _setup(tmp_path, {"02_boxes": ("flat_boxes", None)})
 

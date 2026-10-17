@@ -21,6 +21,7 @@ to eval/reports/. Only the dev split is allowed in Phase 2 (CLAUDE.md §6).
 import argparse
 import hashlib
 import json
+import re
 import uuid
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -259,6 +260,7 @@ class EvalResult:
     forms_without_labels: list[str]
     forms_without_ok_pages: list[str] = field(default_factory=list)  # need OCR, Phase 6
     subset: Mapping[str, PageSelection] | None = None  # None: every labelled page is scored
+    tag: str | None = None  # names the run in the report file name, e.g. "pre-step11-tuning"
 
     def total(self, prefilled: bool | None = None) -> tuple[Counts, Counts, KindStats]:
         at_match, at_diag, kinds = Counts(), Counts(), KindStats()
@@ -320,6 +322,7 @@ def report_json(result: EvalResult) -> dict[str, object]:
 
     return {
         "eval": "phase2-detection",
+        "tag": result.tag,
         "split": result.split,
         "detector": result.detector,
         "created_at": result.created_at,
@@ -382,7 +385,7 @@ _COUNTS_HEADER = (
 def report_markdown(result: EvalResult) -> str:
     at_match, at_diag, kinds = result.total()
     lines = [
-        f"# Detection eval — {result.split} split",
+        f"# Detection eval — {result.split} split" + (f" — {result.tag}" if result.tag else ""),
         "",
         f"- Detector: `{result.detector}`; run at {result.created_at}.",
         f"- Match: one-to-one, greedy by IoU, IoU ≥ {MATCH_IOU} on the same page (SPEC §10); "
@@ -475,11 +478,21 @@ def write_reports(result: EvalResult, out: Path) -> tuple[Path, Path]:
     out.mkdir(parents=True, exist_ok=True)
     stamp = result.created_at[:10].replace("-", "")
     commit = result.detector.removeprefix("flat@")
-    base = out / f"phase2-detection-{result.split}-{stamp}-{commit}"
+    tag = f"-{result.tag}" if result.tag else ""
+    base = out / f"phase2-detection-{result.split}{tag}-{stamp}-{commit}"
     json_path, md_path = base.with_suffix(".json"), base.with_suffix(".md")
     json_path.write_text(json.dumps(report_json(result), indent=2) + "\n", encoding="utf-8")
     md_path.write_text(report_markdown(result), encoding="utf-8")
     return json_path, md_path
+
+
+_TAG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def _tag(value: str) -> str:
+    if not _TAG.fullmatch(value):
+        raise argparse.ArgumentTypeError("tag: lower-case letters, digits and single hyphens")
+    return value
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -488,6 +501,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dataset-root", type=Path, default=DATASET_DIR)
     parser.add_argument("--labels", type=Path, default=LABELS_DIR)
     parser.add_argument("--out", type=Path, default=REPORTS_DIR)
+    parser.add_argument("--tag", type=_tag, help="named run, e.g. pre-step11-tuning")
     args = parser.parse_args(argv)
     configure_logging("INFO", json=False)
     try:
@@ -501,6 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     except EvalError as exc:
         log.error("eval_failed", reason=str(exc))
         return 1
+    result.tag = args.tag
     json_path, md_path = write_reports(result, args.out)
     at_match, _, _ = result.total()
     log.info(
