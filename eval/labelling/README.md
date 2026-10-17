@@ -67,9 +67,16 @@ of the cell, not the label.
 impression areas](images/rule3-label-inside.png)
 
 **Do not box:** printed labels, headings, instructions, and areas where nothing is written —
-a box to paste a photograph, a thumb-impression area. **Do box:** signature areas (as `text`),
-and "for office use" fields — a person writes there too (Phase 3 marks them so FormPilot never
-fills them).
+a box to paste a photograph, a thumb-impression area. **Do box, with the `text` label:**
+signature areas, and "for office use" fields — a person writes there too (Phase 3 marks
+office-use fields so FormPilot never fills them).
+
+| Area | Box? | Label |
+|---|---|---|
+| signature | yes | `text` |
+| for office use / for bank use | yes | `text` |
+| photograph | no | — |
+| thumb impression | no | — |
 
 In the images, green is a box you draw and red dashed is an area that gets no box. They are
 rendered from synthetic test forms (`make label-images`). The same examples on the dev forms
@@ -89,6 +96,21 @@ it did not. Because #21 and #41 are labelled without pre-filling, the detection 
 reports them separately from the pre-filled forms: if the detector scores clearly better on the
 pre-filled forms, pre-annotation may be biasing the labels. On pre-filled pages, first look over
 the whole page for entry areas that have no box, then check the existing boxes.
+
+## Labelling subset (human, 2026-10-17)
+
+The detection eval scores only these dev pages (1-based, as in a PDF viewer):
+
+| Form | Pages scored |
+|---|---|
+| #2, #6, #21, #23, #25, #30, #32, #39, #41 | all |
+| #1 | 1 and 4 |
+| #3 | 2 |
+
+The subset is fixed in `subset.py` and applied by `make eval-detect`. If a label file marks
+another page as labelled (for example a page submitted instead of skipped), the eval does not
+score it and lists it under "Not scored". Changing the subset is a decision for the decision
+record (`docs/decisions/phase-2.md`).
 
 ## Partial labelling
 
@@ -176,4 +198,5 @@ delete `eval/labelling/work/` until the labels are converted and committed.
 | `tasks.py` | `make label-tasks`: renders the `ok` dev pages at 150 DPI, one task per page, with the detector's boxes as predictions (none for #21 and #41) |
 | `convert.py` | `make label-convert`: Label Studio JSON export → `eval/labels/<form>.json` |
 | `schema.py` | the label file format, validated on every read and write |
+| `subset.py` | the labelling subset: which dev pages the detection eval scores |
 | `examples.py` | `make label-images`: the images above, from synthetic fixtures (committed in `images/`); `make label-examples`: the same on the dev forms (local only) |

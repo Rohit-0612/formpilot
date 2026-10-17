@@ -356,6 +356,19 @@ human's decision).
 - **Limitation:** only `analyzing` documents are moved to `failed`. A stale `render` job (Phase
   5) would leave its document `rendering`; to revisit when the render job exists.
 
+## Labelling subset and no-box areas (human, 2026-10-17)
+
+- **Subset scored by the detection eval** (1-based pages): forms #2, #6, #21, #23, #25, #30,
+  #32, #39 and #41 in full; #1 pages 1 and 4 only; #3 page 2 only. Fixed in
+  `eval/labelling/subset.py` and applied by `make eval-detect` (the CLI always applies it).
+  Labelled pages outside the subset (e.g. a page submitted instead of skipped) are not scored and
+  are listed under "Not scored" and in the JSON (`labelled_outside_subset_not_scored`); subset
+  pages without labels are listed as not labelled. A subset that names a form without a PDF, or
+  a page beyond the form's page count, stops the run.
+- **Box kinds for special areas:** signature areas and office-use areas are boxed with the
+  `text` label; photograph and thumb-impression areas get no box. Written into
+  `eval/labelling/README.md` (table under "Do not box").
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
@@ -380,7 +393,10 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 - Built: Form IR (`app/ir/`), `detect.py`, `flat.py`, synthetic fixtures
   (`backend/tests/fixtures/pdfs.py`), Label Studio tooling (`eval/labelling/`), detection eval
   (`eval/detection.py`, `make eval-detect`).
-- **Human task in progress:** labelling the dev boxes in Label Studio (container
+- **2026-10-17:** labelling of the subset (section above) finished in Label Studio; all 27
+  tasks have a submitted annotation, none skipped. The export and `make label-convert` are the
+  human's next step; no label file is in the repo yet.
+- **Human task (was in progress):** labelling the dev boxes in Label Studio (container
   `formpilot-labelstudio`, data in `eval/labelling/work/`; tasks generated at `flat@5fe80d0`).
   Order: #21 and #41 from scratch, then the medium forms, then #1 and #3. The human runs
   `make label-convert EXPORT=…` and commits the label files (or asks Claude to commit them).
