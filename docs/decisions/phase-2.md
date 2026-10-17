@@ -1,7 +1,7 @@
 # Phase 2 — Form IR and flat-PDF frontend: decision record
 
-> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–6 are
-> done; **next is Step 7**. A fresh session continues from the "Remaining plan" section below.
+> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–7 are
+> done; **next is Step 8**. A fresh session continues from the "Remaining plan" section below.
 > Decisions are recorded here as they are taken; the close-out sections are filled in at the end
 > of the phase.
 
@@ -326,6 +326,29 @@ human's decision).
   not scored, as expected.
 - The matching functions are plain and importable, for reuse by Phase 3's `run_eval.py`.
 
+## Step 7 — Stale jobs and storage wiring (D6)
+
+- **Migration `0002`** adds `jobs.started_at timestamptz NULL` (upgrade adds, downgrade drops;
+  `0001` untouched). `JobStore.mark_running` sets it to `now()`. SPEC §7 lists the column.
+- **Reaper** `JobStore.fail_stale(timeout_seconds)`: one transaction; jobs `running` with
+  `COALESCE(started_at, created_at) < now() - timeout` become `failed`, error `Stale`,
+  `finished_at = now()`; their documents that are `analyzing` become `failed`. Returns the job
+  ids and logs them (ids and a count only). A job that waited in the queue longer than the
+  timeout is not stale once it has started: `started_at` decides, `created_at` only for rows
+  from before `0002`.
+- **Worker startup** calls it once with `JOB_TIMEOUT_SECONDS`. **Detail not in the plan:** it is
+  best effort — an error is logged (`stale_jobs_check_failed`, exception type only) and the
+  worker still starts. Reason: `make up` starts the worker before it runs the migrations, so on
+  a fresh database the `jobs` table (or the `started_at` column) does not exist yet; a worker
+  that refused to start would fail `up --wait` and the CI compose-smoke job. Alternative
+  considered: run the migrations before the worker starts (a compose / Makefile change), left
+  for later if the best-effort reaper is not enough.
+- **Storage:** `app.storage.make_storage(settings)` → `LocalStorage(settings.storage_root)`;
+  created once in the API lifespan (`app.state.storage`, dependency `get_storage`) and in the
+  worker (`ctx["storage"]`). Nothing uses it yet; uploads (Step 8) will.
+- **Limitation:** only `analyzing` documents are moved to `failed`. A stale `render` job (Phase
+  5) would leave its document `rendering`; to revisit when the render job exists.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
@@ -345,8 +368,8 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 
 ### Where things stand
 
-- Branch `phase-2-flat-frontend`; Steps 0–6 committed and pushed, CI green on every pushed head
-  (last checked: run 38937110232 on `63ba5e2`).
+- Branch `phase-2-flat-frontend`; Steps 0–7 committed and pushed (Step 7: see its section
+  above). CI green on every pushed head up to Step 6 (run 38937110232 on `63ba5e2`).
 - Built: Form IR (`app/ir/`), `detect.py`, `flat.py`, synthetic fixtures
   (`backend/tests/fixtures/pdfs.py`), Label Studio tooling (`eval/labelling/`), detection eval
   (`eval/detection.py`, `make eval-detect`).
