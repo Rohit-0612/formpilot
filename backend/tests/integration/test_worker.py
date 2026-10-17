@@ -7,6 +7,7 @@ TRUNCATE (truncate_all) and a flushed Redis test database (redis_url) [A1].
 import asyncio
 import contextlib
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -15,7 +16,7 @@ from arq.connections import RedisSettings
 from arq.worker import Worker, async_check_health
 
 from app.config import Settings
-from app.db.models import Job
+from app.db.models import Document, Job, User
 from app.db.session import make_engine, make_sessionmaker
 from app.jobs.cli import enqueue_ping, run
 from app.jobs.tasks import run_tracked
@@ -161,3 +162,48 @@ async def test_cli_ping_without_worker_times_out_with_exit_code_1(live_settings:
 
 async def test_cli_ping_without_wait_only_enqueues(live_settings: Settings) -> None:
     assert await run(["ping"], live_settings) == 0
+
+
+async def test_worker_startup_fails_jobs_left_running_by_a_crashed_worker(
+    live_settings: Settings,
+) -> None:
+    """Decision D6: the document does not stay `analyzing` forever."""
+    long_ago = datetime.now(UTC) - timedelta(seconds=live_settings.job_timeout_seconds + 60)
+    engine = make_engine(live_settings)
+    async with make_sessionmaker(engine)() as session:
+        owner = User(email="owner@example.com", password_hash="$argon2id$not-a-real-hash")
+        session.add(owner)
+        await session.flush()
+        document = Document(
+            owner_id=owner.id,
+            original_filename="blank-form.pdf",
+            sha256="0" * 64,
+            status="analyzing",
+            expires_at=datetime.now(UTC) + timedelta(hours=24),
+        )
+        session.add(document)
+        await session.flush()
+        row = Job(
+            type="analyze",
+            document_id=document.id,
+            status="running",
+            created_at=long_ago,
+            started_at=long_ago,
+        )
+        session.add(row)
+        await session.commit()
+        job_id, document_id = row.id, document.id
+
+    worker = _worker(live_settings)  # burst: starts, finds an empty queue, stops
+    try:
+        await worker.main()
+    finally:
+        await worker.close()
+
+    job = await _job(live_settings, job_id)
+    assert (job.status, job.error) == ("failed", "Stale")
+    async with make_sessionmaker(engine)() as session:
+        stored = await session.get(Document, document_id)
+        assert stored is not None
+        assert stored.status == "failed"
+    await engine.dispose()

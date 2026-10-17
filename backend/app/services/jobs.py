@@ -7,9 +7,13 @@ Status transitions (anything else is refused):
     queued  -> running           (worker picked it up)
     running -> done | failed     (work finished)
     queued  -> failed            (enqueueing failed)
+
+A job left `running` longer than the job timeout (its worker crashed) is failed with error
+"Stale" when a worker starts (JobStore.fail_stale, decision D6).
 """
 
 import uuid
+from datetime import timedelta
 from typing import Any, Protocol
 
 from arq.connections import ArqRedis, RedisSettings, create_pool
@@ -17,12 +21,13 @@ from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import QueueSettings
-from app.db.models import Job, JobStatus, JobType
+from app.db.models import Document, DocumentStatus, Job, JobStatus, JobType
 from app.logging import get_logger
 
 log = get_logger(__name__)
 
 QUEUE_NAME = "formpilot:jobs"
+STALE_ERROR = "Stale"
 
 
 class JobQueue(Protocol):
@@ -84,7 +89,9 @@ class JobStore:
             return await session.get(Job, job_id)
 
     async def mark_running(self, job_id: uuid.UUID) -> bool:
-        return await self._transition(job_id, {JobStatus.QUEUED}, JobStatus.RUNNING)
+        return await self._transition(
+            job_id, {JobStatus.QUEUED}, JobStatus.RUNNING, started_at=func.now()
+        )
 
     async def mark_done(self, job_id: uuid.UUID) -> bool:
         return await self._transition(
@@ -100,6 +107,42 @@ class JobStore:
             finished_at=func.now(),
             error=error,
         )
+
+    async def fail_stale(self, timeout_seconds: int) -> list[uuid.UUID]:
+        """Fail jobs `running` for longer than timeout_seconds; return their ids.
+
+        Such a job's worker died without recording an outcome (arq itself cancels a job at the
+        timeout, and run_tracked records that). Rows without started_at (created before
+        migration 0002) use created_at. Documents of these jobs that are still `analyzing`
+        become `failed`. One transaction, so a job and its document change together.
+        """
+        stale_jobs = (
+            update(Job)
+            .where(
+                Job.status == JobStatus.RUNNING.value,
+                func.coalesce(Job.started_at, Job.created_at)
+                < func.now() - timedelta(seconds=timeout_seconds),
+            )
+            .values(status=JobStatus.FAILED.value, error=STALE_ERROR, finished_at=func.now())
+            .returning(Job.id, Job.document_id)
+        )
+        async with self._sessionmaker() as session:
+            rows = (await session.execute(stale_jobs)).all()
+            document_ids = {document_id for _, document_id in rows if document_id is not None}
+            if document_ids:
+                await session.execute(
+                    update(Document)
+                    .where(
+                        Document.id.in_(document_ids),
+                        Document.status == DocumentStatus.ANALYZING.value,
+                    )
+                    .values(status=DocumentStatus.FAILED.value)
+                )
+            await session.commit()
+        job_ids = [job_id for job_id, _ in rows]
+        if job_ids:
+            log.warning("stale_jobs_failed", count=len(job_ids), job_ids=[str(i) for i in job_ids])
+        return job_ids
 
     async def _transition(
         self,

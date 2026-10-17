@@ -14,6 +14,7 @@ from app.db.session import get_session
 from app.security import InvalidTokenError, decode_access_token
 from app.services.health import HealthService, ping_database, ping_redis
 from app.services.users import UserService
+from app.storage.base import Storage
 
 SESSION_COOKIE = "fp_session"
 
@@ -23,6 +24,10 @@ _session_cookie = APIKeyCookie(name=SESSION_COOKIE, auto_error=False)
 
 def get_app_settings(request: Request) -> Settings:
     return request.app.state.settings
+
+
+def get_storage(request: Request) -> Storage:
+    return request.app.state.storage
 
 
 def get_health_service(request: Request) -> HealthService:

@@ -15,6 +15,7 @@ from app.config import Settings, get_settings
 from app.db.session import make_engine, make_sessionmaker
 from app.logging import configure_logging, get_logger
 from app.services.jobs import JobStore
+from app.storage import make_storage
 
 log = get_logger(__name__)
 
@@ -66,8 +67,22 @@ async def startup(ctx: dict[str, Any]) -> None:
     configure_logging(settings.log_level, settings.log_json)
     engine = make_engine(settings)
     ctx["engine"] = engine
-    ctx["job_store"] = JobStore(make_sessionmaker(engine))
+    ctx["job_store"] = store = JobStore(make_sessionmaker(engine))
+    ctx["storage"] = make_storage(settings)
+    await _fail_stale_jobs(store, settings.job_timeout_seconds)
     log.info("worker_started")
+
+
+async def _fail_stale_jobs(store: JobStore, timeout_seconds: int) -> None:
+    """Once per worker start (decision D6). Best effort: a failure is logged, not raised.
+
+    `make up` starts the worker before it applies the migrations, so on a fresh database the
+    jobs table may not exist yet; a worker that refused to start would fail `up --wait`.
+    """
+    try:
+        await store.fail_stale(timeout_seconds)
+    except Exception:
+        log.exception("stale_jobs_check_failed")
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:

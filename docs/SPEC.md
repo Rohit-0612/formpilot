@@ -300,7 +300,9 @@ Only `CONFIRMED` fields are rendered.
 - `documents(id, owner_id, original_filename, sha256, source_kind, status, page_count,
   created_at, expires_at)` — status: `uploaded | analyzing | ready | rendering | done | failed`
 - `form_ir_versions(id, document_id, version, ir_json JSONB, created_at)` — append-only
-- `jobs(id, document_id, type, status, error, created_at, finished_at)` — types: `analyze`, `render`
+- `jobs(id, document_id, type, status, error, created_at, started_at, finished_at)` — types:
+  `analyze`, `render`; `started_at` is used to fail jobs left running by a crashed worker
+  (decision D6 in `docs/decisions/phase-2.md`)
 - `profiles(user_id, encrypted_blob, updated_at)` — encrypted with Fernet; key from env
 - `audit_events(id, document_id, field_id, event, actor, created_at)` — no values stored
 

@@ -17,6 +17,7 @@ from app.api.router import api_router
 from app.config import Settings, get_settings
 from app.db.session import make_engine, make_sessionmaker
 from app.logging import configure_logging, get_logger
+from app.storage import make_storage
 
 REQUEST_ID_HEADER = "X-Request-ID"
 _VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9-]{1,64}$")
@@ -81,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = make_engine(settings)
         app.state.sessionmaker = make_sessionmaker(app.state.engine)
         app.state.redis = Redis.from_url(settings.redis_url)
+        app.state.storage = make_storage(settings)
         log.info("startup")
         try:
             yield

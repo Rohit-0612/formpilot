@@ -4,7 +4,7 @@ import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import URL, CheckConstraint, create_engine, inspect
+from sqlalchemy import URL, CheckConstraint, create_engine, inspect, text
 from sqlalchemy.pool import NullPool
 
 from app.db.base import Base
@@ -40,6 +40,45 @@ def test_upgrade_downgrade_upgrade_round_trip(scratch_db_url: URL) -> None:
 
     command.upgrade(config, "head")
     assert _tables(scratch_db_url) == EXPECTED_TABLES | {"alembic_version"}
+
+
+def _job_columns(url: URL) -> dict[str, bool]:
+    """Column name -> nullable, for the jobs table."""
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        return {
+            column["name"]: column["nullable"] for column in inspect(engine).get_columns("jobs")
+        }
+    finally:
+        engine.dispose()
+
+
+def test_0002_adds_a_nullable_started_at_and_keeps_existing_jobs(scratch_db_url: URL) -> None:
+    config = alembic_config(scratch_db_url)
+    command.upgrade(config, "0001")
+    assert "started_at" not in _job_columns(scratch_db_url)
+    engine = create_engine(scratch_db_url, poolclass=NullPool)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO jobs (id, type, status)"
+                    " VALUES (gen_random_uuid(), 'ping', 'running')"
+                )
+            )
+
+        command.upgrade(config, "0002")
+        assert _job_columns(scratch_db_url)["started_at"] is True
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT status, started_at FROM jobs")).all()
+        assert [tuple(row) for row in rows] == [("running", None)]
+
+        command.downgrade(config, "0001")
+        assert "started_at" not in _job_columns(scratch_db_url)
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 1
+    finally:
+        engine.dispose()
 
 
 def test_models_match_migrations(migrated_db_url: URL) -> None:

@@ -4,8 +4,11 @@ import uuid
 
 import pytest
 
-from app.jobs.tasks import FUNCTIONS, ping, run_tracked
+from app.config import Settings
+from app.jobs.tasks import FUNCTIONS, ping, run_tracked, shutdown, startup
 from app.logging import configure_logging
+from app.services.jobs import JobStore
+from app.storage.local import LocalStorage
 
 JOB_ID = str(uuid.UUID("00000000-0000-4000-8000-00000000000a"))
 LEAKY_EMAIL = "asha.verma@example.com"
@@ -104,3 +107,45 @@ async def test_cancellation_is_recorded_and_propagated() -> None:
 
 def test_ping_is_registered_with_the_worker() -> None:
     assert ping in FUNCTIONS
+
+
+# --- worker startup -------------------------------------------------------------------
+
+
+async def test_startup_fails_stale_jobs_with_the_job_timeout_and_provides_storage(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    timeouts: list[int] = []
+
+    async def fake_fail_stale(self: JobStore, timeout_seconds: int) -> list[uuid.UUID]:
+        timeouts.append(timeout_seconds)
+        return []
+
+    monkeypatch.setattr(JobStore, "fail_stale", fake_fail_stale)
+    ctx: dict = {"settings": settings.model_copy(update={"job_timeout_seconds": 123})}
+
+    await startup(ctx)
+    await shutdown(ctx)
+
+    assert timeouts == [123]
+    assert isinstance(ctx["job_store"], JobStore)
+    assert isinstance(ctx["storage"], LocalStorage)
+
+
+async def test_startup_survives_a_failing_stale_job_check(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """On a fresh database the worker starts before the migrations (`make up`)."""
+
+    async def missing_table(self: JobStore, timeout_seconds: int) -> list[uuid.UUID]:
+        raise RuntimeError('relation "jobs" does not exist')
+
+    monkeypatch.setattr(JobStore, "fail_stale", missing_table)
+    ctx: dict = {"settings": settings}
+
+    await startup(ctx)  # does not raise
+    await shutdown(ctx)
+
+    output = capsys.readouterr().out
+    assert '"event": "stale_jobs_check_failed"' in output
+    assert '"event": "worker_started"' in output

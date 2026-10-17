@@ -3,7 +3,13 @@ import stat
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
+from starlette.requests import Request
 
+from app.api.deps import get_storage
+from app.config import Settings
+from app.main import create_app
+from app.storage import make_storage
 from app.storage.base import InvalidStorageKeyError, ObjectNotFoundError, validate_key
 from app.storage.local import LocalStorage
 
@@ -212,3 +218,25 @@ async def test_files_and_directories_are_owner_only(storage: LocalStorage, root:
     assert _mode(root) == 0o700
     assert _mode(file_path.parent) == 0o700
     assert _mode(file_path.parent.parent) == 0o700
+
+
+# --- wiring ---------------------------------------------------------------------------
+
+
+async def test_make_storage_writes_under_the_configured_root(settings: Settings) -> None:
+    storage = make_storage(settings)
+
+    await storage.put(KEY, PDF)
+
+    assert isinstance(storage, LocalStorage)
+    assert (settings.storage_root / KEY).read_bytes() == PDF
+
+
+def test_get_storage_returns_the_storage_created_in_the_lifespan(settings: Settings) -> None:
+    app = create_app(settings)
+
+    with TestClient(app):  # runs the lifespan; nothing connects to Postgres or Redis
+        storage = get_storage(Request({"type": "http", "app": app}))
+
+        assert storage is app.state.storage
+        assert isinstance(storage, LocalStorage)

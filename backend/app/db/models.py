@@ -144,6 +144,9 @@ class Job(Base):
     # Error class / short reason only; never field values.
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _created_at()
+    # Set when a worker picks the job up; NULL for jobs that never ran (and for rows older than
+    # migration 0002). The stale-job reaper uses it (decision D6).
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
