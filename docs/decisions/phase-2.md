@@ -413,6 +413,31 @@ was lifted for this run).
   match their PDF's SHA-256 and page count, have `verified_by_human: true`, and #21 / #41 have
   `prefilled_from: null`. No email address or other personal data is in the label files.
 
+## Pre-tuning baseline (before Step 11, 2026-10-18)
+
+`make eval-detect TAG=pre-step11-tuning` (new `--tag` option: names the report files and title)
+→ `eval/reports/phase2-detection-dev-pre-step11-tuning-20261017-2e70d9d.{json,md}` (the date
+in the name is the UTC run date). Labelling subset only; IoU ≥ 0.5.
+
+| | Precision | Recall | TP | FP | FN |
+|---|--:|--:|--:|--:|--:|
+| all scored pages | 87.7 % | 77.2 % | 487 | 68 | 144 |
+| from scratch (#21, #41) | 43.8 % | 32.3 % | 21 | 27 | 44 |
+| pre-filled (other 9) | 91.9 % | 82.3 % | 466 | 41 | 100 |
+
+- **Anchoring check: a large gap.** At IoU ≥ 0.3 the from-scratch forms reach 75.0 % / 55.4 %,
+  so many of their boxes overlap the detector's but are drawn differently. A one-off read-only
+  diagnostic (not part of the committed eval) on #21: of 45 labelled boxes, 20 overlap no
+  detector box at all (real misses); 14 overlap with IoU < 0.5, and for those the labelled box
+  is about half the detector's height (median ratio 0.50; width ratio 0.94, same bottom edge),
+  i.e. the hand-drawn boxes are about 0.6× the font size, where the detector uses 1.2× — the
+  lower edge of the tolerance in the labelling README. #41 shows the same ratio (0.52). On
+  pre-filled pages the box heights come from the detector, so the gap mixes possible
+  pre-annotation bias with a box-height convention difference. To be looked at in Step 11
+  (decision for the human: whether the line-entry box height convention or the matching needs
+  revisiting); nothing was changed.
+- Lowest recall among pre-filled forms: #30 48.4 %, #23 65.6 %; comb recall 62.5 % (60/96).
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
