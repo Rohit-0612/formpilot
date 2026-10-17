@@ -4,8 +4,10 @@
 
 For every PDF in eval/dataset/<split>/ that has a label file in eval/labels/:
 - run detect + the flat frontend (pure functions; no database, no worker);
-- per labelled page whose text layer is OK, match predicted and labelled boxes one-to-one,
-  greedily by descending IoU, keeping pairs with IoU >= 0.5 (SPEC §10);
+- per labelled page whose text layer is OK and that is in the labelling subset
+  (eval/labelling/subset.py; labelled pages outside it are listed, not scored), match
+  predicted and labelled boxes one-to-one, greedily by descending IoU, keeping pairs with
+  IoU >= 0.5 (SPEC §10);
 - TP = matched pairs, FP = unmatched predictions, FN = unmatched labels;
   precision = TP / (TP + FP), recall = TP / (TP + FN), micro-averaged over pages and forms.
 
@@ -21,7 +23,7 @@ import hashlib
 import json
 import uuid
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,6 +36,7 @@ from app.ir.geometry import MATCH_IOU, iou
 from app.ir.models import BBox, FieldKind, TextLayer
 from app.logging import configure_logging, get_logger
 from eval.labelling.schema import DATASET_DIR, LABELS_DIR, REPO_ROOT, LabelKind, load_label_file
+from eval.labelling.subset import DEV_SUBSET, PageSelection, SubsetError, subset_pages
 from eval.labelling.tasks import detector_version
 
 log = get_logger(__name__)
@@ -171,7 +174,8 @@ class FormResult:
     prefilled_from: str | None
     scored_pages: list[int]  # 0-based
     ocr_pages: list[int]  # labelled, but the text layer is not OK: routed to OCR, not scored
-    unlabelled_pages: list[int]  # OK pages without labels
+    unlabelled_pages: list[int]  # OK pages in the subset without labels
+    outside_subset: list[int] = field(default_factory=list)  # labelled, but not in the subset
     at_match: Counts = field(default_factory=Counts)
     at_diagnostic: Counts = field(default_factory=Counts)
     kinds: KindStats = field(default_factory=KindStats)
@@ -193,7 +197,10 @@ class EvalError(Exception):
     pass
 
 
-def evaluate_form(pdf: Path, label_path: Path) -> FormResult:
+def evaluate_form(
+    pdf: Path, label_path: Path, subset: Mapping[str, PageSelection] | None = None
+) -> FormResult:
+    """Score one form. Without a subset, every labelled page is in scope."""
     label = load_label_file(label_path)
     data = pdf.read_bytes()
     sha256 = hashlib.sha256(data).hexdigest()
@@ -208,12 +215,20 @@ def evaluate_form(pdf: Path, label_path: Path) -> FormResult:
 
     ok = {i for i, page in enumerate(detection.pages) if page.text_layer is TextLayer.OK}
     labelled = set(label.labelled_pages)
+    if subset is None:
+        in_scope: set[int] = set(range(len(detection.pages)))
+    else:
+        try:
+            in_scope = set(subset_pages(subset, pdf.stem, len(detection.pages)))
+        except SubsetError as exc:
+            raise EvalError(str(exc)) from None
     result = FormResult(
         form=label.form,
         prefilled_from=label.prefilled_from,
-        scored_pages=sorted(labelled & ok),
-        ocr_pages=sorted(labelled - ok),
-        unlabelled_pages=sorted(ok - labelled),
+        scored_pages=sorted(labelled & ok & in_scope),
+        ocr_pages=sorted((labelled & in_scope) - ok),
+        unlabelled_pages=sorted((ok & in_scope) - labelled),
+        outside_subset=sorted(labelled - in_scope),
     )
     for page in result.scored_pages:
         predicted = [
@@ -243,6 +258,7 @@ class EvalResult:
     forms: list[FormResult]
     forms_without_labels: list[str]
     forms_without_ok_pages: list[str] = field(default_factory=list)  # need OCR, Phase 6
+    subset: Mapping[str, PageSelection] | None = None  # None: every labelled page is scored
 
     def total(self, prefilled: bool | None = None) -> tuple[Counts, Counts, KindStats]:
         at_match, at_diag, kinds = Counts(), Counts(), KindStats()
@@ -255,25 +271,34 @@ class EvalResult:
         return at_match, at_diag, kinds
 
 
-def evaluate(dataset: Path, labels: Path, split: str, detector: str) -> EvalResult:
+def evaluate(
+    dataset: Path,
+    labels: Path,
+    split: str,
+    detector: str,
+    subset: Mapping[str, PageSelection] | None = None,
+) -> EvalResult:
     pdfs = sorted(dataset.glob("*.pdf"))
     stems = {p.stem for p in pdfs}
     orphans = sorted(p.name for p in labels.glob("*.json") if p.stem not in stems)
     if orphans:
         raise EvalError(f"label files without a PDF in {dataset}: {', '.join(orphans)}")
+    unknown = sorted(set(subset or {}) - stems)
+    if unknown:
+        raise EvalError(f"subset names forms without a PDF in {dataset}: {', '.join(unknown)}")
     forms: list[FormResult] = []
     without: list[str] = []
     no_ok_pages: list[str] = []
     for pdf in pdfs:
         label_path = labels / f"{pdf.stem}.json"
         if label_path.exists():
-            forms.append(evaluate_form(pdf, label_path))
+            forms.append(evaluate_form(pdf, label_path, subset))
         elif _has_ok_page(pdf):
             without.append(pdf.stem)
         else:
             no_ok_pages.append(pdf.stem)
     created = datetime.now(UTC).isoformat(timespec="seconds")
-    return EvalResult(split, detector, created, forms, without, no_ok_pages)
+    return EvalResult(split, detector, created, forms, without, no_ok_pages, subset)
 
 
 def _has_ok_page(pdf: Path) -> bool:
@@ -299,6 +324,11 @@ def report_json(result: EvalResult) -> dict[str, object]:
         "detector": result.detector,
         "created_at": result.created_at,
         "match_rule": f"one-to-one, greedy by IoU, IoU >= {MATCH_IOU} on the same page",
+        "subset_pages_1based": (
+            None
+            if result.subset is None
+            else {form: _selection(pages) for form, pages in sorted(result.subset.items())}
+        ),
         "overall": section(None),
         "anchoring_check": {"from_scratch": section(False), "prefilled": section(True)},
         "forms": [
@@ -308,6 +338,7 @@ def report_json(result: EvalResult) -> dict[str, object]:
                 "scored_pages": [p + 1 for p in f.scored_pages],
                 "ocr_pages_not_scored": [p + 1 for p in f.ocr_pages],
                 "unlabelled_pages": [p + 1 for p in f.unlabelled_pages],
+                "labelled_outside_subset_not_scored": [p + 1 for p in f.outside_subset],
                 f"iou_{MATCH_IOU}": f.at_match.as_dict(),
                 f"iou_{DIAGNOSTIC_IOU}": f.at_diagnostic.as_dict(),
                 "kinds": f.kinds.as_dict(),
@@ -318,6 +349,16 @@ def report_json(result: EvalResult) -> dict[str, object]:
         "forms_without_ok_pages": result.forms_without_ok_pages,
         "dataset_notes": DATASET_NOTES,
     }
+
+
+def _selection(pages: PageSelection) -> str | list[int]:
+    return pages if isinstance(pages, str) else list(pages)
+
+
+def _describe(pages: PageSelection) -> str:
+    if isinstance(pages, str):
+        return "all pages"
+    return ("page " if len(pages) == 1 else "pages ") + ", ".join(map(str, pages))
 
 
 def _pct(value: float | None) -> str:
@@ -346,8 +387,17 @@ def report_markdown(result: EvalResult) -> str:
         f"- Detector: `{result.detector}`; run at {result.created_at}.",
         f"- Match: one-to-one, greedy by IoU, IoU ≥ {MATCH_IOU} on the same page (SPEC §10); "
         f"IoU ≥ {DIAGNOSTIC_IOU} shown as a diagnostic.",
-        "- Scored: labelled pages whose text layer is OK. All numbers below are measured by this "
-        "run.",
+        "- Scored: labelled pages whose text layer is OK"
+        + (
+            "."
+            if result.subset is None
+            else " and that are in the labelling subset (eval/labelling/subset.py): "
+            + "; ".join(
+                f"{form} {_describe(pages)}" for form, pages in sorted(result.subset.items())
+            )
+            + "."
+        ),
+        "- All numbers below are measured by this run.",
         "",
     ]
     if not result.forms:
@@ -402,6 +452,11 @@ def report_markdown(result: EvalResult) -> str:
             rows.append(f"- {f.form}: labelled pages {_pages(f.ocr_pages)} need OCR (Phase 6)")
         if f.unlabelled_pages:
             rows.append(f"- {f.form}: pages {_pages(f.unlabelled_pages)} not labelled yet")
+        if f.outside_subset:
+            rows.append(
+                f"- {f.form}: labelled pages {_pages(f.outside_subset)} are outside the labelling "
+                "subset (not scored)"
+            )
     rows += [f"- {stem}: no label file" for stem in result.forms_without_labels]
     rows += [
         f"- {stem}: no page with a usable text layer (needs OCR, Phase 6)"
@@ -437,7 +492,11 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging("INFO", json=False)
     try:
         result = evaluate(
-            args.dataset_root / args.split, args.labels, args.split, detector_version()
+            args.dataset_root / args.split,
+            args.labels,
+            args.split,
+            detector_version(),
+            subset=DEV_SUBSET,
         )
     except EvalError as exc:
         log.error("eval_failed", reason=str(exc))

@@ -15,6 +15,7 @@ from app.ir.models import BBox, FieldKind
 from eval import detection
 from eval.detection import Box, Counts, count, match
 from eval.labelling.schema import LabelField, LabelFile, LabelKind, LabelPage, dump_label_file
+from eval.labelling.subset import ALL, DEV_SUBSET, subset_pages
 from tests.fixtures import pdfs
 
 SCRATCH = None  # prefilled_from for from-scratch label files
@@ -225,6 +226,76 @@ def test_label_file_without_pdf_is_rejected(tmp_path: Path) -> None:
         detection.evaluate(dataset, labels, "dev", "flat@test")
 
 
+# --- labelling subset ---------------------------------------------------------------------
+
+
+def test_pages_outside_the_subset_are_listed_and_not_scored(tmp_path: Path) -> None:
+    # mixed_mostly_flat: pages 0 and 1 are OK, page 2 is garbled; all three marked labelled.
+    label = _label_file("mixed_mostly_flat", "01_mixed", pages=[0, 1, 2])
+    dataset, labels = _setup(tmp_path, {"01_mixed": ("mixed_mostly_flat", label)})
+
+    result = detection.evaluate(dataset, labels, "dev", "flat@test", subset={"01_mixed": (1,)})
+
+    (form,) = result.forms
+    assert form.scored_pages == [0]
+    assert form.outside_subset == [1, 2]
+    assert (form.ocr_pages, form.unlabelled_pages) == ([], [])
+    assert form.at_match == Counts(tp=2, fp=0, fn=0)  # pages 1 and 2 count for nothing
+    markdown = detection.report_markdown(result)
+    assert "01_mixed: labelled pages 2, 3 are outside the labelling subset" in markdown
+    assert "01_mixed page 1." in markdown
+    data = detection.report_json(result)
+    assert data["subset_pages_1based"] == {"01_mixed": [1]}
+    assert data["forms"][0]["labelled_outside_subset_not_scored"] == [2, 3]  # type: ignore[index]
+
+
+def test_subset_page_without_labels_is_listed_as_not_labelled(tmp_path: Path) -> None:
+    label = _label_file("mixed_mostly_flat", "01_mixed", pages=[0])
+    dataset, labels = _setup(tmp_path, {"01_mixed": ("mixed_mostly_flat", label)})
+
+    result = detection.evaluate(dataset, labels, "dev", "flat@test", subset={"01_mixed": ALL})
+
+    (form,) = result.forms
+    assert (form.scored_pages, form.unlabelled_pages, form.outside_subset) == ([0], [1], [])
+
+
+def test_form_missing_from_the_subset_is_not_scored(tmp_path: Path) -> None:
+    dataset, labels = _setup(
+        tmp_path,
+        {
+            "02_boxes": ("flat_boxes", _label_file("flat_boxes", "02_boxes")),
+            "06_lines": ("flat_lines", _label_file("flat_lines", "06_lines")),
+        },
+    )
+
+    result = detection.evaluate(dataset, labels, "dev", "flat@test", subset={"02_boxes": ALL})
+
+    boxes, lines = result.forms
+    assert boxes.scored_pages == [0]
+    assert (lines.scored_pages, lines.outside_subset) == ([], [0])
+    assert result.total()[0] == boxes.at_match
+
+
+def test_subset_errors_stop_the_run(tmp_path: Path) -> None:
+    dataset, labels = _setup(
+        tmp_path, {"02_boxes": ("flat_boxes", _label_file("flat_boxes", "02_boxes"))}
+    )
+
+    with pytest.raises(detection.EvalError, match=r"outside 1\.\.1"):
+        detection.evaluate(dataset, labels, "dev", "flat@test", subset={"02_boxes": (2,)})
+    with pytest.raises(detection.EvalError, match="without a PDF"):
+        detection.evaluate(dataset, labels, "dev", "flat@test", subset={"99_ghost": ALL})
+
+
+def test_dev_subset_is_the_human_decision_in_zero_based_pages() -> None:
+    """Human, 2026-10-17: #1 pages 1 and 4, #3 page 2, nine forms in full."""
+    assert subset_pages(DEV_SUBSET, "01_sbi_account_opening_form", 9) == {0, 3}
+    assert subset_pages(DEV_SUBSET, "03_sbi_kyc_annexure_b", 2) == {1}
+    full = {form for form, pages in DEV_SUBSET.items() if pages == ALL}
+    assert {form[:2] for form in full} == {"02", "06", "21", "23", "25", "30", "32", "39", "41"}
+    assert subset_pages(DEV_SUBSET, "37_aees_joining_report", 1) == frozenset()
+
+
 # --- reports ------------------------------------------------------------------------------
 
 
@@ -283,10 +354,11 @@ def test_cli_allows_only_the_dev_split(tmp_path: Path) -> None:
         detection.main(["--split", "test", "--out", str(tmp_path)])
 
 
-def test_cli_writes_reports(tmp_path: Path) -> None:
+def test_cli_writes_reports(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     dataset, labels = _setup(
         tmp_path, {"02_boxes": ("flat_boxes", _label_file("flat_boxes", "02_boxes"))}
     )
+    monkeypatch.setattr(detection, "DEV_SUBSET", {"02_boxes": ALL})  # the CLI always applies it
 
     code = detection.main(
         [
@@ -300,7 +372,18 @@ def test_cli_writes_reports(tmp_path: Path) -> None:
     )
 
     assert code == 0
-    assert len(list((tmp_path / "r").glob("phase2-detection-dev-*.md"))) == 1
+    (report,) = (tmp_path / "r").glob("phase2-detection-dev-*.json")
+    assert json.loads(report.read_text())["subset_pages_1based"] == {"02_boxes": "all"}
+
+
+def test_cli_stops_when_the_subset_does_not_match_the_dataset(tmp_path: Path) -> None:
+    dataset, labels = _setup(tmp_path, {"02_boxes": ("flat_boxes", None)})
+
+    code = detection.main(
+        ["--dataset-root", str(dataset.parent), "--labels", str(labels), "--out", str(tmp_path)]
+    )
+
+    assert code == 1  # DEV_SUBSET names forms that this dataset does not have
 
 
 def test_forms_without_ok_pages_are_listed_as_needing_ocr(tmp_path: Path) -> None:
