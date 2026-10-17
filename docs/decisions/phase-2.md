@@ -1,7 +1,9 @@
 # Phase 2 — Form IR and flat-PDF frontend: decision record
 
-> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Decisions are
-> recorded here as they are taken; the close-out sections are filled in at the end of the phase.
+> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–6 are
+> done; **next is Step 7**. A fresh session continues from the "Remaining plan" section below.
+> Decisions are recorded here as they are taken; the close-out sections are filled in at the end
+> of the phase.
 
 ## Decisions taken when the plan was approved (human, 2026-10-11)
 
@@ -249,7 +251,9 @@ human's decision).
   different semantic types. The detector change belongs to Step 11. Where the form does not show
   where one part ends (form #1: uniform cells, hints placed differently in every row), Claude
   proposed: split halfway through the empty cells between two hints, an odd middle cell going to
-  the earlier part — **awaiting the human's confirmation**; the README and the fixture use it.
+  the earlier part; empty cells before the first hint belong to the first part, those after the
+  last hint to the last part. **Approved by the human on 2026-10-17.** The README, the fixture
+  `flat_hinted_comb` and the local #1 example use it.
 - **No-box areas (human, 2026-10-16):** photo boxes and thumb-impression areas get no box
   (nothing is written there); signature areas are `text` boxes; "for office use" fields are boxed
   like any other field, and Phase 3 must mark them so FormPilot never fills them (added to the
@@ -321,6 +325,161 @@ human's decision).
   the dev split without labels (2026-10-16, written outside the repo) listed all 14 forms as
   not scored, as expected.
 - The matching functions are plain and importable, for reuse by Phase 3's `run_eval.py`.
+
+## Remaining plan (hand-off, 2026-10-17)
+
+Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
+approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) still apply.
+
+### How to work
+
+- Read `CLAUDE.md`, `docs/SPEC.md`, `docs/PLAN.md` and this file first.
+- **One step per turn.** After each step: run the tests, commit (conventional message), push,
+  show the human the exact test commands and their summary lines, then **stop** and wait for the
+  human's go-ahead. Wait for CI on the pushed commit and report its run id and result.
+- `make lint` (backend + `eval/` + web) and `make test` before every commit; `make test-int`
+  when a step touches the database, Redis or the worker (needs Docker).
+- Never create or edit files in `eval/labels/` (human ground truth); never report `test/`
+  numbers; never commit dev-form PDFs or renders of them (`eval/overlays/`,
+  `eval/labelling/examples/`, `eval/labelling/work/` are gitignored).
+
+### Where things stand
+
+- Branch `phase-2-flat-frontend`; Steps 0–6 committed and pushed, CI green on every pushed head
+  (last checked: run 38937110232 on `63ba5e2`).
+- Built: Form IR (`app/ir/`), `detect.py`, `flat.py`, synthetic fixtures
+  (`backend/tests/fixtures/pdfs.py`), Label Studio tooling (`eval/labelling/`), detection eval
+  (`eval/detection.py`, `make eval-detect`).
+- **Human task in progress:** labelling the dev boxes in Label Studio (container
+  `formpilot-labelstudio`, data in `eval/labelling/work/`; tasks generated at `flat@5fe80d0`).
+  Order: #21 and #41 from scratch, then the medium forms, then #1 and #3. The human runs
+  `make label-convert EXPORT=…` and commits the label files (or asks Claude to commit them).
+  Do not regenerate the tasks (`python -m eval.labelling.tasks --force`) while labelling is in
+  progress: re-importing duplicates tasks.
+
+### Step 7 — Storage wiring and stale jobs (D6)
+
+- **D6 (approved):** migration `0002` adds `jobs.started_at timestamptz NULL`;
+  `JobStore.mark_running` sets it. On worker startup, jobs that are `running` with
+  `COALESCE(started_at, created_at) < now() - JOB_TIMEOUT_SECONDS` become `failed`, error
+  `Stale`, `finished_at = now()`; documents of those jobs that are `analyzing` become `failed`.
+  Runs once per worker start. No other table changes.
+- Files: `app/db/models.py` (`Job.started_at`),
+  `app/db/migrations/versions/0002_jobs_started_at.py` (upgrade adds, downgrade drops; never edit
+  `0001`), `app/services/jobs.py` (`started_at` in `mark_running`, `JobStore.fail_stale()`
+  returning the failed job ids), `app/jobs/tasks.py` (call the reaper in `startup`; put the
+  storage in `ctx["storage"]`), `app/storage/__init__.py` (`make_storage(settings)` →
+  `LocalStorage(settings.storage_root)`), `app/main.py` (lifespan: `app.state.storage`),
+  `app/api/deps.py` (`get_storage`).
+- Tests: integration — migration up/down and the existing drift tests (models vs migrated
+  schema, CHECK names, enum inserts); `mark_running` sets `started_at`; the reaper fails only
+  stale running jobs (fresh running, queued and finished jobs untouched; a legacy row with NULL
+  `started_at` uses `created_at`) and moves their `analyzing` documents to `failed`. Unit —
+  `make_storage` and `get_storage`.
+
+### Step 8 — Upload, analyze job, read endpoints (D3, D4, D7)
+
+- **D3 (approved):** the API never opens a PDF (SPEC §11). It checks size (`MAX_UPLOAD_MB`,
+  default 20) and magic bytes (`%PDF-` within the first 1024 bytes) and rejects synchronously:
+  413 (too large) / 415 (not a PDF), with a clear error body. The worker enforces the page limit
+  (`MAX_PAGES`, default 50): document `failed`, job error `TooManyPages`. Page PNGs for the
+  viewer are rendered in the worker (`PAGE_IMAGE_DPI`, proposed default 144) and stored as
+  `documents/<id>/pages/<n>.png`; the API only serves bytes. SPEC §8 gets the upload step written
+  down.
+- **D4 (approved):** add `python-multipart` (FastAPI's multipart parser). Cap the upload by
+  `Content-Length` before reading, and read the stream in chunks up to limit + 1 bytes (a missing
+  or lying `Content-Length` is still caught).
+- **D7 (approved) API contract**, prefix `/api/v1`, all require login:
+  - `POST /documents` (multipart field `file`) → 202 `{document_id, job_id}`
+  - `GET /documents/{id}` → `{id, original_filename, status, source_kind, page_count,
+    created_at, expires_at, job: {id, status, error_message}}`
+  - `GET /documents/{id}/ir` → latest Form IR, values of sensitive types masked
+  - `GET /documents/{id}/pages/{n}.png` → `n` 0-based like `BBox.page`; 404 when out of range
+    or not rendered yet
+  - `GET /jobs/{id}`
+  - another user's document or job → 404, not 403 (ids are not confirmed)
+- Upload flow (`app/services/documents.py`): validate → SHA-256 → insert `Document`
+  (`original_filename` ≤ 255 chars, `expires_at = now + FILE_TTL_HOURS`) → `storage.put(
+  "documents/<id>/original.pdf")` → commit → `JobService.create_job(ANALYZE, document_id)`.
+  The API needs an arq pool in the lifespan (`create_queue`, as the CLI does). A storage failure
+  rolls back; an enqueue failure marks the document `failed`. Filenames and field values are
+  never logged.
+- Analyze job (`app/jobs/tasks.py` `analyze`, via `run_tracked`; logic in
+  `app/services/analysis.py`, rendering in `app/frontends/page_images.py`): document
+  `analyzing` → load bytes → open (encrypted → `EncryptedPdf`; unreadable → `UnreadablePdf`) →
+  page limit → `detect` → frontend by source kind (`flat_text` → `flat.run`; `fillable` →
+  `acroform` from Step 9, until then an IR without fields and a trace event; `scanned` → IR
+  without fields, every page traced as needing OCR) → render PNGs → `FormIRVersion` version 1
+  (`ir.model_dump(mode="json")`) → document `ready` with `source_kind` and `page_count`.
+  Any failure → document `failed`. Job errors are class names; `GET /documents/{id}` maps them
+  to readable messages (e.g. "The PDF has more than 50 pages.").
+- Config (`app/config.py`, `.env.example`): `MAX_UPLOAD_MB`, `MAX_PAGES`, `PAGE_IMAGE_DPI`.
+- Files: also `app/api/routes/documents.py`, `app/api/routes/jobs.py`,
+  `app/api/schemas/documents.py`; then `make types` (CI fails on stale generated types).
+- Tests: unit — magic bytes, size cap (incl. a lying `Content-Length`), masking, error-message
+  mapping. Integration — upload → worker → IR v1 and PNGs stored, document `ready`; non-PDF →
+  415; oversized → 413; the 51-page fixture → `failed` / `TooManyPages`; the encrypted fixture →
+  `failed`; another user → 404; captured logs contain no filenames or values.
+
+### Step 9 — AcroForm frontend (secondary)
+
+- `app/frontends/acroform.py`, routed from `analysis.py` for `fillable`. Text, checkbox, radio,
+  choice; options with export values (checkbox on-state, e.g. `/Agreed`; radio group = one
+  field whose options are the kids' on-states, bbox = union of the kids; choice `/Opt` pairs);
+  `max_chars` from `/MaxLen`; label from the tooltip (`/TU`), else the nearest text left/above
+  (reuse the flat label logic). Boxes: `widget.rect * page.rotation_matrix`.
+- Tests on `fillable_basic` (its expected fields are in the fixture), plus the acceptance test
+  "coordinate conversion bottom-left ↔ top-left": the raw `/Rect` read from the PDF object,
+  converted with `app/ir/coords.py`, equals the IR bbox (offset CropBox).
+
+### Step 10 — Web: upload, progress, viewer
+
+- `web/src/app/documents/new/page.tsx` (upload), `web/src/app/documents/[id]/page.tsx` (status
+  polled with TanStack Query until `ready`/`failed`, readable error), `web/src/components/
+  page-viewer.tsx` (page PNG with the IR boxes on top, scaled by image width / page width,
+  coloured by kind; no editing), `web/src/lib/api/documents.ts`, a link from the dashboard.
+  Request/response types only from the generated `schema.d.ts`.
+- Tests: lint, typecheck, build (CI); a manual `make up` run uploading a dev form. The human
+  does the visual check on 5 forms (Gate 2 item).
+
+### Step 11 — Eval on the human labels, tuning, OpenCV decision
+
+- Needs the human's label files in `eval/labels/`. Run `make eval-detect`; commit the report in
+  `eval/reports/`. Tune `flat.py` on dev only, re-run, commit each report.
+- To implement (labelling rules, Step 5): rule 1 (hinted cells, one comb per hinted part, the
+  approved split rule; hinted dates as D8), rule 2 (wide cells: one character per cell → comb;
+  groups → one field per cell), rule 3 (label inside a cell → only the empty part; no box for
+  photo and thumb-impression areas). Remove each strict xfail in `tests/unit/test_flat.py`
+  (`STEP_11_RULES`) as its rule lands. Also check the comb cell-width limit (20 pt; #25's cells
+  are 26–27 pt).
+- Report the anchoring check (from-scratch #21/#41 vs pre-filled forms) to the human.
+- OpenCV raster fallback: only if the eval shows misses caused by boxes drawn as images (#3 has
+  43 images), and only with the human's approval (new dependency); otherwise it stays in Phase 6.
+- Seen but not part of the detection metric: some labels are incomplete (#25 row 3 lost
+  "Father's" and the superscript "th"); label quality matters for Phase 3.
+
+### Step 12 — Close-out
+
+- `/end-phase 2`: finish this record (what was built, alternatives, limitations), tick the PLAN
+  items that have evidence. Gate 2 acceptance (`docs/PLAN.md`): eval report in `eval/reports/`;
+  human visual check on 5 forms; coordinate conversion unit tests (Step 1 `test_coords.py`,
+  Step 9); non-PDF / oversized upload rejected with a clear error (Step 8). Only the human ticks
+  the gate. After the gate: PR to `main` with `gh pr create` (summary + acceptance results).
+
+### Open items
+
+- Human: labelling (above); Phase 1 teach-back and the "In my own words" sections of
+  `phase-0.md`, `phase-1.md` and this file.
+- Step 8: the masking format for sensitive values in `GET /documents/{id}/ir` is not decided
+  yet (Phase 2 IRs have no values, but the path is built and tested now) — propose it in the
+  Step 8 plan.
+- The recorded Label Studio export (`backend/tests/fixtures/labelstudio_export_1.23.2.json`)
+  pins the SHA-256 of fixtures `flat_underscores`, `flat_boxes` and `mixed_mostly_flat`;
+  changing those fixtures means re-recording the export with a throwaway Label Studio.
+- The README's Label Studio click path follows the 1.23.2 docs; the flow itself was verified
+  through the API, not by clicking.
+- Labels for the scanned/garbled dev forms (#37, #38, #42) are a Phase 6 task.
+- Phase 3 must mark office-use fields so FormPilot never fills them (added to `docs/PLAN.md`).
 
 ## Known issues
 
