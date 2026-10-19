@@ -758,18 +758,22 @@ def _context(cand: _Candidate, text: _PageText) -> str | None:
     return max(headings, key=lambda line: (line.rect[3], -line.rect[0])).text
 
 
+def _label(cand: _Candidate, candidates: list[_Candidate], text: _PageText) -> str | None:
+    """Tick boxes look right first (the label follows the box); entries look left, then above."""
+    if cand.kind in (FieldKind.CHECKBOX, FieldKind.RADIO):
+        return (
+            _label_right(cand, candidates, text.tokens)
+            or _label_left(cand, candidates, text.tokens)
+            or _label_above(cand, text.tokens, text.median_size)
+        )
+    return _label_left(cand, candidates, text.tokens) or _label_above(
+        cand, text.tokens, text.median_size
+    )
+
+
 def _assign_text(candidates: list[_Candidate], text: _PageText) -> None:
     for cand in candidates:
-        if cand.kind is FieldKind.CHECKBOX:
-            cand.label = (
-                _label_right(cand, candidates, text.tokens)
-                or _label_left(cand, candidates, text.tokens)
-                or _label_above(cand, text.tokens, text.median_size)
-            )
-        else:
-            cand.label = _label_left(cand, candidates, text.tokens) or _label_above(
-                cand, text.tokens, text.median_size
-            )
+        cand.label = _label(cand, candidates, text)
         cand.context = _context(cand, text)
         if cand.rect[3] - cand.rect[1] < MIN_BOX_HEIGHT:
             cand.validations.append(
@@ -808,10 +812,10 @@ def _displayed(rect: Rect, page: pymupdf.Page, page_no: int) -> BBox:
     return BBox(page=page_no, x0=r.x0, y0=r.y0, x1=r.x1, y1=r.y1)
 
 
-def _reading_order(boxes: list[tuple[BBox, _Candidate]]) -> list[tuple[BBox, _Candidate]]:
+def _reading_order[T](boxes: list[tuple[BBox, T]]) -> list[tuple[BBox, T]]:
     """Top to bottom in rows, left to right within a row (displayed page)."""
     ordered = sorted(boxes, key=lambda item: ((item[0].y0 + item[0].y1) / 2, item[0].x0))
-    rows: list[list[tuple[BBox, _Candidate]]] = []
+    rows: list[list[tuple[BBox, T]]] = []
     for item in ordered:
         center = (item[0].y0 + item[0].y1) / 2
         if rows:
@@ -822,6 +826,53 @@ def _reading_order(boxes: list[tuple[BBox, _Candidate]]) -> list[tuple[BBox, _Ca
                 continue
         rows.append([item])
     return [item for row in rows for item in sorted(row, key=lambda i: i[0].x0)]
+
+
+# --- reused by the AcroForm frontend (labels, context, boxes and order work the same) -------
+
+PageText = _PageText
+
+
+def page_text(page: pymupdf.Page) -> PageText:
+    """Words, lines and leaders of a page, on the unrotated page (like widget rects)."""
+    return _extract_text(page)
+
+
+def _widget_candidate(rect: Rect, kind: FieldKind) -> _Candidate:
+    x0, y0, x1, y1 = rect
+    return _Candidate(rect=(x0, y0, x1, y1), kind=kind, group="widget", source="widget")
+
+
+def label_for(
+    rect: Rect, kind: FieldKind, text: PageText, others: Sequence[Rect] = ()
+) -> str | None:
+    """The label the flat frontend would give an entry area at rect (unrotated page).
+
+    others are the page's other entry areas: a label never reaches past one of them.
+    """
+    cand = _widget_candidate(rect, kind)
+    candidates = [cand, *(_widget_candidate(r, FieldKind.TEXT) for r in others)]
+    return _label(cand, candidates, text)
+
+
+def label_right_of(rect: Rect, text: PageText, others: Sequence[Rect] = ()) -> str | None:
+    """Only the text to the right of rect, e.g. the label of one radio button."""
+    cand = _widget_candidate(rect, FieldKind.CHECKBOX)
+    candidates = [cand, *(_widget_candidate(r, FieldKind.TEXT) for r in others)]
+    return _label_right(cand, candidates, text.tokens)
+
+
+def context_for(rect: Rect, text: PageText) -> str | None:
+    return _context(_widget_candidate(rect, FieldKind.TEXT), text)
+
+
+def displayed(rect: Rect, page: pymupdf.Page, page_no: int) -> BBox:
+    """A rect on the unrotated page -> an IR box on the displayed page."""
+    return _displayed(rect, page, page_no)
+
+
+def reading_order[T](boxes: list[tuple[BBox, T]]) -> list[tuple[BBox, T]]:
+    return _reading_order(boxes)
 
 
 def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: datetime) -> FormIR:
