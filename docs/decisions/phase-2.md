@@ -662,6 +662,37 @@ The IoU ≥ 0.5 numbers equal the committed pre-tuning report exactly (that repo
   misses on the pre-filled forms; Step 11 looks at the missed spots on #21 and #41.
 - Lowest writing-spot recall: #30 48.4 %, comb rows 62.5 % (60/96), #23 68.8 %.
 
+## D8 amended: split comb rows at gaps relative to the row (human, 2026-10-19; written before any number was computed)
+
+**Observation that prompted it.** On a synthetic test form of the human's (not in the eval
+dataset; never used for tuning) a date row of 16 pt cells grouped `DD │ MM │ YYYY` by 8 pt gaps,
+and a name row grouped `FIRST │ LAST` by a 10 pt gap, each came out as one comb box. The
+captions sit below the cells, so the "printed text between cells" condition does not apply.
+`flat.py` implemented D8's example threshold literally (`gap > one cell width`), so an 8–10 pt
+gap in an otherwise contiguous row never split it — although D8's own wording ("clearly larger
+than the normal cell spacing") says it should.
+
+**Rule (human).** A comb row is split where the gap between two neighbouring cells is larger
+than **max(3 pt, 2 × the median gap in that row)**, instead of larger than one cell width.
+- "Gaps" are the distances between consecutive cells of the row as found, before any split;
+  the median is taken over all of them. Contiguous cells have gap 0, so in a row whose cells
+  mostly touch, any gap over 3 pt splits it.
+- The other D8 condition stays: printed text or a separator between cells also splits.
+- Unchanged: each part keeps `max_chars` = its number of cells; a row of contiguous cells
+  without separators stays one comb (e.g. a date of birth with no gaps: one box, as the human
+  confirmed for the test form).
+- Edge cases of the median (noted, not changed): a two-cell row has one gap, which is its own
+  median and never larger than twice itself, so it is never split by a gap. With an even number
+  of gaps the median is the mean of the middle two, so a three-cell row with gaps [0, 8] has
+  median 4 and threshold 8, and is not split either. Short rows like these are reported in
+  Step 11 if they occur on dev.
+
+**How it is checked (Step 11).** A new synthetic generator fixture with 16 pt cells grouped by
+8 pt and 10 pt gaps (captions below the cells) and a contiguous row is the unit test. Then
+`make eval-detect` on the dev labels only: every form where the number of detected boxes changes
+is reported to the human — improvements and regressions, especially #1 and #25. The human's
+synthetic test form stays out of tuning.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
