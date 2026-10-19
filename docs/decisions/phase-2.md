@@ -1,7 +1,7 @@
 # Phase 2 — Form IR and flat-PDF frontend: decision record
 
-> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–8 are
-> done; **next is Step 9**. A fresh session continues from the "Remaining plan" section below.
+> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–9 are
+> done; **next is Step 10**. A fresh session continues from the "Remaining plan" section below.
 > Decisions are recorded here as they are taken; the close-out sections are filled in at the end
 > of the phase.
 
@@ -427,6 +427,45 @@ Plan approved by the human on 2026-10-18, with the four proposals below and thre
   endpoints; masked IR response with the database unchanged; no file name or value in the logs.
   The test worker helper moved to `tests/integration/workers.py`.
 
+## Step 9 — AcroForm frontend (minimal; plan approved 2026-10-19)
+
+- **Why minimal, and why now.** PLAN lists `frontends/acroform.py` as a secondary Phase 2
+  deliverable; SPEC §2 keeps the fillable path small and tested on synthetic fixtures, because
+  Phase 0 found 0 of 20 real forms fillable. Since Step 8, any PDF with a widget is `fillable`
+  and got an IR without fields — a dead end in an existing path. Reading widgets is exact (no
+  heuristics), so the step is small. Not done: eval (no real fillable form), tuning, web,
+  filling (`acroform_fill.py`, Phase 5), hybrid widget + printed-blank detection. Alternative
+  considered: defer to Phase 5 (a PLAN change, and the dead end would stay).
+- **Built** (`app/frontends/acroform.py`, routed from `analysis.py` for `fillable`): text →
+  `TEXT` (`max_chars` from `/MaxLen`); checkbox → `CHECKBOX` with its on-state as the one option
+  (e.g. `Agreed`); a radio group → one `RADIO` field per page, options = the buttons' on-states
+  with their boxes and the text right of each button, field box = union of the buttons; combo /
+  list box → `CHOICE` with `/Opt` (export value, display text). Label: tooltip (`/TU`), else the
+  flat frontend's label logic (entries left then above; tick boxes right first; a radio group's
+  own label left or above the group), only on pages whose text layer is `ok`. Context: the flat
+  heading logic. Boxes: widget rects (unrotated page) mapped to the displayed page with the flat
+  frontend's transform. Ids `p{page}_f{nnn}` in the flat reading order. One trace event per
+  field and per skipped widget.
+- **Reuse, not copies:** `flat.py` exposes `page_text`, `label_for`, `label_right_of`,
+  `context_for`, `displayed`, `reading_order`, wrapping its private functions (separate
+  `refactor` commit). No behaviour change: the flat tests pass, and a detection eval run after
+  the refactor equals the committed both-metrics report in every number.
+- **New fixture `fillable_rotated`** (PyMuPDF-built, byte-deterministic): a text widget labelled
+  by printed text and a push button on a `/Rotate 90` page. Existing fixtures unchanged (the
+  SHA-256 values pinned by the recorded Label Studio export still match).
+- **Gate 2 acceptance "coordinate conversion bottom-left ↔ top-left":** besides the Step 1
+  `test_coords.py`, `test_raw_pdf_rects_converted_with_coords_equal_the_ir_boxes` reads each
+  widget's raw `/Rect` and the page's raw `/CropBox` (or `/MediaBox`) and `/Rotate` from the PDF
+  objects — independent of PyMuPDF's transforms — converts them with `app/ir/coords.py`, and
+  checks they equal the IR boxes: offset CropBox (`fillable_basic`, 6 widgets) and `/Rotate 90`
+  (`fillable_rotated`).
+- Tests: unit — both fixtures against their hand-written ground truth (kind, box ±0.01 pt,
+  label, name, `max_chars`, options with values, labels and boxes, reading order); form values
+  (`/V`) not copied; ids and trace, push button skipped; on a page without a usable text layer
+  only tooltips label fields; the document is not changed; the raw `/Rect` check. Integration —
+  a `fillable_basic` upload through the real worker → `ready`, `fillable`, five fields of the
+  expected kinds. No API change (`make types` gives no diff).
+
 ## Labelling subset and no-box areas (human, 2026-10-17)
 
 - **Subset scored by the detection eval** (1-based pages): forms #2, #6, #21, #23, #25, #30,
@@ -602,7 +641,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 
 ### Where things stand
 
-- Branch `phase-2-flat-frontend`; Steps 0–8 committed and pushed (Steps 7 and 8: see their
+- Branch `phase-2-flat-frontend`; Steps 0–9 committed and pushed (Steps 7–9: see their
   sections above). CI green on every pushed head up to Step 6 (run 38937110232 on `63ba5e2`).
 - Built: Form IR (`app/ir/`), `detect.py`, `flat.py`, synthetic fixtures
   (`backend/tests/fixtures/pdfs.py`), Label Studio tooling (`eval/labelling/`), detection eval
@@ -750,6 +789,13 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   with a SWIG version that sets `__module__`.
 
 ## Known limitations
+
+- **AcroForm (Step 9), synthetic fixtures only.** Hybrid documents (widgets plus printed
+  blanks): only the widgets are detected, because a document with any widget is `fillable`.
+  Push buttons, signature fields and unknown widget types are skipped (trace event). Values a
+  form carries (`/V`) are not copied into the IR. A radio group whose buttons lie on several
+  pages becomes one field per page. No real fillable form has been evaluated (Phase 0 found
+  none).
 
 - **Masking: misclassified phone field.** A bank account field misclassified as a phone field
   (`phone_mobile` / `phone_alternate`) whose value happens to be in Indian mobile format (10
