@@ -464,7 +464,8 @@ def flat_comb_gap_groups() -> PdfFixture:
     """Comb groups split by gaps narrower than a cell (amended D8, 2026-10-19): a date row
     DD | MM | YYYY with 8 pt gaps and a name row FIRST | LAST with a 10 pt gap, captions printed
     below the cells (not between them); and a contiguous date-of-birth row that stays one comb.
-    With D8's old threshold (a gap wider than a cell, 14 pt) both grouped rows were one comb."""
+    With D8's old threshold (a gap wider than a cell, 14 pt) both grouped rows were one comb.
+    A line of separate checkboxes far apart must stay separate (second amendment)."""
     doc = _new_doc(A4)
     page = doc[0]
     fields: list[ExpectedField] = []
@@ -489,6 +490,14 @@ def flat_comb_gap_groups() -> PdfFixture:
     fields.append(
         ExpectedField(0, _comb(page, 160, 220, 8), FieldKind.TEXT, "Date of birth", max_chars=8)
     )
+    # Separate checkboxes at a regular spacing, captions below (no text between the boxes): a
+    # large median gap must not merge them into one comb (second amendment).
+    _text(page, 72, 282, "Account type")
+    for x, caption in ((160.0, "Savings"), (240.0, "Current"), (320.0, "Other")):
+        box = (x, 272.0, x + 10.0, 282.0)
+        _rect(page, box)
+        _text(page, x - 4, 292, caption, size=6)
+        fields.append(ExpectedField(0, box, FieldKind.CHECKBOX))
     return PdfFixture(
         "flat_comb_gap_groups",
         "Comb groups split by gaps narrower than a cell, captions below; a contiguous row (D8)",

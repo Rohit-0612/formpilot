@@ -58,8 +58,8 @@ MAX_BOX_PAGE_SHARE = 0.5
 CHECKBOX_SIZE = (5.0, 16.0)
 SQUARE_RATIO = (0.75, 1.33)
 COMB_CELL_MAX = (20.0, 25.0)  # width, height
-# D8 as amended (docs/decisions/phase-2.md, 2026-10-19): a comb row splits where a gap is larger
-# than max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR x the median gap of that row).
+# D8 as amended twice (docs/decisions/phase-2.md, 2026-10-19): a comb row splits where a gap is
+# larger than min(cell width, max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR x the median gap of that row)).
 MIN_SPLIT_GAP = 3.0
 SPLIT_GAP_FACTOR = 2.0
 MIN_BOX_HEIGHT = 6.0  # SPEC §6.7 minimum font size; smaller boxes are flagged
@@ -569,7 +569,9 @@ def _continues_comb(prev: Rect, cell: Rect, tokens: Sequence[_Token], split_gap:
     prev_w, cell_w = prev[2] - prev[0], cell[2] - cell[0]
     if not 0.7 <= cell_w / prev_w <= 1.43:
         return False
-    if cell[0] - prev[2] > split_gap:  # a gap clearly wider than the row's usual spacing (D8)
+    # D8: a gap wider than a cell always splits; a narrower one splits when it is clearly wider
+    # than the row's usual spacing (split_gap).
+    if cell[0] - prev[2] > min(max(prev_w, cell_w), split_gap):
         return False
     gap = (prev[2] - 0.5, prev[1], cell[0] + 0.5, prev[3])
     for token in tokens:  # printed text or a separator between the cells (D8)
