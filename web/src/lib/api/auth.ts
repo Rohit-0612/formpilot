@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { api, type User } from "./client";
 import { ApiError, detailMessage } from "./errors";
@@ -23,6 +25,18 @@ export function useMe() {
     },
     retry: false,
   });
+}
+
+/** For signed-in pages: the logged-in user; without a valid session, go to the login page. */
+export function useRequireUser() {
+  const router = useRouter();
+  const me = useMe();
+  useEffect(() => {
+    if (me.data === null) {
+      router.replace("/login");
+    }
+  }, [me.data, router]);
+  return me;
 }
 
 export function useRegister() {
