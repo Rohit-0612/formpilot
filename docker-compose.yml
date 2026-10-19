@@ -95,6 +95,8 @@ services:
       args:
         # Inlined into the browser bundle at build time; the browser calls the API directly.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        # Same value as the API's MAX_UPLOAD_MB (a readable size message before uploading).
+        NEXT_PUBLIC_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
     ports:
       - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
     depends_on:
