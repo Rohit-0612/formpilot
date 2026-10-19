@@ -385,7 +385,7 @@ Metrics:
 
 | Metric | Definition |
 |---|---|
-| Detection precision / recall | predicted vs labelled fields, match if IoU ≥ 0.5 on the same page |
+| Detection precision / recall | predicted vs labelled fields, match if IoU ≥ 0.5 on the same page; Phase 2 adds a primary **writing-spot match** (same horizontal extent and same writing row, box height not scored; `docs/decisions/phase-2.md`) |
 | Semantic accuracy | share of matched fields with the correct semantic type |
 | Fill correctness | render with a persona, read back values, compare to expected |
 | Placement IoU (v1) | mean IoU of rendered text box vs labelled entry box |

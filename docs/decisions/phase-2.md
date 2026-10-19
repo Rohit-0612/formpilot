@@ -509,6 +509,57 @@ in the name is the UTC run date). Labelling subset only; IoU ≥ 0.5.
   revisiting); nothing was changed.
 - Lowest recall among pre-filled forms: #30 48.4 %, #23 65.6 %; comb recall 62.5 % (60/96).
 
+## Writing-spot matching (human decision 2026-10-19; written before any number was computed)
+
+**Principle (human).** The detection eval measures whether the detector found the same
+**writing spot** as the labeller — the same place on the page where a person writes — not
+whether the two boxes have the same height. Box height is a drawing convention (the detector
+uses 1.2× the label's font size; the from-scratch labels are about 0.6×, see the pre-tuning
+baseline) and is not scored.
+
+**Rule (proposed by Claude, fixed before computing numbers).** A predicted box P and a labelled
+box L, on the same page, mark the same writing spot if both hold:
+
+1. **Same horizontal extent:** the IoU of their x-intervals,
+   |[P.x0, P.x1] ∩ [L.x0, L.x1]| / |[P.x0, P.x1] ∪ [L.x0, L.x1]|, is at least **0.5**.
+2. **Same writing row:** the distance between their vertical centres is at most **0.5 × the
+   taller box's height**: |cy(P) − cy(L)| ≤ 0.5 × max(h(P), h(L)).
+
+Matching stays one-to-one and greedy, now ordered by horizontal IoU (descending), then by
+centre distance relative to the taller height (ascending), then by index — deterministic, as
+before.
+
+**Why these thresholds (geometry, not dev numbers).**
+- The rule asks for a distance "relative to the font size", but neither the label files nor
+  the IR record a font size; box height is the scale both have. The taller box is the reference,
+  because the shorter one may be a thin hand-drawn box.
+- Same spot, different heights, same writing line (the bottom edge): with heights h and k·h,
+  the centres are |1 − k|·h/2 apart and the limit is max(1, k)·h/2, so every k from 0 up to any
+  height matches. The 0.6× hand-drawn box against the detector's 1.2× box (k = 0.5) is well
+  inside.
+- Neighbouring writing lines must not match. Line pitch is at least about one font size; with
+  the detector's box of 1.2× font size the limit is 0.6× font size, while centres on adjacent
+  lines are at least about 0.7× apart (pitch minus half the height difference of a 0.6× and a
+  1.2× box). Multi-line entries (one box per line) therefore stay separate.
+- Horizontal IoU ≥ 0.5 is the same threshold as SPEC §10, on one axis: a comb row labelled as one
+  box against 8 per-cell predictions does not match (each cell covers 1/8), which is correct —
+  they are different fields.
+- A checkbox 2 pt off (9 pt square) has horizontal IoU 7/11 ≈ 0.64 and centre distance 2 ≤ 4.5:
+  it matches, where plain IoU (≈ 0.43) did not.
+
+**Known edge case.** A labelled box much taller than the line pitch (e.g. 2.4× font size drawn
+over dense lines) can reach the centre of the line above; the greedy order then prefers the
+closer centre, but ties are possible. Not expected under the labelling rules (the README asks for
+"a little above the capital letters").
+
+**Reporting.** `make eval-detect` reports the writing-spot match as the **primary** metric
+(overall, by kind, anchoring check, per form) and plain IoU ≥ 0.5 (SPEC §10) as the
+**secondary** metric; IoU ≥ 0.3 stays in the JSON as a diagnostic. The committed pre-tuning
+report (`phase2-detection-dev-pre-step11-tuning-20261017-2e70d9d`) is left unchanged; the
+baseline is re-reported under both metrics in a new report. No label is changed. SPEC §10's
+detection metric is IoU ≥ 0.5; this adds a primary metric for Phase 2 detection and keeps the
+SPEC metric — SPEC §10 gets a note pointing here.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
