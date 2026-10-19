@@ -10,11 +10,23 @@ import {
 } from "@/lib/api/documents";
 import { userMessage } from "@/lib/api/errors";
 
-type Kind = IrField["kind"];
+/**
+ * What the viewer shows: the IR kind, plus "comb" for display only. The IR has no comb kind
+ * (decision D8: a comb row is a text field with max_chars = its number of cells). On flat and
+ * scanned documents max_chars only comes from comb rows; on fillable documents it comes from
+ * /MaxLen, which is a text field with a length limit, not cells.
+ */
+type DisplayKind = IrField["kind"] | "comb";
+type SourceKind = MaskedFormIR["source_kind"];
+
+function displayKind(field: IrField, sourceKind: SourceKind): DisplayKind {
+  return field.kind === "text" && field.max_chars && sourceKind !== "fillable" ? "comb" : field.kind;
+}
 
 // Full class names (Tailwind only sees literal strings).
-const KIND_STYLE: Record<Kind, { box: string; swatch: string; name: string }> = {
+const KIND_STYLE: Record<DisplayKind, { box: string; swatch: string; name: string }> = {
   text: { box: "border-blue-600 bg-blue-500/10", swatch: "bg-blue-600", name: "Text" },
+  comb: { box: "border-cyan-600 bg-cyan-500/10", swatch: "bg-cyan-600", name: "Comb" },
   checkbox: { box: "border-emerald-600 bg-emerald-500/10", swatch: "bg-emerald-600", name: "Checkbox" },
   radio: { box: "border-purple-600 bg-purple-500/10", swatch: "bg-purple-600", name: "Radio group" },
   choice: { box: "border-amber-600 bg-amber-500/10", swatch: "bg-amber-600", name: "Choice" },
@@ -38,9 +50,15 @@ function boxStyle(bbox: IrField["bbox"], page: PageInfo) {
 }
 
 /** The field's printed label and kind. Values are never shown in Phase 2 (masked or not). */
-function describe(field: IrField): string {
-  const kind = KIND_STYLE[field.kind].name;
-  return field.label_text ? `${field.label_text} · ${kind}` : kind;
+function describe(field: IrField, sourceKind: SourceKind): string {
+  const kind = displayKind(field, sourceKind);
+  let name = KIND_STYLE[kind].name;
+  if (kind === "comb") {
+    name = `Comb (${field.max_chars} cells)`;
+  } else if (kind === "text" && field.max_chars) {
+    name = `Text, max ${field.max_chars} characters`;
+  }
+  return field.label_text ? `${field.label_text} · ${name}` : name;
 }
 
 function PageImage({ documentId, page }: { documentId: string; page: number }) {
@@ -87,7 +105,8 @@ export function PageViewer({ documentId, ir }: { documentId: string; ir: MaskedF
   const [page, setPage] = useState(0);
   const info = ir.pages[page];
   const fields = (ir.fields ?? []).filter((field) => field.bbox.page === page);
-  const kinds = [...new Set(fields.map((field) => field.kind))];
+  const kindOf = (field: IrField) => displayKind(field, ir.source_kind);
+  const kinds = [...new Set(fields.map(kindOf))];
 
   return (
     <section aria-label="Page viewer">
@@ -117,7 +136,7 @@ export function PageViewer({ documentId, ir }: { documentId: string; ir: MaskedF
           {kinds.map((kind) => (
             <li key={kind} className="flex items-center gap-1.5">
               <span className={`inline-block h-3 w-3 rounded-sm ${KIND_STYLE[kind].swatch}`} />
-              {KIND_STYLE[kind].name} ({fields.filter((field) => field.kind === kind).length})
+              {KIND_STYLE[kind].name} ({fields.filter((field) => kindOf(field) === kind).length})
             </li>
           ))}
         </ul>
@@ -142,8 +161,8 @@ export function PageViewer({ documentId, ir }: { documentId: string; ir: MaskedF
         {fields.map((field) => (
           <div key={field.id}>
             <div
-              title={describe(field)}
-              className={`absolute border-2 ${KIND_STYLE[field.kind].box}`}
+              title={describe(field, ir.source_kind)}
+              className={`absolute border-2 ${KIND_STYLE[kindOf(field)].box}`}
               style={boxStyle(field.bbox, info)}
             />
             {field.kind === "radio"
