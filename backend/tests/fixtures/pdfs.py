@@ -885,6 +885,37 @@ def fillable_basic() -> PdfFixture:
     )
 
 
+def fillable_rotated() -> PdfFixture:
+    """A text widget with its label printed to the left and a push button, on a /Rotate 90
+    page. Widget rects are given on the unrotated page; the expected box is on the displayed
+    page: raw /Rect [150 624 350 642] -> (842 - 218, 150, 842 - 200, 350) by hand."""
+    doc = _new_doc(A4)
+    page = doc[0]
+    _text(page, 72, 214, "Name")
+    text = pymupdf.Widget()
+    text.field_type = pymupdf.PDF_WIDGET_TYPE_TEXT
+    text.field_name = "name"
+    text.rect = pymupdf.Rect(150, 200, 350, 218)
+    text.text_fontsize = 10
+    page.add_widget(text)
+    button = pymupdf.Widget()  # not an entry area: skipped by the frontend
+    button.field_type = pymupdf.PDF_WIDGET_TYPE_BUTTON
+    button.field_name = "submit"
+    button.rect = pymupdf.Rect(150, 300, 230, 320)
+    button.button_caption = "Submit"
+    page.add_widget(button)
+    page.set_rotation(90)
+    fields = (ExpectedField(0, (624, 150, 642, 350), FieldKind.TEXT, "Name", native_name="name"),)
+    return PdfFixture(
+        "fillable_rotated",
+        "AcroForm on a /Rotate 90 page: text widget labelled from the text, push button",
+        _bytes(doc),
+        SourceKind.FILLABLE,
+        (TextLayer.OK,),
+        fields,
+    )
+
+
 # --- files the upload path must handle ----------------------------------------------------
 
 MAX_PAGES_PLUS_ONE = 51  # SPEC §8 limit is 50 pages
@@ -940,6 +971,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         mixed_mostly_flat,
         mixed_mostly_scanned,
         fillable_basic,
+        fillable_rotated,
         too_many_pages,
         encrypted,
     )

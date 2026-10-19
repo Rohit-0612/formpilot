@@ -136,6 +136,22 @@ async def test_upload_analyze_and_read_back(
     assert "234567890124" not in logs.out + logs.err
 
 
+async def test_a_fillable_pdf_is_analysed_by_the_acroform_frontend(
+    client_for: ClientFactory, live_settings: Settings
+) -> None:
+    client = await client_for()
+    fixture = pdfs.get("fillable_basic")
+    document_id = (await _upload(client, fixture.data)).json()["document_id"]
+
+    await _run_worker(live_settings)
+
+    document = (await client.get(f"{DOCS}/{document_id}")).json()
+    assert (document["status"], document["source_kind"]) == ("ready", "fillable")
+    ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
+    assert [f["native_name"] for f in ir["fields"]] == [f.native_name for f in fixture.fields]
+    assert [f["kind"] for f in ir["fields"]] == ["text", "text", "checkbox", "radio", "choice"]
+
+
 # --- rejected uploads ----------------------------------------------------------------------
 
 

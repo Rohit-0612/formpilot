@@ -18,10 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.db.models import Document, DocumentStatus, FormIRVersion, Job
-from app.frontends import flat
+from app.frontends import acroform, flat
 from app.frontends.detect import detect
 from app.frontends.page_images import render_pages
-from app.ir.models import FormIR, SourceKind, TraceEvent
+from app.ir.models import FormIR, SourceKind
 from app.logging import get_logger
 from app.storage.base import Storage
 
@@ -30,7 +30,6 @@ log = get_logger(__name__)
 # PyMuPDF is not thread-safe, even across documents: one PDF at a time per worker process. The
 # work runs in a thread so the event loop (and arq's health check) stays responsive.
 _PYMUPDF_LOCK = threading.Lock()
-ACROFORM_STAGE = "frontend.acroform"
 
 
 class AnalysisError(Exception):
@@ -85,20 +84,8 @@ def analyze_pdf(
                 raise TooManyPages
             detection = detect(doc)
             if detection.source_kind is SourceKind.FILLABLE:
-                # The AcroForm frontend arrives in Step 9.
-                ir = FormIR(
-                    document_id=document_id,
-                    source_kind=SourceKind.FILLABLE,
-                    pages=detection.pages,
-                    trace=[
-                        TraceEvent(
-                            pass_name=ACROFORM_STAGE,
-                            field_id=None,
-                            change="AcroForm frontend not available yet; no fields detected",
-                            at=at,
-                        )
-                    ],
-                )
+                # Widgets only; printed blanks of a hybrid document are not detected (Step 9).
+                ir = acroform.run(doc, detection, document_id, at)
             else:
                 # flat_text and scanned alike: fields on pages with a usable text layer, a
                 # "needs OCR" trace event for the others (OCR is Phase 6).

@@ -50,12 +50,12 @@ def test_scanned_pdf_goes_through_the_flat_frontend() -> None:
     assert sum("needs OCR" in event.change for event in ir.trace) == len(other_pages)
 
 
-def test_fillable_pdf_gets_an_ir_without_fields_until_step_9() -> None:
+def test_fillable_pdf_goes_through_the_acroform_frontend() -> None:
     result = _analyze("fillable_basic")
 
     assert result.ir.source_kind is SourceKind.FILLABLE
-    assert result.ir.fields == []
-    assert [event.pass_name for event in result.ir.trace] == ["frontend.acroform"]
+    assert len(result.ir.fields) == len(pdfs.get("fillable_basic").fields)
+    assert {event.pass_name for event in result.ir.trace} == {"frontend.acroform"}
 
 
 def test_page_limit() -> None:
