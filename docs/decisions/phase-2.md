@@ -400,12 +400,14 @@ Plan approved by the human on 2026-10-18, with the four proposals below and thre
   revealed; idempotent. **Defence in depth (addition 1):** a value that looks like a D2
   identifier is masked whatever the field's semantic type — Aadhaar `[2-9]` + 11 digits (no
   checksum required), PAN, Indian passport (`A1234567`), voter ID (`ABC1234567`), bank account
-  9–18 digits — matched on the whole value with spaces and hyphens removed. **One exception,
-  Claude's detail for the human to confirm:** a 10-digit mobile number matches the bank account
-  pattern, so in a field understood as `phone_mobile` / `phone_alternate`, a value in the phone
-  format (SPEC §6.6) is not masked for that reason alone (still masked if it matches another
-  pattern, e.g. an Aadhaar). In any other field a phone-shaped value is masked. Not covered: an
-  identifier inside a longer free text (e.g. in an address) — only whole values are matched.
+  9–18 digits — matched on the whole value with spaces, hyphens and (since 2026-10-19) a
+  leading `+` removed; before that fix a `+`-prefixed number such as `+234567890124` matched no
+  pattern. **Phone exception (approved by the human on 2026-10-19, with conditions):** in a
+  field understood as `phone_mobile` / `phone_alternate`, a value in Indian mobile format (10
+  digits starting 6–9, optional `+91` or leading `0`) is not masked; any other value in a phone
+  field (an Aadhaar, an account-shaped number starting with 5, `91…` without `+`, another
+  country code) is masked as everywhere else, and a mobile-shaped value in any other field is
+  masked. Limitations: see Known limitations.
   **Rule (addition 3):** every Form IR returned to the client is masked — written into SPEC §8;
   enforced by a test that walks the OpenAPI document and fails if any response, at any depth,
   contains a plain `FormIR` (with a test that the check catches a nested one). The check uses
@@ -674,6 +676,18 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   with a SWIG version that sets `__module__`.
 
 ## Known limitations
+
+- **Masking: misclassified phone field.** A bank account field misclassified as a phone field
+  (`phone_mobile` / `phone_alternate`) whose value happens to be in Indian mobile format (10
+  digits starting 6–9) is not masked, because of the approved phone exception (Step 8).
+- **Masking: identifiers inside longer values.** Defence-in-depth masking matches whole values
+  only; an identifier inside a longer value (e.g. an Aadhaar number written into an address
+  line) is not caught. Fields whose semantic type is sensitive are always masked. Both cases are
+  pinned by `test_known_limitations_are_what_they_say`.
+- **Worker throughput: one PDF at a time.** PyMuPDF is not thread-safe, also across documents,
+  so a process-wide lock lets each worker process analyse one PDF at a time (Step 8); other jobs
+  wait for the lock. Throughput scales with worker processes, not with arq's concurrent jobs.
+  Not measured yet.
 
 - **Searchable scans.** A scanned page with an OCR text layer (invisible text over a full-page
   image) has enough characters, so it is `ok`, but its entry boxes are part of the image, not

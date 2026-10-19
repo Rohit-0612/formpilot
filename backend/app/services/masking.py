@@ -22,8 +22,9 @@ _SHOW_TAIL_FROM_LENGTH = 8
 _TAIL = 4
 _SEPARATORS = re.compile(r"[\s\-]+")
 
-# The D2 identifiers as Indian formats, matched against the whole value with spaces and hyphens
-# removed and letters upper-cased. Deliberately broad: masking too much is safe, too little not.
+# The D2 identifiers as Indian formats, matched against the whole value with spaces, hyphens and
+# a leading "+" removed and letters upper-cased. Deliberately broad: masking too much is safe,
+# too little is not.
 SENSITIVE_PATTERNS: dict[SemanticType, re.Pattern[str]] = {
     SemanticType.AADHAAR: re.compile(r"[2-9][0-9]{11}"),  # checksum not required
     SemanticType.PAN: re.compile(r"[A-Z]{5}[0-9]{4}[A-Z]"),
@@ -32,11 +33,13 @@ SENSITIVE_PATTERNS: dict[SemanticType, re.Pattern[str]] = {
     SemanticType.BANK_ACCOUNT_NUMBER: re.compile(r"[0-9]{9,18}"),
 }
 
-# A 10-digit mobile number also matches the bank account pattern (9-18 digits). In a field
-# understood as a phone number, a value in the phone format (SPEC §6.6) is not masked for that
-# reason alone; it is still masked if it matches any other identifier pattern.
+# Phone exception (human, 2026-10-19): a mobile number matches the bank account pattern (and
+# "+91" + 10 digits looks like an Aadhaar). In a field understood as a phone number, a value in
+# Indian mobile format (10 digits starting 6-9, optional "+91" or leading "0"; SPEC §6.6) is not
+# masked. Any other value in a phone field is checked like everywhere else. Known limitation: a
+# bank account field misclassified as a phone field, holding a mobile-shaped number, is not masked.
 _PHONE_TYPES = frozenset({SemanticType.PHONE_MOBILE, SemanticType.PHONE_ALTERNATE})
-_PHONE = re.compile(r"(?:\+91|0)?[6-9][0-9]{9}")
+_INDIAN_MOBILE = re.compile(r"(?:\+91|0)?[6-9][0-9]{9}")
 
 
 def _compact(value: str) -> str:
@@ -51,16 +54,16 @@ def mask_value(value: str) -> str:
 
 
 def looks_sensitive(value: str, semantic_type: SemanticType) -> bool:
-    """True if the value matches a D2 identifier pattern (the phone exception aside)."""
+    """True if the value matches a D2 identifier pattern (the phone exception aside).
+
+    Only whole values are matched: an identifier inside a longer value (e.g. an address) is not
+    caught (known limitation).
+    """
     compact = _compact(value)
-    for pattern_type, pattern in SENSITIVE_PATTERNS.items():
-        if not pattern.fullmatch(compact):
-            continue
-        is_phone = semantic_type in _PHONE_TYPES and _PHONE.fullmatch(compact)
-        if pattern_type is SemanticType.BANK_ACCOUNT_NUMBER and is_phone:
-            continue
-        return True
-    return False
+    if semantic_type in _PHONE_TYPES and _INDIAN_MOBILE.fullmatch(compact):
+        return False
+    candidate = compact.removeprefix("+")
+    return any(pattern.fullmatch(candidate) for pattern in SENSITIVE_PATTERNS.values())
 
 
 def must_mask(value: str | None, semantic_type: SemanticType) -> bool:

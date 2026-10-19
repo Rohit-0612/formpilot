@@ -124,13 +124,58 @@ def test_other_values_are_left_alone(semantic_type: T, value: str | None) -> Non
     assert field.value == value
 
 
-def test_phone_exception_covers_only_the_account_number_pattern() -> None:
-    """A phone field holding an Aadhaar-shaped value is masked; another field's phone is too."""
-    masked = MaskedFormIR.model_validate(
-        _ir((T.PHONE_MOBILE, AADHAAR), (T.OTHER, "9876543210"))
-    ).fields
+@pytest.mark.parametrize(
+    "value",
+    [
+        "9876543210",
+        "6000000000",
+        "+91 98765 43210",
+        "+91-9876543210",
+        "098765 43210",
+    ],
+)
+@pytest.mark.parametrize("semantic_type", [T.PHONE_MOBILE, T.PHONE_ALTERNATE])
+def test_phone_exception_covers_indian_mobile_numbers_in_phone_fields(
+    semantic_type: T, value: str
+) -> None:
+    (field,) = MaskedFormIR.model_validate(_ir((semantic_type, value))).fields
 
-    assert [f.value for f in masked] == ["XXXX0124", "XXXX3210"]
+    assert field.value == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        AADHAAR,  # an Aadhaar typed into a phone field
+        "5876543210",  # starts with 5: not a mobile number, but account-shaped
+        "98765432101",  # 11 digits without a leading 0
+        "919876543210",  # 91 without "+": Aadhaar-shaped
+        "+1 234567890123",  # another country code
+        PAN,
+    ],
+)
+def test_other_values_in_phone_fields_are_still_masked(value: str) -> None:
+    (field,) = MaskedFormIR.model_validate(_ir((T.PHONE_MOBILE, value))).fields
+
+    assert field.value == mask_value(value)
+
+
+@pytest.mark.parametrize("value", ["9876543210", "+91 98765 43210", "+234567890124"])
+def test_mobile_shaped_and_plus_prefixed_values_are_masked_outside_phone_fields(
+    value: str,
+) -> None:
+    (field,) = MaskedFormIR.model_validate(_ir((T.OTHER, value))).fields
+
+    assert field.value == mask_value(value)
+
+
+def test_known_limitations_are_what_they_say() -> None:
+    """Recorded in docs/decisions/phase-2.md; this test fails if the behaviour changes."""
+    misclassified_account = _ir((T.PHONE_MOBILE, "9876543210"))  # really an account number
+    in_free_text = _ir((T.CURRENT_ADDRESS_LINE1, "House 12, Aadhaar 2345 6789 0124"))
+
+    assert MaskedFormIR.model_validate(misclassified_account).fields[0].value == "9876543210"
+    assert "2345 6789 0124" in str(MaskedFormIR.model_validate(in_free_text).fields[0].value)
 
 
 # --- building the client IR ---------------------------------------------------------------

@@ -344,6 +344,8 @@ Page images are sent with `Cache-Control: private, no-store`.
 nesting depth; the stored IR keeps the real values. A field value is masked when its semantic
 type is sensitive (§5) or, as defence in depth, when the value itself looks like one of those
 identifiers (Aadhaar, PAN, passport, voter ID, bank account number), whatever the field's type.
+Exception: in a field understood as a phone number, a value in Indian mobile format (10 digits
+starting 6–9, optional `+91` or leading `0`) is not masked.
 Mask: `XXXX` + the last 4 characters for values of 8 or more characters, else `XXXX`. Enforced by
 the response type `MaskedFormIR` (masks on construction) and a test over the OpenAPI document
 that no response contains a plain `FormIR`.
