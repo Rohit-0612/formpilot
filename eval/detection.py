@@ -6,16 +6,19 @@ For every PDF in eval/dataset/<split>/ that has a label file in eval/labels/:
 - run detect + the flat frontend (pure functions; no database, no worker);
 - per labelled page whose text layer is OK and that is in the labelling subset
   (eval/labelling/subset.py; labelled pages outside it are listed, not scored), match
-  predicted and labelled boxes one-to-one, greedily by descending IoU, keeping pairs with
-  IoU >= 0.5 (SPEC §10);
+  predicted and labelled boxes one-to-one and greedily;
 - TP = matched pairs, FP = unmatched predictions, FN = unmatched labels;
   precision = TP / (TP + FP), recall = TP / (TP + FN), micro-averaged over pages and forms.
 
+Two match rules (docs/decisions/phase-2.md, "Writing-spot matching"):
+- primary, writing spot: same page, x-interval IoU >= 0.5, and vertical centres at most half the
+  taller box's height apart; box height is not scored;
+- secondary, IoU >= 0.5 on the same page (SPEC §10); IoU >= 0.3 kept in the JSON as a diagnostic.
+
 Reported as well: per form; recall by labelled kind and precision by predicted kind (text, comb,
-checkbox); kind agreement on matched pairs; the same numbers at IoU >= 0.3 as a diagnostic
-(a 9 pt checkbox 2 pt off has IoU ~0.43); from-scratch forms separately from pre-filled ones
-(anchoring check); and which pages were not scored and why. Writes a JSON and a Markdown report
-to eval/reports/. Only the dev split is allowed in Phase 2 (CLAUDE.md §6).
+checkbox) and kind agreement on matched pairs (primary rule); from-scratch forms separately from
+pre-filled ones (anchoring check); and which pages were not scored and why. Writes a JSON and a
+Markdown report to eval/reports/. Only the dev split is allowed in Phase 2 (CLAUDE.md §6).
 """
 
 import argparse
@@ -24,7 +27,7 @@ import json
 import re
 import uuid
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -44,6 +47,8 @@ log = get_logger(__name__)
 
 REPORTS_DIR = REPO_ROOT / "eval" / "reports"
 DIAGNOSTIC_IOU = 0.3
+SPOT_X_IOU = 0.5  # writing spot: minimum IoU of the x-intervals
+SPOT_ROW = 0.5  # writing spot: maximum centre distance, as a share of the taller box's height
 KINDS = ("text", "comb", "checkbox")
 
 DATASET_NOTES = (
@@ -63,30 +68,66 @@ class Box:
     kind: str  # one of KINDS
 
 
-def match(
-    predicted: Sequence[Box], labelled: Sequence[Box], threshold: float
-) -> list[tuple[int, int, float]]:
-    """One-to-one matches (predicted index, labelled index, IoU), greedy by descending IoU.
+# A match rule: (score, tie-break) for a pair that matches, None otherwise. Higher scores are
+# matched first, then lower tie-breaks.
+Rule = Callable[[BBox, BBox], tuple[float, float] | None]
 
-    Boxes on different pages never match. Ties are broken by the lower predicted, then the lower
-    labelled index, so the result is deterministic.
+
+def iou_rule(threshold: float) -> Rule:
+    def rule(pred: BBox, truth: BBox) -> tuple[float, float] | None:
+        overlap = iou(pred, truth)
+        return (overlap, 0.0) if overlap >= threshold else None
+
+    return rule
+
+
+def x_iou(a: BBox, b: BBox) -> float:
+    inter = min(a.x1, b.x1) - max(a.x0, b.x0)
+    if inter <= 0:
+        return 0.0
+    return inter / (max(a.x1, b.x1) - min(a.x0, b.x0))
+
+
+def writing_spot(pred: BBox, truth: BBox) -> tuple[float, float] | None:
+    """Same writing spot: same page, same horizontal extent, same writing row (the rule fixed
+    in docs/decisions/phase-2.md before any number was computed). Box height is not scored."""
+    if pred.page != truth.page:
+        return None
+    overlap = x_iou(pred, truth)
+    if overlap < SPOT_X_IOU:
+        return None
+    taller = max(pred.y1 - pred.y0, truth.y1 - truth.y0)
+    distance = abs((pred.y0 + pred.y1) / 2 - (truth.y0 + truth.y1) / 2) / taller
+    return (overlap, distance) if distance <= SPOT_ROW else None
+
+
+def match(
+    predicted: Sequence[Box], labelled: Sequence[Box], rule: Rule | float
+) -> list[tuple[int, int, float]]:
+    """One-to-one matches (predicted index, labelled index, score), greedy by the rule's score.
+
+    A float rule means IoU >= that threshold, and the score is the IoU. Boxes on different pages
+    never match. Ties are broken by the rule's tie-break, then the lower predicted, then the
+    lower labelled index, so the result is deterministic.
     """
+    if isinstance(rule, float | int):
+        rule = iou_rule(float(rule))
     pairs = [
-        (overlap, p, t)
+        (key[0], key[1], p, t)
         for p, pred in enumerate(predicted)
         for t, truth in enumerate(labelled)
-        if (overlap := iou(pred.bbox, truth.bbox)) >= threshold
+        if (key := rule(pred.bbox, truth.bbox)) is not None
     ]
-    pairs.sort(key=lambda pair: (-pair[0], pair[1], pair[2]))
+    pairs.sort(key=lambda pair: (-pair[0], pair[1], pair[2], pair[3]))
     used_p: set[int] = set()
     used_t: set[int] = set()
     matches: list[tuple[int, int, float]] = []
-    for overlap, p, t in pairs:
+    for score, _, p, t in pairs:
         if p in used_p or t in used_t:
             continue
         used_p.add(p)
         used_t.add(t)
-        matches.append((p, t, overlap))
+        matches.append((p, t, score))
     return matches
 
 
@@ -119,8 +160,8 @@ class Counts:
         }
 
 
-def count(predicted: Sequence[Box], labelled: Sequence[Box], threshold: float) -> Counts:
-    tp = len(match(predicted, labelled, threshold))
+def count(predicted: Sequence[Box], labelled: Sequence[Box], rule: Rule | float) -> Counts:
+    tp = len(match(predicted, labelled, rule))
     return Counts(tp=tp, fp=len(predicted) - tp, fn=len(labelled) - tp)
 
 
@@ -134,10 +175,12 @@ class KindStats:
     predicted_matched: Counter[str] = field(default_factory=Counter)
     agreement: Counter[str] = field(default_factory=Counter)  # "pred->label"
 
-    def add_page(self, predicted: Sequence[Box], labelled: Sequence[Box], threshold: float) -> None:
+    def add_page(
+        self, predicted: Sequence[Box], labelled: Sequence[Box], rule: Rule | float
+    ) -> None:
         self.labelled.update(b.kind for b in labelled)
         self.predicted.update(b.kind for b in predicted)
-        for p, t, _ in match(predicted, labelled, threshold):
+        for p, t, _ in match(predicted, labelled, rule):
             self.predicted_matched[predicted[p].kind] += 1
             self.labelled_matched[labelled[t].kind] += 1
             self.agreement[f"{predicted[p].kind}->{labelled[t].kind}"] += 1
@@ -177,9 +220,10 @@ class FormResult:
     ocr_pages: list[int]  # labelled, but the text layer is not OK: routed to OCR, not scored
     unlabelled_pages: list[int]  # OK pages in the subset without labels
     outside_subset: list[int] = field(default_factory=list)  # labelled, but not in the subset
-    at_match: Counts = field(default_factory=Counts)
-    at_diagnostic: Counts = field(default_factory=Counts)
-    kinds: KindStats = field(default_factory=KindStats)
+    at_spot: Counts = field(default_factory=Counts)  # primary: writing spot
+    at_match: Counts = field(default_factory=Counts)  # secondary: IoU >= 0.5
+    at_diagnostic: Counts = field(default_factory=Counts)  # IoU >= 0.3
+    kinds: KindStats = field(default_factory=KindStats)  # primary rule
 
 
 def _predicted_kind(kind: FieldKind, max_chars: int | None) -> str:
@@ -245,9 +289,10 @@ def evaluate_form(
             for f in label.fields
             if f.page == page
         ]
+        result.at_spot.add(count(predicted, truth, writing_spot))
         result.at_match.add(count(predicted, truth, MATCH_IOU))
         result.at_diagnostic.add(count(predicted, truth, DIAGNOSTIC_IOU))
-        result.kinds.add_page(predicted, truth, MATCH_IOU)
+        result.kinds.add_page(predicted, truth, writing_spot)
     return result
 
 
@@ -262,15 +307,24 @@ class EvalResult:
     subset: Mapping[str, PageSelection] | None = None  # None: every labelled page is scored
     tag: str | None = None  # names the run in the report file name, e.g. "pre-step11-tuning"
 
-    def total(self, prefilled: bool | None = None) -> tuple[Counts, Counts, KindStats]:
-        at_match, at_diag, kinds = Counts(), Counts(), KindStats()
+    def total(self, prefilled: bool | None = None) -> "Totals":
+        totals = Totals()
         for form in self.forms:
             if prefilled is not None and (form.prefilled_from is not None) != prefilled:
                 continue
-            at_match.add(form.at_match)
-            at_diag.add(form.at_diagnostic)
-            kinds.add(form.kinds)
-        return at_match, at_diag, kinds
+            totals.spot.add(form.at_spot)
+            totals.iou.add(form.at_match)
+            totals.diagnostic.add(form.at_diagnostic)
+            totals.kinds.add(form.kinds)
+        return totals
+
+
+@dataclass
+class Totals:
+    spot: Counts = field(default_factory=Counts)  # primary: writing spot
+    iou: Counts = field(default_factory=Counts)  # secondary: IoU >= 0.5
+    diagnostic: Counts = field(default_factory=Counts)  # IoU >= 0.3
+    kinds: KindStats = field(default_factory=KindStats)  # primary rule
 
 
 def evaluate(
@@ -313,11 +367,12 @@ def _has_ok_page(pdf: Path) -> bool:
 
 def report_json(result: EvalResult) -> dict[str, object]:
     def section(prefilled: bool | None) -> dict[str, object]:
-        at_match, at_diag, kinds = result.total(prefilled)
+        totals = result.total(prefilled)
         return {
-            f"iou_{MATCH_IOU}": at_match.as_dict(),
-            f"iou_{DIAGNOSTIC_IOU}": at_diag.as_dict(),
-            "kinds": kinds.as_dict(),
+            "writing_spot": totals.spot.as_dict(),
+            f"iou_{MATCH_IOU}": totals.iou.as_dict(),
+            f"iou_{DIAGNOSTIC_IOU}": totals.diagnostic.as_dict(),
+            "kinds": totals.kinds.as_dict(),
         }
 
     return {
@@ -326,7 +381,15 @@ def report_json(result: EvalResult) -> dict[str, object]:
         "split": result.split,
         "detector": result.detector,
         "created_at": result.created_at,
-        "match_rule": f"one-to-one, greedy by IoU, IoU >= {MATCH_IOU} on the same page",
+        "primary_metric": "writing_spot",
+        "match_rules": {
+            "writing_spot": (
+                f"same page, x-interval IoU >= {SPOT_X_IOU}, vertical centres at most "
+                f"{SPOT_ROW} x the taller box's height apart; one-to-one, greedy"
+            ),
+            f"iou_{MATCH_IOU}": f"IoU >= {MATCH_IOU} on the same page; one-to-one, greedy",
+            f"iou_{DIAGNOSTIC_IOU}": f"IoU >= {DIAGNOSTIC_IOU} (diagnostic)",
+        },
         "subset_pages_1based": (
             None
             if result.subset is None
@@ -342,6 +405,7 @@ def report_json(result: EvalResult) -> dict[str, object]:
                 "ocr_pages_not_scored": [p + 1 for p in f.ocr_pages],
                 "unlabelled_pages": [p + 1 for p in f.unlabelled_pages],
                 "labelled_outside_subset_not_scored": [p + 1 for p in f.outside_subset],
+                "writing_spot": f.at_spot.as_dict(),
                 f"iou_{MATCH_IOU}": f.at_match.as_dict(),
                 f"iou_{DIAGNOSTIC_IOU}": f.at_diagnostic.as_dict(),
                 "kinds": f.kinds.as_dict(),
@@ -368,28 +432,33 @@ def _pct(value: float | None) -> str:
     return "n/a" if value is None else f"{100 * value:.1f} %"
 
 
-def _counts_row(name: str, c: Counts, diag: Counts) -> str:
+def _counts_row(name: str, spot: Counts, iou_counts: Counts) -> str:
     return (
-        f"| {name} | {_pct(c.precision)} | {_pct(c.recall)} | {c.tp} | {c.fp} | {c.fn} | "
-        f"{_pct(diag.precision)} | {_pct(diag.recall)} |"
+        f"| {name} | {_pct(spot.precision)} | {_pct(spot.recall)} | {spot.tp} | {spot.fp} | "
+        f"{spot.fn} | {_pct(iou_counts.precision)} | {_pct(iou_counts.recall)} |"
     )
 
 
 _COUNTS_HEADER = (
     "| | Precision | Recall | TP | FP | FN | "
-    f"Precision @ {DIAGNOSTIC_IOU} | Recall @ {DIAGNOSTIC_IOU} |\n"
+    f"Precision (IoU ≥ {MATCH_IOU}) | Recall (IoU ≥ {MATCH_IOU}) |\n"
     "|---|--:|--:|--:|--:|--:|--:|--:|"
 )
 
 
 def report_markdown(result: EvalResult) -> str:
-    at_match, at_diag, kinds = result.total()
+    totals = result.total()
     lines = [
         f"# Detection eval — {result.split} split" + (f" — {result.tag}" if result.tag else ""),
         "",
         f"- Detector: `{result.detector}`; run at {result.created_at}.",
-        f"- Match: one-to-one, greedy by IoU, IoU ≥ {MATCH_IOU} on the same page (SPEC §10); "
-        f"IoU ≥ {DIAGNOSTIC_IOU} shown as a diagnostic.",
+        "- **Primary metric: writing-spot match** — same page, x-interval IoU ≥ "
+        f"{SPOT_X_IOU}, vertical centres at most {SPOT_ROW} times the taller box's height apart; "
+        "box height is not scored (docs/decisions/phase-2.md). Precision, recall, TP, FP, FN "
+        "and the by-kind table use it.",
+        f"- Secondary metric: IoU ≥ {MATCH_IOU} on the same page (SPEC §10), in the last two "
+        f"columns. IoU ≥ {DIAGNOSTIC_IOU} is in the JSON as a diagnostic. Matching is "
+        "one-to-one and greedy under each rule.",
         "- Scored: labelled pages whose text layer is OK"
         + (
             "."
@@ -410,12 +479,12 @@ def report_markdown(result: EvalResult) -> str:
             "## Overall",
             "",
             _COUNTS_HEADER,
-            _counts_row("all scored pages", at_match, at_diag),
+            _counts_row("all scored pages", totals.spot, totals.iou),
             "",
         ]
-        k = kinds.as_dict()
+        k = totals.kinds.as_dict()
         lines += [
-            "## By kind",
+            "## By kind (writing spot)",
             "",
             "| Kind | Recall (labelled boxes found) | Precision (predicted boxes correct) |",
             "|---|--:|--:|",
@@ -442,12 +511,12 @@ def report_markdown(result: EvalResult) -> str:
             _COUNTS_HEADER,
         ]
         for name, flag in (("from scratch", False), ("pre-filled", True)):
-            m, d, _ = result.total(flag)
-            lines.append(_counts_row(name, m, d))
+            part = result.total(flag)
+            lines.append(_counts_row(name, part.spot, part.iou))
         lines += ["", "## Per form", "", _COUNTS_HEADER.replace("| |", "| Form |", 1)]
         for f in result.forms:
             name = f"{f.form}{' (from scratch)' if f.prefilled_from is None else ''}"
-            lines.append(_counts_row(name, f.at_match, f.at_diagnostic))
+            lines.append(_counts_row(name, f.at_spot, f.at_match))
     lines += ["", "## Not scored", ""]
     rows = []
     for f in result.forms:
@@ -517,14 +586,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     result.tag = args.tag
     json_path, md_path = write_reports(result, args.out)
-    at_match, _, _ = result.total()
+    totals = result.total()
     log.info(
         "eval_written",
         markdown=str(md_path),
         json=str(json_path),
         forms=len(result.forms),
-        precision=at_match.precision,
-        recall=at_match.recall,
+        precision=totals.spot.precision,
+        recall=totals.spot.recall,
+        iou_precision=totals.iou.precision,
+        iou_recall=totals.iou.recall,
     )
     return 0
 

@@ -11,6 +11,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
+from app.ir.geometry import iou
 from app.ir.models import BBox, FieldKind
 from eval import detection
 from eval.detection import Box, Counts, count, match
@@ -102,6 +103,104 @@ def test_kind_stats() -> None:
     assert data["matched_pairs_predicted_to_labelled_kind"] == {"text->comb": 1}
 
 
+# --- writing-spot rule (docs/decisions/phase-2.md, fixed before measuring) ---------------
+
+FS = 10.0  # font size of the synthetic label, pt
+BASELINE = 100.0
+
+
+def _line_box(height_factor: float, baseline: float = BASELINE, x0: float = 50, x1: float = 250):
+    """A line entry drawn from the writing line up by height_factor x the font size."""
+    return BBox(page=0, x0=x0, y0=baseline - height_factor * FS, x1=x1, y1=baseline)
+
+
+@pytest.mark.parametrize("factor", [0.4, 0.6, 1.0, 1.5, 2.4])
+def test_same_writing_line_matches_whatever_the_height(factor: float) -> None:
+    detector = _line_box(1.2)
+    labeller = _line_box(factor)
+
+    assert detection.writing_spot(detector, labeller) is not None
+
+
+def test_the_hand_drawn_height_that_iou_misses_is_a_writing_spot_match() -> None:
+    detector, labeller = _line_box(1.2), _line_box(0.4)
+
+    assert iou(detector, labeller) < 0.5  # plain IoU calls this a miss
+    assert detection.writing_spot(detector, labeller) is not None
+
+
+@pytest.mark.parametrize("pitch", [1.0, 1.2, 1.5])
+@pytest.mark.parametrize("label_factor", [0.6, 1.2])
+def test_neighbouring_writing_lines_do_not_match(pitch: float, label_factor: float) -> None:
+    """Multi-line entries (one box per line) stay separate, above and below."""
+    detector = _line_box(1.2)
+    below = _line_box(label_factor, baseline=BASELINE + pitch * FS)
+    above = _line_box(label_factor, baseline=BASELINE - pitch * FS)
+
+    assert detection.writing_spot(detector, below) is None
+    assert detection.writing_spot(detector, above) is None
+
+
+def test_horizontal_extent_must_overlap_by_half() -> None:
+    detector = _line_box(1.2, x0=0, x1=100)
+
+    assert detection.writing_spot(detector, _line_box(1.2, x0=30, x1=130)) is not None  # 70/130
+    assert detection.writing_spot(detector, _line_box(1.2, x0=34, x1=134)) is None  # 66/134
+
+
+def test_a_comb_row_does_not_match_its_single_cells() -> None:
+    comb = BBox(page=0, x0=100, y0=90, x1=260, y1=110)  # 8 cells of 20 pt
+    cells = [BBox(page=0, x0=100 + 20 * i, y0=90, x1=120 + 20 * i, y1=110) for i in range(8)]
+
+    assert all(detection.writing_spot(cell, comb) is None for cell in cells)
+
+
+def test_a_checkbox_2pt_off_in_both_directions_matches_where_plain_iou_does_not() -> None:
+    labelled = BBox(page=0, x0=100, y0=100, x1=109, y1=109)
+    predicted = BBox(page=0, x0=102, y0=102, x1=111, y1=111)  # plain IoU 49/113 ~ 0.43
+
+    assert iou(predicted, labelled) < 0.5
+    assert detection.writing_spot(predicted, labelled) is not None
+
+
+def test_different_pages_never_match() -> None:
+    assert (
+        detection.writing_spot(_line_box(1.2), _line_box(1.2).model_copy(update={"page": 1}))
+        is None
+    )
+
+
+def test_greedy_prefers_the_same_line_over_a_reachable_neighbour() -> None:
+    """A tall labelled box (2x font size) reaches the line above too; the closer centre wins."""
+    tall_label = Box(_line_box(2.0), "text")
+    same_line = Box(_line_box(1.2), "text")
+    line_above = Box(_line_box(1.2, baseline=BASELINE - 1.2 * FS), "text")
+
+    matches = detection.match([line_above, same_line], [tall_label], detection.writing_spot)
+
+    assert [(p, t) for p, t, _ in matches] == [(1, 0)]
+
+
+def test_known_edge_case_a_label_halfway_between_two_lines_is_a_tie() -> None:
+    """docs/decisions/phase-2.md: a 2.4x label over lines 1.2x apart is equally close to both;
+    the tie goes to the lower predicted index. Pinned so a change is noticed."""
+    tall_label = Box(_line_box(2.4), "text")
+    same_line = Box(_line_box(1.2), "text")
+    line_above = Box(_line_box(1.2, baseline=BASELINE - 1.2 * FS), "text")
+
+    assert detection.writing_spot(same_line.bbox, tall_label.bbox) == detection.writing_spot(
+        line_above.bbox, tall_label.bbox
+    )
+    matches = detection.match([line_above, same_line], [tall_label], detection.writing_spot)
+    assert [(p, t) for p, t, _ in matches] == [(0, 0)]
+
+
+def test_x_iou() -> None:
+    a = BBox(page=0, x0=0, y0=0, x1=10, y1=1)
+    assert detection.x_iou(a, BBox(page=0, x0=5, y0=50, x1=15, y1=60)) == pytest.approx(5 / 15)
+    assert detection.x_iou(a, BBox(page=0, x0=10, y0=0, x1=20, y1=1)) == 0.0
+
+
 # --- evaluate() on synthetic fixtures -----------------------------------------------------
 
 
@@ -154,11 +253,11 @@ def test_perfect_detector_on_a_fixture_scores_one(tmp_path: Path) -> None:
 
     result = detection.evaluate(dataset, labels, "dev", "flat@test")
 
-    at_match, _, kinds = result.total()
+    totals = result.total()
     n = len(pdfs.get("flat_boxes").fields)
-    assert at_match == Counts(tp=n, fp=0, fn=0)
-    assert (at_match.precision, at_match.recall) == (1.0, 1.0)
-    assert kinds.as_dict()["recall_by_labelled_kind"]["text"]["share"] == 1.0
+    assert totals.spot == totals.iou == Counts(tp=n, fp=0, fn=0)
+    assert (totals.spot.precision, totals.spot.recall) == (1.0, 1.0)
+    assert totals.kinds.as_dict()["recall_by_labelled_kind"]["text"]["share"] == 1.0
 
 
 def test_rule_fixture_shows_the_step_11_gap(tmp_path: Path) -> None:
@@ -166,7 +265,7 @@ def test_rule_fixture_shows_the_step_11_gap(tmp_path: Path) -> None:
     label = _label_file("flat_hinted_comb", "21_hinted", prefilled=SCRATCH)
     dataset, labels = _setup(tmp_path, {"21_hinted": ("flat_hinted_comb", label)})
 
-    at_match, _, _ = detection.evaluate(dataset, labels, "dev", "flat@test").total()
+    at_match = detection.evaluate(dataset, labels, "dev", "flat@test").total().spot
 
     assert at_match.recall is not None and at_match.recall < 1.0
 
@@ -203,11 +302,11 @@ def test_anchoring_check_separates_scratch_and_prefilled(tmp_path: Path) -> None
 
     result = detection.evaluate(dataset, labels, "dev", "flat@test")
 
-    scratch, _, _ = result.total(prefilled=False)
-    prefilled, _, _ = result.total(prefilled=True)
+    scratch = result.total(prefilled=False).spot
+    prefilled = result.total(prefilled=True).spot
     assert prefilled.recall == 1.0
     assert scratch.recall is not None and scratch.recall < 1.0
-    assert scratch.tp + prefilled.tp == result.total()[0].tp
+    assert scratch.tp + prefilled.tp == result.total().spot.tp
 
 
 def test_labels_for_another_pdf_are_rejected(tmp_path: Path) -> None:
@@ -273,7 +372,7 @@ def test_form_missing_from_the_subset_is_not_scored(tmp_path: Path) -> None:
     boxes, lines = result.forms
     assert boxes.scored_pages == [0]
     assert (lines.scored_pages, lines.outside_subset) == ([], [0])
-    assert result.total()[0] == boxes.at_match
+    assert result.total().spot == boxes.at_spot
 
 
 def test_subset_errors_stop_the_run(tmp_path: Path) -> None:
@@ -319,16 +418,18 @@ def test_reports_carry_the_numbers_and_the_dataset_notes(tmp_path: Path) -> None
         "-abc1234.json"
     )
     data = json.loads(json_path.read_text())
-    overall = data["overall"]["iou_0.5"]
-    total = result.total()[0]
-    assert (overall["tp"], overall["fp"], overall["fn"]) == (total.tp, total.fp, total.fn)
+    totals = result.total()
+    for key, counts in (("writing_spot", totals.spot), ("iou_0.5", totals.iou)):
+        overall = data["overall"][key]
+        assert (overall["tp"], overall["fp"], overall["fn"]) == (counts.tp, counts.fp, counts.fn)
+    assert data["primary_metric"] == "writing_spot"
     assert set(data["anchoring_check"]) == {"from_scratch", "prefilled"}
     assert data["forms_without_labels"] == ["06_lines"]
     assert data["dataset_notes"] == detection.DATASET_NOTES
     markdown = md_path.read_text()
     for heading in (
         "## Overall",
-        "## By kind",
+        "## By kind (writing spot)",
         "## Anchoring check",
         "## Per form",
         "## Not scored",

@@ -544,12 +544,15 @@ before.
 - Horizontal IoU ≥ 0.5 is the same threshold as SPEC §10, on one axis: a comb row labelled as one
   box against 8 per-cell predictions does not match (each cell covers 1/8), which is correct —
   they are different fields.
-- A checkbox 2 pt off (9 pt square) has horizontal IoU 7/11 ≈ 0.64 and centre distance 2 ≤ 4.5:
-  it matches, where plain IoU (≈ 0.43) did not.
+- A checkbox 2 pt off in both directions (9 pt square) has horizontal IoU 7/11 ≈ 0.64 and
+  centre distance 2 ≤ 4.5: it matches, where plain IoU (49/113 ≈ 0.43) did not. (Wording made
+  precise on 2026-10-19 while writing the tests, before any number was computed; the rule is
+  unchanged. Off on one axis only, plain IoU is already 0.64.)
 
 **Known edge case.** A labelled box much taller than the line pitch (e.g. 2.4× font size drawn
 over dense lines) can reach the centre of the line above; the greedy order then prefers the
-closer centre, but ties are possible. Not expected under the labelling rules (the README asks for
+closer centre, but ties are possible (a box exactly halfway between two lines; the tie goes to
+the lower predicted index — pinned by a test). Not expected under the labelling rules (the README asks for
 "a little above the capital letters").
 
 **Reporting.** `make eval-detect` reports the writing-spot match as the **primary** metric
