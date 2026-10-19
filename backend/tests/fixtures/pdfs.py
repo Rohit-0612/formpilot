@@ -460,6 +460,45 @@ def flat_comb() -> PdfFixture:
     )
 
 
+def flat_comb_gap_groups() -> PdfFixture:
+    """Comb groups split by gaps narrower than a cell (amended D8, 2026-10-19): a date row
+    DD | MM | YYYY with 8 pt gaps and a name row FIRST | LAST with a 10 pt gap, captions printed
+    below the cells (not between them); and a contiguous date-of-birth row that stays one comb.
+    With D8's old threshold (a gap wider than a cell, 14 pt) both grouped rows were one comb."""
+    doc = _new_doc(A4)
+    page = doc[0]
+    fields: list[ExpectedField] = []
+    _, cell_height = COMB_CELL
+
+    def groups(top: float, label: str, parts: list[tuple[int, str]], gap: float) -> None:
+        _text(page, 72, top + 12, label)
+        x = 160.0
+        for index, (count, caption) in enumerate(parts):
+            box = _comb(page, x, top, count)
+            fields.append(
+                ExpectedField(
+                    0, box, FieldKind.TEXT, label if index == 0 else None, max_chars=count
+                )
+            )
+            _text(page, x + 1, top + cell_height + 8, caption, size=6)
+            x = box[2] + gap
+
+    groups(120, "Date", [(2, "DD"), (2, "MM"), (4, "YYYY")], gap=8)
+    groups(170, "Name", [(10, "FIRST"), (8, "LAST")], gap=10)
+    _text(page, 72, 232, "Date of birth")
+    fields.append(
+        ExpectedField(0, _comb(page, 160, 220, 8), FieldKind.TEXT, "Date of birth", max_chars=8)
+    )
+    return PdfFixture(
+        "flat_comb_gap_groups",
+        "Comb groups split by gaps narrower than a cell, captions below; a contiguous row (D8)",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
 def flat_multiline() -> PdfFixture:
     """Entries spanning several writing lines: one field per line (Phase 2 convention)."""
     doc = _new_doc(A4)
@@ -958,6 +997,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_boxes,
         flat_checkboxes,
         flat_comb,
+        flat_comb_gap_groups,
         flat_multiline,
         flat_hinted_comb,
         flat_wide_cells,

@@ -58,6 +58,10 @@ MAX_BOX_PAGE_SHARE = 0.5
 CHECKBOX_SIZE = (5.0, 16.0)
 SQUARE_RATIO = (0.75, 1.33)
 COMB_CELL_MAX = (20.0, 25.0)  # width, height
+# D8 as amended (docs/decisions/phase-2.md, 2026-10-19): a comb row splits where a gap is larger
+# than max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR x the median gap of that row).
+MIN_SPLIT_GAP = 3.0
+SPLIT_GAP_FACTOR = 2.0
 MIN_BOX_HEIGHT = 6.0  # SPEC §6.7 minimum font size; smaller boxes are flagged
 # Labels.
 LABEL_GAP_EM = 2.0  # words further apart than this (in font sizes) are separate phrases
@@ -548,9 +552,11 @@ def _group_combs(
     singles: list[Rect] = list(rest)
     for row in rows:
         row.sort(key=lambda r: r[0])
+        gaps = [b[0] - a[2] for a, b in pairwise(row)]
+        split_gap = max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR * statistics.median(gaps or [0.0]))
         run = [row[0]]
         for cell in row[1:]:
-            if _continues_comb(run[-1], cell, tokens):
+            if _continues_comb(run[-1], cell, tokens, split_gap):
                 run.append(cell)
             else:
                 _close_comb(run, combs, singles)
@@ -559,11 +565,11 @@ def _group_combs(
     return combs, singles
 
 
-def _continues_comb(prev: Rect, cell: Rect, tokens: Sequence[_Token]) -> bool:
+def _continues_comb(prev: Rect, cell: Rect, tokens: Sequence[_Token], split_gap: float) -> bool:
     prev_w, cell_w = prev[2] - prev[0], cell[2] - cell[0]
     if not 0.7 <= cell_w / prev_w <= 1.43:
         return False
-    if cell[0] - prev[2] > max(prev_w, cell_w):  # gap wider than a cell (D8)
+    if cell[0] - prev[2] > split_gap:  # a gap clearly wider than the row's usual spacing (D8)
         return False
     gap = (prev[2] - 0.5, prev[1], cell[0] + 0.5, prev[3])
     for token in tokens:  # printed text or a separator between the cells (D8)
