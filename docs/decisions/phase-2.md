@@ -790,6 +790,11 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 
 ## Known limitations
 
+- **Known inconsistency: signatures differ between frontends.** Flat signature areas are boxed
+  (labelled `text`, Phase 2 labelling rules, so the flat detector is scored on them), while
+  AcroForm signature widgets are skipped (Step 9). Signature handling must be made consistent
+  across frontends in Phase 3 (added to the Phase 3 deliverables in `docs/PLAN.md`).
+
 - **AcroForm (Step 9), synthetic fixtures only.** Hybrid documents (widgets plus printed
   blanks): only the widgets are detected, because a document with any widget is `fillable`.
   Push buttons, signature fields and unknown widget types are skipped (trace event). Values a
