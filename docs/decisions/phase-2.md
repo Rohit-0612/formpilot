@@ -751,6 +751,31 @@ touch. Written before re-measuring.
 is reported to the human — improvements and regressions, especially #1 and #25. The human's
 synthetic test form stays out of tuning.
 
+## Step 11 — tuning on dev: ablation table (from baseline v2)
+
+**Baselines.** The committed pre-tuning report (`…pre-step11-tuning-20261017-2e70d9d`, labels v1)
+is unchanged. After the second relabel (above), **baseline v2** is the original pre-Step-11
+detector (`0ee9999`, run from a temporary worktree; detection identical to the committed
+baseline) on the corrected labels: `eval/reports/phase2-detection-dev-pre-step11-tuning-v2-
+20261019-0ee9999.{json,md}`. The relabel alone moved the numbers (same detector): writing spot
+91.2 / 80.2 → 87.2 / 79.0, because the original detector gives one box per cell on the two rows
+that are now combs (#2, #3: TP −11 each, FP +11 each) and finds only one part of each split #1
+comb (FN +2). From scratch is unchanged by the relabel.
+
+**Procedure.** One fix per commit; after each, `make eval-detect TAG=step11-<n>-…` on dev
+(labelling subset, labels v2), report committed, row added here. Writing spot is the primary
+metric; from scratch (#21, #41) is the main signal. Δ is against the previous row.
+
+| Row | Commit | Writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
+|---|---|---|---|---|---|---|
+| Baseline v2 | `0ee9999` | 87.2 / 79.0 | 77.1 / 56.9 | 88.2 / 81.6 | 83.8 / 75.9 | — |
+| Fix 1 — D8 gap split (amended twice) | `f535a3f` | 87.3 / 79.3 (+0.0 / +0.3) | 77.1 / 56.9 (±0) | 88.2 / 81.9 (+0.0 / +0.4) | 83.8 / 76.2 (+0.1 / +0.3) | #1: TP 154 → 156, FN 36 → 34 (169 boxes); the 3- and 2-cell country-code parts found |
+
+Fix 1 history (labels v1, kept as evidence; reports committed): as first written
+(`step11-1-d8-gap-…-3833df9`) it regressed to 90.2 / 77.0 from 91.2 / 80.2 (#2 TP −10, #3 TP −10)
+and led to the second D8 amendment; capped (`step11-1b-d8-gap-capped-…-f535a3f`) it measured
+90.8 / 80.2 on labels v1. #25 is unchanged by fix 1 on both label versions.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
