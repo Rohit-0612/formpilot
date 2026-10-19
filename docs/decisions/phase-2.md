@@ -543,6 +543,50 @@ it visually.
   else changed. The human also re-checked #6 page 2 and #32 page 1 (every detector box kept
   unchanged) and confirmed them as correct.
 
+### Second relabel by Claude Code (human request, 2026-10-19)
+
+Four annotation edits, made in Label Studio by Claude Code at the human's request, after the
+human confirmed each one. Like the #25 fix, an exception to CLAUDE.md §6 (Claude never edits
+labels) granted for these edits only.
+
+- **Why.** Fix 1 of Step 11 (the amended D8) changed the detector's output on #1, #2 and #3. A
+  read-only scan of all 11 dev label files for rows that labelling rule 2 says should be one
+  comb (adjacent `text` boxes of similar width, ≤ 34 pt wide, ≤ 3 pt apart, one character each)
+  found exactly two such rows; the human confirmed both. Separately, two #1 comb labels span a
+  gap that the amended D8 splits; the human opened both tasks and checked the printed form.
+- **Basis (human).** The decisions were based on the field label, the cell structure and the
+  labelling rules — not on the detector's output.
+  - **#2 page 1, task 4:** the "Account No." row, `p0_l038`–`p0_l048` (11 one-character
+    cells, 19.1–20.1 pt wide) → **one `comb` box** over their outer edge (x 30.8–250.0,
+    y 724.5–737.3). Rule 2.
+  - **#3 page 2, task 27:** `p1_l063`–`p1_l073` (11 one-character cells, 19.9–20.0 pt wide) →
+    **one `comb` box** (x 33.6–253.6, y 787.3–796.9). Rule 2.
+  - **#1 page 1, task 17:** `p0_l115`, "Mobile No." → **split 3 + 10**: x 53.8–92.0 (3 cells)
+    and x 104.8–232.4 (10 cells), same height. The last 10 cells hold the 10-digit mobile
+    number and the cells before the gap a country code — parts written separately, like the STD
+    code rule.
+  - **#1 page 4, task 20:** `p3_l007`, "Mobile Number of the Nominee" → **split 2 + 10**: x
+    110.3–135.8 and x 142.2–269.7. Same reasoning.
+  - The split points of #1 come from the printed cell edges (vertical lines at 92.0 / 104.8 and
+    135.8 / 142.2), not from the detector's boxes.
+- **How.** As for #25: a consistent backup of the Label Studio database first; the existing
+  annotations edited in place through Label Studio's data model (`Annotation.save()`), each
+  edit refused if the annotation had changed since the backup; the new boxes are the exact
+  union (merges) or the printed-cell spans at the label's height (splits). Checked afterwards:
+  only annotations 4, 17, 20 and 27 changed, each equal to the dry run; still one annotation
+  per task; no task data, pre-annotation, draft or other annotation changed. Boxes: task 4
+  51 → 41, task 27 76 → 66, task 17 121 → 122, task 20 67 → 68.
+- **Verified by the human (2026-10-19):** tasks 4, 27, 17 and 20 checked visually after
+  reloading, all correct; Update was not clicked anywhere. Export and conversion followed.
+- **Export and conversion (Claude Code, after the human's check):** `label-studio export 1 JSON`
+  → `~/Downloads/formpilot-dev-boxes-20261019-203955.json`; against the previous export only
+  tasks 4, 17, 20 and 27 differ, one annotation per task, no task data changed.
+  `make label-convert … OVERWRITE=1`: label content changed only in #1 (2 combs → 4), #2 (11
+  boxes → 1 comb) and #3 (11 boxes → 1 comb), exactly the planned boxes; the other 8 files
+  differ only in `source` (the export's file name), kept as converted as decided for the first
+  conversion (option A). All 11 files validate (schema, PDF SHA-256, page count,
+  `verified_by_human`, `prefilled_from` null only for #21 / #41, every subset page labelled).
+
 ### Export and conversion run by Claude Code (human request, 2026-10-18)
 
 After the human had verified the labels by hand, Claude Code ran the export and the conversion
