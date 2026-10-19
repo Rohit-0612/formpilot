@@ -1,7 +1,7 @@
 # Phase 2 — Form IR and flat-PDF frontend: decision record
 
-> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–9 are
-> done; **next is Step 10**. A fresh session continues from the "Remaining plan" section below.
+> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–10
+> are done; **next is Step 11**. A fresh session continues from the "Remaining plan" section below.
 > Decisions are recorded here as they are taken; the close-out sections are filled in at the end
 > of the phase.
 
@@ -466,6 +466,46 @@ Plan approved by the human on 2026-10-18, with the four proposals below and thre
   a `fillable_basic` upload through the real worker → `ready`, `fillable`, five fields of the
   expected kinds. No API change (`make types` gives no diff).
 
+## Step 10 — Web: upload, progress, page viewer (plan approved 2026-10-19)
+
+- **Pages:** `/documents/new` (upload), `/documents/[id]` (status polled every 1.5 s while
+  `uploaded` / `analyzing`, then the viewer or the failure), dashboard link "Upload a form".
+  There is no document list: no list endpoint exists (SPEC §8, D7). `AppHeader` and
+  `useRequireUser` were extracted from the dashboard (separate `refactor` commit).
+- **Masked IR only (human requirement):** the generated web schema has `MaskedFormIR` and no
+  plain `FormIR` (guaranteed by the backend OpenAPI test). `lib/api/documents.ts` defines the
+  only IR type the web uses and a `@ts-expect-error` guard on `components["schemas"]["FormIR"]`:
+  typecheck fails if a plain FormIR ever appears (checked once by hand: pointing the guard at an
+  existing type fails with TS2578). The viewer never shows values; box titles show the printed
+  label and the kind.
+- **Readable failures (human requirement):** a failed document shows the API's
+  `job.error_message` from Step 8 (fallback "The analysis failed."); a missing or another user's
+  document: "This form was not found. It may have expired or belong to another account."; IR,
+  page image and network errors inline via the existing `userMessage`.
+- **Viewer:** one page at a time; boxes positioned in percent of the page size from the IR
+  (the PNG shows the displayed page, so no pixel size is needed); colour by kind with a legend;
+  radio groups show the group box and each button's box; pages that need OCR get a note. Page
+  PNGs are fetched with the session cookie (`parseAs: "blob"`) rather than `<img src>` to the
+  API (cross-origin cookies would break on separate hosts); the object URL is set through a ref
+  in an effect and revoked in its cleanup (correct under StrictMode, no state in the effect).
+- **Upload size in the browser (approved recommendation):** `NEXT_PUBLIC_MAX_UPLOAD_MB` (build
+  argument, compose passes the API's `MAX_UPLOAD_MB`, default 20) gives "The file is larger than
+  20 MB." before uploading, because browsers often report the API's early 413 as a network
+  error. The API stays the authority.
+- **Verified 2026-10-19** on a throwaway compose stack (fresh database) with headless Chrome
+  driven over the DevTools protocol (a scratch script, not committed; no new dependency): login
+  → dashboard; `flat_boxes` ready with 5 boxes over the loaded page image; no values shown;
+  `fillable_basic` with the radio group and its 2 button boxes; `mixed_mostly_scanned` with the
+  OCR note; 51 pages and encrypted fail with their readable messages; non-PDF → "The file is not
+  a PDF."; 21 MB → the size message; dev form #2 ready (42 fields), boxes on their cells in the
+  screenshot (viewed locally, not committed); another user's document and an invalid id → not
+  found; logged out → login. 13 of 13 checks passed.
+- No web test runner exists and none was added (a new dependency); Playwright is Phase 5.
+- **Observation:** page images show what the PDF itself draws, including a fillable form's own
+  widget values (e.g. the combo box's default "UP" in `fillable_basic`), while the IR never
+  copies them. Images are served only to the owner (`private, no-store`), so this exposes nothing
+  to anyone else; noted for Phase 5, when filled values are rendered.
+
 ## Labelling subset and no-box areas (human, 2026-10-17)
 
 - **Subset scored by the detection eval** (1-based pages): forms #2, #6, #21, #23, #25, #30,
@@ -641,7 +681,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 
 ### Where things stand
 
-- Branch `phase-2-flat-frontend`; Steps 0–9 committed and pushed (Steps 7–9: see their
+- Branch `phase-2-flat-frontend`; Steps 0–10 committed and pushed (Steps 7–10: see their
   sections above). CI green on every pushed head up to Step 6 (run 38937110232 on `63ba5e2`).
 - Built: Form IR (`app/ir/`), `detect.py`, `flat.py`, synthetic fixtures
   (`backend/tests/fixtures/pdfs.py`), Label Studio tooling (`eval/labelling/`), detection eval
