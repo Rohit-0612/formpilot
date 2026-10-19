@@ -687,6 +687,20 @@ than **max(3 pt, 2 × the median gap in that row)**, instead of larger than one 
   median 4 and threshold 8, and is not split either. Short rows like these are reported in
   Step 11 if they occur on dev.
 
+**Second amendment (human, 2026-10-19), made after fix 1's dev measurement revealed a
+regression.** Applied literally, the rule above lost D8's original protection, "a gap wider than
+a cell always splits". The comb grouper collects every small box on a line before applying the
+gap rule, so a line of *separate* small boxes spaced regularly far apart has a large median gap
+and a threshold larger still: on #3 two checkboxes 62 pt apart became one 2-cell comb (median 62,
+threshold 124), and on #2 / #3 cells of about 20 pt — half measured 19.9 pt, half 20.1 pt, so
+only every other one passed the 20 pt comb-cell limit — left candidates 40 pt apart that merged
+into one wide comb (threshold 80) and pushed out the cells between them. Fix 1 as first written
+measured writing spot P 90.2 / R 77.0 against the baseline 91.2 / 80.2 (#2 TP 42 → 32, #3 TP
+68 → 58; from scratch unchanged). **Rule now:** split where gap >
+**min(cell width, max(3 pt, 2 × the row's median gap))** — a gap wider than a cell always
+splits (old D8), and the median rule adds splits for narrow gaps in rows whose cells otherwise
+touch. Written before re-measuring.
+
 **How it is checked (Step 11).** A new synthetic generator fixture with 16 pt cells grouped by
 8 pt and 10 pt gaps (captions below the cells) and a contiguous row is the unit test. Then
 `make eval-detect` on the dev labels only: every form where the number of detected boxes changes
