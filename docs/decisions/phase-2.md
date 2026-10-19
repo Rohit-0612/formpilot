@@ -563,6 +563,26 @@ baseline is re-reported under both metrics in a new report. No label is changed.
 detection metric is IoU ≥ 0.5; this adds a primary metric for Phase 2 detection and keeps the
 SPEC metric — SPEC §10 gets a note pointing here.
 
+### Baseline under both metrics (2026-10-19)
+
+Same detector and labels as the pre-tuning report, with the rule above implemented:
+`make eval-detect TAG=pre-step11-tuning-both-metrics` →
+`eval/reports/phase2-detection-dev-pre-step11-tuning-both-metrics-20261019-23dea75.{json,md}`.
+The IoU ≥ 0.5 numbers equal the committed pre-tuning report exactly (that report is unchanged).
+
+| | Writing spot P | Writing spot R | TP / FP / FN | IoU ≥ 0.5 P | IoU ≥ 0.5 R |
+|---|--:|--:|--:|--:|--:|
+| all scored pages | 91.2 % | 80.2 % | 506 / 49 / 125 | 87.7 % | 77.2 % |
+| from scratch (#21, #41) | 77.1 % | 56.9 % | 37 / 11 / 28 | 43.8 % | 32.3 % |
+| pre-filled (other 9) | 92.5 % | 82.9 % | 469 / 38 / 97 | 91.9 % | 82.3 % |
+
+- **Anchoring check under the writing-spot rule:** the precision gap mostly closes (#21: 39.3 % →
+  89.3 %), which confirms most of it was the box-height convention. A recall gap remains
+  (56.9 % vs 82.9 %; #21 recall 55.6 %, 20 of 45 labelled spots not found at all). This data
+  cannot tell whether that is a detector weakness on these two forms or pre-annotation hiding
+  misses on the pre-filled forms; Step 11 looks at the missed spots on #21 and #41.
+- Lowest writing-spot recall: #30 48.4 %, comb rows 62.5 % (60/96), #23 68.8 %.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
