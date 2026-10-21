@@ -892,9 +892,10 @@ labels v4 and its report carries the macro average.
 | Fix 1 — D8 gap split (amended twice) | `f535a3f` | 86.9 / 77.8 (+0.0 / +0.3) | 88.4 / 77.1 (+0.0 / +0.1) | 77.1 / 55.2 (±0) | 87.8 / 80.5 (+0.0 / +0.4) | 83.5 / 74.8 (+0.1 / +0.3) | #1: TP 152 → 154, FN 45 → 43 (167 → 169 boxes) |
 | Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.4 (+3.2 / +6.6) | 89.3 / 79.5 (+0.9 / +2.4) | 77.1 / 55.2 (±0) | 91.2 / 87.9 (+3.4 / +7.4) | 86.8 / 81.4 (+3.3 / +6.6) | #1: TP 154 → 189, FP 15 → 0, FN 43 → 8 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 59.4 % → 94.1 % (95/101) |
 | Fix 5 — blanks after a colon (done before fixes 3 and 4, human decision) | `5fef220` | 89.7 / 88.3 (−0.3 / +3.9) | 89.4 / 85.2 (+0.1 / +5.7) | **81.1 / 89.6 (+4.0 / +34.3)** | 90.9 / 88.1 (−0.3 / +0.2) | 84.0 / 82.6 (−2.8 / +1.3) | #21: TP 25 → 44, FP 3 → 5, FN 22 → 3 (28 → 49 boxes); #41: TP 12 → 16, FP 8 → 9, FN 8 → 4 (20 → 25); #2: TP 31 → 32, FN 10 → 9 (42 → 43); #23: FP 3 → 5 (47 → 49); text recall 80.0 % (323/404) → 85.9 % (347/404) |
+| Fix 3 — rule 2, wide cells | `c41510e` | 96.3 / 88.9 (+6.6 / +0.6) | 94.6 / 85.8 (+5.2 / +0.5) | 81.1 / 89.6 (±0) | 98.6 / 88.8 (+7.7 / +0.7) | 90.2 / 83.3 (+6.3 / +0.6) | #25: TP 95 → 97, FP 20 → 0, FN 8 → 6 (115 → 97 boxes); #2: TP 32 → 33, FP 11 → 0, FN 9 → 8 (43 → 33); #3: TP 63 → 64, FP 13 → 2, FN 3 → 2 (76 → 66); comb recall 94.1 % → 98.0 % (99/101) |
 
 After fix 5 the macro from scratch is 76.9 / 86.8 (2 forms) and the macro pre-filled 92.2 / 84.9
-(9 forms; writing spot).
+(9 forms; writing spot). After fix 3: 76.9 / 86.8 and 98.5 / 85.6.
 
 **History: labels v3** (superseded by the v4 table above; reports committed). The macro values of
 the first three rows come from the per-form counts in their committed reports; a fresh
@@ -989,6 +990,30 @@ from-scratch forms).
   "Particulars regarding the claimant :" and "…other policies on the life of the deceased :"
   (sentences introducing a list and a header-column table); and two that look like real blanks
   without labels (label question 4 below).
+
+**Fix 3 — labelling rule 2, wide cells** (`c41510e`, report `step11-3-wide-cells-20261021-c41510e`;
+labels v4).
+- **What the dev forms show.** Four labelled comb rows were found as one box per cell: #25's
+  date of birth (8 cells, 26–27 × 16 pt) and Aadhaar (12 cells, 20–26 × 19.5 pt), #2's Account
+  No. and #3's row at y 787 (11 cells each, 19.1–20.1 pt wide; the cells just over 20 pt broke
+  the run). Cell shape does not tell one character from a group: #3's one-character cells are
+  20 × 9.6 pt.
+- **Rule.** The comb cell width limit goes from 20 to **30 pt** (height limit unchanged, 25 pt);
+  neighbouring cells must still have similar widths (ratio 0.7–1.43) and D8's gap rules still
+  split. 30 pt is a threshold chosen on dev (allowed: thresholds are tuned on dev), checked
+  read-only before writing code: 25 pt misses #25's cells and fuses the 20–21 pt cells in the
+  middle of #25's Aadhaar row into a 3-cell comb; 30 pt changes exactly the four rows above and
+  nothing else; 35 pt merges #1 page 4's separate 33 pt "Queue No." / "Initials" boxes (10 pt
+  apart) into 2-cell combs. Rule 2's second case: a cell whose grey hint is a group (`DD`)
+  holds the group and is a field of its own, whatever its width (it never joins a comb).
+- **Tests.** The `flat_wide_cells` strict xfail is removed (it passes; it fails with the old
+  limit); a unit test for 28 pt group cells (fails without the group rule) and the hinted-part
+  split of group cells. Only the rule 3 xfail (`flat_label_inside`, fix 4) is left.
+- **Effect.** Only #2, #3 and #25 change, and only those four rows (each now one comb, labelled
+  "Account No.", "2. Date of Birth", "11. AADHAR No."). From scratch unchanged (no wide cells on
+  #21 / #41). Comb precision stays 100 % (99/99).
+- **Known limitation.** A run of two or three separate boxes up to 30 pt wide, close together
+  with no text between them, would be read as one comb; none on dev.
 
 **Label question from fix 5 (reported to the human 2026-10-21; decided the same day: add both boxes, see "Fourth relabel by Claude Code").**
 4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x
