@@ -849,7 +849,7 @@ pooled numbers, which stay the primary summary in the report and the ablation ta
 before the macro existed get it from the per-form counts in their committed reports, with the
 same function (`eval.detection.macro`); no detector is re-run for that.
 
-## Step 11 — tuning on dev: ablation table (from baseline v3)
+## Step 11 — tuning on dev: ablation table (from baseline v4)
 
 **Baselines.** The committed pre-tuning report (`…pre-step11-tuning-20261017-2e70d9d`, labels v1)
 is unchanged. Each relabel re-measures the earlier rows on the new labels with the detector they
@@ -867,15 +867,37 @@ labels differ), so every row of the current table is on the same labels.
   154 → 152, FP 13 → 15, FN 36 → 45: the original detector finds none of the three date-of-birth
   parts or the six `INITIALS` boxes, and neither of its two name-row-2 boxes matches the merged
   comb).
-- From scratch is unchanged by both relabels.
+- **Labels v4** (fourth relabel, 2026-10-21, after fix 5; #21 page 2 gets two blanks): all four
+  rows re-run as `…pre-step11-tuning-v4-…-0ee9999`, `…step11-1-d8-gap-v4-…-f535a3f`,
+  `…step11-2-hinted-rows-v4-…-9541889` and `…step11-5-colon-blanks-v4-…-5fef220` (with the current
+  eval code, which adds the macro average; matching is unchanged). The relabel alone: only #21
+  changes. The baseline, fix 1 and fix 2 find nothing at the two spots (#21 FN 20 → 22; from
+  scratch recall 56.9 → 55.2 %); fix 5 found both, so its two false positives become matches
+  (#21 TP 42 → 44, FP 7 → 5; from scratch 78.4 / 89.2 → 81.1 / 89.6). This is the bias the human
+  pointed out: a detector-prompted correction can only move the numbers in the detector's favour;
+  the human's re-review of #21 and #41 without detector boxes found nothing else to change.
+- From scratch was unchanged by the v2 and v3 relabels.
 
 **Procedure.** One fix per commit; after each, `make eval-detect TAG=step11-<n>-…` on dev
 (labelling subset, current labels), report committed, row added here. Writing spot is the primary
 metric; from scratch (#21, #41) is the main signal. Δ is against the previous row.
 
-**Current table (labels v3).** Pooled P / R unless the column says macro (writing spot, the
-mean over the 11 forms, each weighted equally; section "Macro average"). The macro values of
-these three rows come from the per-form counts in their committed reports; a fresh
+**Current table (labels v4).** Pooled P / R unless the column says macro (writing spot, the
+mean over the 11 forms, each weighted equally; section "Macro average"). Every row was run on
+labels v4 and its report carries the macro average.
+
+| Row | Commit | Writing spot P / R (all) | Macro writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
+|---|---|---|---|---|---|---|---|
+| Baseline v4 | `0ee9999` | 86.8 / 77.5 | 88.3 / 77.0 | 77.1 / 55.2 | 87.8 / 80.2 | 83.4 / 74.4 | — (comb recall 57.4 %, 58/101) |
+| Fix 1 — D8 gap split (amended twice) | `f535a3f` | 86.9 / 77.8 (+0.0 / +0.3) | 88.4 / 77.1 (+0.0 / +0.1) | 77.1 / 55.2 (±0) | 87.8 / 80.5 (+0.0 / +0.4) | 83.5 / 74.8 (+0.1 / +0.3) | #1: TP 152 → 154, FN 45 → 43 (167 → 169 boxes) |
+| Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.4 (+3.2 / +6.6) | 89.3 / 79.5 (+0.9 / +2.4) | 77.1 / 55.2 (±0) | 91.2 / 87.9 (+3.4 / +7.4) | 86.8 / 81.4 (+3.3 / +6.6) | #1: TP 154 → 189, FP 15 → 0, FN 43 → 8 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 59.4 % → 94.1 % (95/101) |
+| Fix 5 — blanks after a colon (done before fixes 3 and 4, human decision) | `5fef220` | 89.7 / 88.3 (−0.3 / +3.9) | 89.4 / 85.2 (+0.1 / +5.7) | **81.1 / 89.6 (+4.0 / +34.3)** | 90.9 / 88.1 (−0.3 / +0.2) | 84.0 / 82.6 (−2.8 / +1.3) | #21: TP 25 → 44, FP 3 → 5, FN 22 → 3 (28 → 49 boxes); #41: TP 12 → 16, FP 8 → 9, FN 8 → 4 (20 → 25); #2: TP 31 → 32, FN 10 → 9 (42 → 43); #23: FP 3 → 5 (47 → 49); text recall 80.0 % (323/404) → 85.9 % (347/404) |
+
+After fix 5 the macro from scratch is 76.9 / 86.8 (2 forms) and the macro pre-filled 92.2 / 84.9
+(9 forms; writing spot).
+
+**History: labels v3** (superseded by the v4 table above; reports committed). The macro values of
+the first three rows come from the per-form counts in their committed reports; a fresh
 `make eval-detect` at `a200f52` (fix 2's detector) gives the same macro and pooled numbers.
 
 | Row | Commit | Writing spot P / R (all) | Macro writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
@@ -889,7 +911,7 @@ After fix 2 the macro recall (79.7 %) is 5 points below the pooled recall (84.7 
 far helped #1 and #3, which hold most of the boxes; the smaller forms are unchanged. Macro from
 scratch / pre-filled after fix 2: 74.6 / 57.8 and 92.5 / 84.6 (writing spot; 2 and 9 forms).
 
-**History: labels v2** (superseded by the v3 table above; reports committed).
+**History: labels v2** (superseded; reports committed).
 
 | Row | Commit | Writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
 |---|---|---|---|---|---|---|
@@ -953,14 +975,15 @@ from-scratch forms).
   false positive (#21 "Mandatory requirements:-") and was left out to keep the rule simple. A
   first version also ended the blank at a drawn vertical line; on #1 that left slivers between a
   label and the comb right after it (12 boxes), so it was removed before measuring.
-- **Effect.** From scratch, writing spot: recall 56.9 → 89.2 %, precision 77.1 → 78.4 %. Pre-filled:
+- **Effect** (labels v3, as first measured). From scratch, writing spot: recall 56.9 → 89.2 %,
+  precision 77.1 → 78.4 % (on labels v4: 55.2 → 89.6 % and 77.1 → 81.1 %). Pre-filled:
   −0.3 / +0.2 (#2 one blank found; #23 two false positives). Only #2, #21, #23 and #41 change
   (and #1 pages 5 and 9, outside the subset: 3 boxes).
 - **Secondary metric falls on from-scratch precision (43.8 → 36.5 %, IoU ≥ 0.5).** The new boxes
   are 1.2 × the font size high, the hand-drawn from-scratch labels about 0.6× (the box-height
   convention, see the pre-tuning baseline); the writing spots match, the boxes do not. Not a
   detection error; reported because it is the SPEC §10 metric.
-- **False positives left (7):** #21 page 2 "Mandatory requirements:-" (a heading over a numbered
+- **False positives left (7 on labels v3; 5 on labels v4, after the two blanks below were labelled):** #21 page 2 "Mandatory requirements:-" (a heading over a numbered
   list) and "Details of nominee / appointee (in case nominee is minor):" (a heading over the
   E-mail / Branch / IFSC lines); #41 "Documents Enclosed:" (a heading over a list); #23
   "Particulars regarding the claimant :" and "…other policies on the life of the deceased :"
