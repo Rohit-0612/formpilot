@@ -845,6 +845,7 @@ these three rows come from the per-form counts in their committed reports; a fre
 | Baseline v3 | `0ee9999` | 86.8 / 77.7 | 88.3 / 77.2 | 77.1 / 56.9 | 87.8 / 80.2 | 83.4 / 74.7 | — (comb recall 57.4 %, 58/101) |
 | Fix 1 — D8 gap split (amended twice) | `f535a3f` | 86.9 / 78.1 (+0.0 / +0.3) | 88.4 / 77.3 (+0.0 / +0.1) | 77.1 / 56.9 (±0) | 87.8 / 80.5 (+0.0 / +0.4) | 83.5 / 75.0 (+0.1 / +0.3) | #1: TP 152 → 154, FN 45 → 43 (167 → 169 boxes) |
 | Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.7 (+3.2 / +6.6) | 89.3 / 79.7 (+0.9 / +2.4) | 77.1 / 56.9 (±0) | 91.2 / 87.9 (+3.4 / +7.4) | 86.8 / 81.6 (+3.3 / +6.6) | #1: TP 154 → 189, FP 15 → 0, FN 43 → 8 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 59.4 % → 94.1 % (95/101) |
+| Fix 5 — blanks after a colon (done before fixes 3 and 4, human decision) | `5fef220` | 89.4 / 88.2 (−0.7 / +3.5) | 89.0 / 85.2 (−0.3 / +5.5) | **78.4 / 89.2 (+1.3 / +32.3)** | 90.9 / 88.1 (−0.3 / +0.2) | 83.7 / 82.6 (−3.1 / +1.0) | #21: TP 25 → 42, FP 3 → 7, FN 20 → 3 (28 → 49 boxes); #41: TP 12 → 16, FP 8 → 9, FN 8 → 4 (20 → 25); #2: TP 31 → 32, FN 10 → 9 (42 → 43); #23: FP 3 → 5 (47 → 49); text recall 80.3 % (323/402) → 85.8 % (345/402) |
 
 After fix 2 the macro recall (79.7 %) is 5 points below the pooled recall (84.7 %): the fixes so
 far helped #1 and #3, which hold most of the boxes; the smaller forms are unchanged. Macro from
@@ -889,6 +890,51 @@ and led to the second D8 amendment; capped (`step11-1b-d8-gap-capped-…-f535a3f
   date of birth (3 FP, 1 FN), name row 2's second part and the two STD rows (3 FN), and page 4's
   six `INITIALS` boxes (6 FP). After the third relabel (labels v3) only the two STD rows' 5-cell
   parts remain (2 FN, Known limitations); #1 has no false positive left.
+
+**Fix 5 — blanks after a colon** (`5fef220`, report `step11-5-colon-blanks-20261021-5fef220`;
+done before fixes 3 and 4 at the human's request, 2026-10-21, because it is the main fix for the
+from-scratch forms).
+- **Why the order could change (checked on the dev pages before writing code).** For every miss
+  on #21, #41, #2, #30 and #6: the colon-blank misses (#21 17, #41 4, #2 1) all have a colon and
+  nothing drawn, and none lies in a drawn cell; the rule-3 misses (#30, 14) all lie in drawn
+  cells, and only one of them follows a colon; fix 3's misses (#25's wide cells) hold no text.
+  With "skip inside a drawn cell" the two rules are disjoint, so fix 5 depends on neither.
+- **Rule.** A token ending in `:` or `:-` gets a line entry on its baseline (1.2 × its font size
+  high), from 0.3 em after the colon to the next text on the line (0.3 em before it) or the page's
+  text margin (the right end of its widest text), if that leaves at least 3 em. Skipped when
+  something is drawn there (a leader, line or box overlapping it, or a drawn horizontal line in
+  the band: that is the entry), when the colon lies inside a drawn cell (rule 3, fix 4), and when
+  a drawn cell starts within 2.5 em below the colon line (the colon introduces a table). Lowest
+  overlap priority. Its label is the phrase before the colon, also when the colon is printed
+  apart ("2. POLICY NO.            :"); `:-` is stripped from labels like `:`.
+- **How the exclusions were chosen.** A read-only prototype over all scored pages listed every
+  colon with room after it. The candidates that matched no label were looked at on renders (local
+  only): section headings followed by a table (#6 ×5, #25, #30) and a table header cell (#6).
+  Bold and capitals were checked as heading cues and rejected: #21's and #41's real field labels
+  are bold, #21's are in capitals. A "followed by a numbered list" cue would remove one more
+  false positive (#21 "Mandatory requirements:-") and was left out to keep the rule simple. A
+  first version also ended the blank at a drawn vertical line; on #1 that left slivers between a
+  label and the comb right after it (12 boxes), so it was removed before measuring.
+- **Effect.** From scratch, writing spot: recall 56.9 → 89.2 %, precision 77.1 → 78.4 %. Pre-filled:
+  −0.3 / +0.2 (#2 one blank found; #23 two false positives). Only #2, #21, #23 and #41 change
+  (and #1 pages 5 and 9, outside the subset: 3 boxes).
+- **Secondary metric falls on from-scratch precision (43.8 → 36.5 %, IoU ≥ 0.5).** The new boxes
+  are 1.2 × the font size high, the hand-drawn from-scratch labels about 0.6× (the box-height
+  convention, see the pre-tuning baseline); the writing spots match, the boxes do not. Not a
+  detection error; reported because it is the SPEC §10 metric.
+- **False positives left (7):** #21 page 2 "Mandatory requirements:-" (a heading over a numbered
+  list) and "Details of nominee / appointee (in case nominee is minor):" (a heading over the
+  E-mail / Branch / IFSC lines); #41 "Documents Enclosed:" (a heading over a list); #23
+  "Particulars regarding the claimant :" and "…other policies on the life of the deceased :"
+  (sentences introducing a list and a header-column table); and two that look like real blanks
+  without labels (label question 4 below).
+
+**Label question from fix 5 (reported to the human 2026-10-21; open, no label changed).**
+4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x
+   120–545 and 185–545, y 82–108). Nothing is drawn after either colon; the policy number and the
+   post office name are written there, as on page 1's "2. POLICY NO. :" (labelled). Under the top
+   rule each would be a `text` box; neither is labelled (#21 was labelled from scratch). They
+   count as 2 false positives now.
 
 **Label questions from fix 2 (reported to the human 2026-10-21; decided by the human the same day, see "Third relabel by Claude Code").**
 1. **#1 page 1, `p0_l023` (date of birth).** 8 touching cells hinted `D D M M Y Y Y Y` are labelled
