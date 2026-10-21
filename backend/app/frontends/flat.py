@@ -6,7 +6,8 @@ Entry areas come from PyMuPDF only (no OpenCV in Phase 2):
 - empty rectangles and empty table cells (cells rebuilt from horizontal and vertical lines);
 - comb rows of per-character cells, merged into one field (decision D8), one field per hinted
   part when the cells carry grey hints (labelling rule 1);
-- small squares: checkboxes.
+- small squares: checkboxes;
+- blanks after a colon where nothing is drawn ("NAME OF THE BANK :  ", Step 11 fix 5).
 
 Box convention (docs/decisions/phase-2.md, Step 2): a line-type entry spans the line and rises
 ROW_HEIGHT_FACTOR x the font size above its writing line; boxes are the drawn rectangle; a comb
@@ -68,6 +69,12 @@ SPLIT_GAP_FACTOR = 2.0
 # black, dark blue or blue (luminance <= 0.27), hints are grey (0.58); white text sits on a dark
 # fill (a heading banner) and stays text.
 HINT_LUMINANCE = (0.4, 0.85)
+# Blanks after a colon (Step 11, fix 5): a phrase ending in ":" or ":-" with nothing drawn after
+# it. The blank needs room for a few characters, and a colon line directly above a drawn table
+# introduces the table instead.
+COLON_ENDINGS = (":", ":-")
+MIN_COLON_BLANK_EM = 3.0
+TABLE_BELOW_EM = 2.5
 MIN_BOX_HEIGHT = 6.0  # SPEC §6.7 minimum font size; smaller boxes are flagged
 # Labels.
 LABEL_GAP_EM = 2.0  # words further apart than this (in font sizes) are separate phrases
@@ -78,7 +85,7 @@ HEADING_SIZE_FACTOR = 1.15
 Rect = tuple[float, float, float, float]
 
 # Candidate priorities when boxes overlap: lower wins.
-_PRIORITY = {"checkbox": 0, "comb": 1, "box": 2, "line": 3, "leader": 4}
+_PRIORITY = {"checkbox": 0, "comb": 1, "box": 2, "line": 3, "leader": 4, "colon": 5}
 
 
 @dataclass(frozen=True)
@@ -508,9 +515,11 @@ def _has_text_inside(rect: Rect, tokens: Sequence[_Token]) -> bool:
     return False
 
 
-def _box_candidates(drawings: _Drawings, text: _PageText, page_area: float) -> list[_Candidate]:
+def _box_candidates(
+    drawings: _Drawings, grid: list[Rect], text: _PageText, page_area: float
+) -> list[_Candidate]:
     sources: list[tuple[Rect, str]] = [(r, "rectangle") for r in drawings.rects]
-    sources += [(c, "table cell") for c in _grid_cells(drawings.horizontal, drawings.vertical)]
+    sources += [(c, "table cell") for c in grid]
 
     boxes: list[tuple[Rect, str]] = []
     for rect, source in sources:
@@ -679,6 +688,85 @@ def _close_comb(
     )
 
 
+def _colon_candidates(
+    text: _PageText, drawings: _Drawings, cells: list[Rect], taken: list[_Candidate]
+) -> list[_Candidate]:
+    """Blanks after a colon with nothing drawn: from just after the colon to the next text on its
+    line or the page's text margin; a line entry on the colon's baseline.
+
+    Skipped where something is drawn (a leader, line or box is the entry), inside a drawn cell
+    (a label inside a cell is labelling rule 3), and when a drawn table starts right below (the
+    colon introduces the table).
+    """
+    if not text.tokens:
+        return []
+    margin = max(t.rect[2] for t in text.tokens)
+    candidates = []
+    for token in text.tokens:
+        if not token.text.endswith(COLON_ENDINGS):
+            continue
+        size, baseline = token.size, token.baseline
+        pad = 0.3 * size
+        x0, top = token.rect[2] + pad, baseline - _row_height(size)
+        x1 = min(
+            (
+                t.rect[0] - pad
+                for t in text.tokens
+                if t is not token
+                and abs(t.baseline - baseline) <= max(0.4 * size, SNAP)
+                and t.rect[0] >= token.rect[2] - 0.5
+            ),
+            default=margin,
+        )
+        if x1 - x0 < MIN_COLON_BLANK_EM * size:
+            continue
+        rect = (x0, top, x1, baseline)
+        if any(_intersection(rect, c.rect) > 0 for c in taken):
+            continue
+        if any(
+            h.start < x1 and h.end > x0 and top - SNAP <= h.pos <= baseline + 0.5 * size
+            for h in drawings.horizontal
+        ):
+            continue
+        if any(
+            c[0] - SNAP <= token.rect[0]
+            and token.rect[2] <= c[2] + SNAP
+            and c[1] <= token.vcenter <= c[3]
+            for c in cells
+        ):
+            continue
+        if any(
+            baseline < c[1] <= baseline + TABLE_BELOW_EM * size and c[0] < x1 and c[2] > x0
+            for c in cells
+        ):
+            continue
+        candidates.append(
+            _Candidate(
+                rect,
+                FieldKind.TEXT,
+                "colon",
+                "blank after a colon",
+                writing_line=baseline,
+                label=_colon_label(token, text.tokens),
+            )
+        )
+    return candidates
+
+
+def _colon_label(colon: _Token, tokens: Sequence[_Token]) -> str | None:
+    """The phrase that ends with the colon; a colon printed apart ("NAME OF THE BANK      :")
+    still belongs to the phrase before it, however wide the gap."""
+    row = [
+        t
+        for t in tokens
+        if t is not colon
+        and abs(t.baseline - colon.baseline) <= max(0.4 * colon.size, SNAP)
+        and t.rect[2] <= colon.rect[0] + 0.5
+    ]
+    bare = colon.text in COLON_ENDINGS
+    return _clean_label(_phrase(row if bare else [*row, colon], leftwards=True))
+
+
 # --- overlaps -----------------------------------------------------------------------------
 
 
@@ -762,7 +850,7 @@ def _phrase(tokens: list[_Token], leftwards: bool) -> list[_Token]:
 
 
 def _clean_label(tokens: Iterable[_Token]) -> str | None:
-    text = " ".join(t.text for t in tokens).strip().rstrip(":").strip()
+    text = " ".join(t.text for t in tokens).strip().removesuffix(":-").rstrip(":").strip()
     return text if any(ch.isalnum() for ch in text) else None
 
 
@@ -861,7 +949,8 @@ def _label(cand: _Candidate, candidates: list[_Candidate], text: _PageText) -> s
 
 def _assign_text(candidates: list[_Candidate], text: _PageText) -> None:
     for cand in candidates:
-        cand.label = _label(cand, candidates, text)
+        if cand.label is None:  # colon blanks already have theirs
+            cand.label = _label(cand, candidates, text)
         cand.context = _context(cand, text)
         if cand.rect[3] - cand.rect[1] < MIN_BOX_HEIGHT:
             cand.validations.append(
@@ -882,8 +971,10 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     unrotated = page.rect * page.derotation_matrix
     page_area = abs(unrotated)
 
+    grid = _grid_cells(drawings.horizontal, drawings.vertical)
     candidates = _leader_candidates(text) + _line_candidates(drawings, text)
-    candidates += _box_candidates(drawings, text, page_area)
+    candidates += _box_candidates(drawings, grid, text, page_area)
+    candidates += _colon_candidates(text, drawings, drawings.rects + grid, candidates)
     kept, dropped = _resolve_overlaps(candidates)
     _assign_text(kept, text)
     notes = [

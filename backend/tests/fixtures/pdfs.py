@@ -508,6 +508,58 @@ def flat_comb_gap_groups() -> PdfFixture:
     )
 
 
+def flat_colon_blanks() -> PdfFixture:
+    """Blanks after a colon with nothing drawn (Step 11, fix 5).
+
+    The blank runs from just after the colon to the next text on its line or to the page's text
+    margin (the right end of its widest text line), as a line entry on the label's baseline. A
+    leader after the colon is the entry itself; a colon line right above a drawn table introduces
+    the table and gets no blank.
+    """
+    doc = _new_doc(A4)
+    page = doc[0]
+    fields: list[ExpectedField] = []
+    pad = 0.3 * FONT_SIZE
+
+    intro = "Please fill in all the details below in block letters and sign at the end."
+    _text(page, 72, 100, intro)
+    margin = 72 + _width(intro)
+
+    def label_at(x: float, baseline: float, label: str) -> float:
+        _text(page, x, baseline, label)
+        return x + _width(label) + pad
+
+    x0 = label_at(72, 140, "NAME OF THE BANK :")
+    fields.append(ExpectedField(0, _line_box(x0, margin, 140), FieldKind.TEXT, "NAME OF THE BANK"))
+
+    # Two blanks on one line: the first one ends where the next label starts.
+    date = label_at(72, 170, "Date:-")
+    place_x = 300.0
+    place = label_at(place_x, 170, "Place:")
+    fields += [
+        ExpectedField(0, _line_box(date, place_x - pad, 170), FieldKind.TEXT, "Date"),
+        ExpectedField(0, _line_box(place, margin, 170), FieldKind.TEXT, "Place"),
+    ]
+
+    # A leader after the colon is the entry: no second box.
+    fields.append(_labelled_leader(page, 0, 72, 200, "E-mail:", "_" * 30))
+
+    # A colon line directly above a drawn table introduces it: only the cell is an entry.
+    _text(page, 72, 240, "Particulars of the nominee:")
+    cell = (72.0, 250.0, 400.0, 270.0)
+    _rect(page, cell)
+    fields.append(ExpectedField(0, cell, FieldKind.TEXT))
+
+    return PdfFixture(
+        "flat_colon_blanks",
+        "Blanks after a colon with nothing drawn: to the next text or the text margin (fix 5)",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
 def flat_multiline() -> PdfFixture:
     """Entries spanning several writing lines: one field per line (Phase 2 convention)."""
     doc = _new_doc(A4)
@@ -1007,6 +1059,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_checkboxes,
         flat_comb,
         flat_comb_gap_groups,
+        flat_colon_blanks,
         flat_multiline,
         flat_hinted_comb,
         flat_wide_cells,

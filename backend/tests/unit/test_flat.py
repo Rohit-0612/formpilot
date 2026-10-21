@@ -395,3 +395,56 @@ def test_hints_are_not_labels_and_do_not_hide_cells() -> None:
     comb, line = fields
     assert (comb.kind, comb.max_chars, comb.label_text) == (FieldKind.TEXT, 6, "PIN code")
     assert line.label_text is None  # not "P I N X X X"
+
+
+# --- blanks after a colon (Step 11, fix 5) --------------------------------------------------
+
+
+def test_colon_inside_a_drawn_cell_gets_no_colon_blank() -> None:
+    """A label inside a cell is labelling rule 3 (fix 4), never a colon blank."""
+
+    def draw(page: pymupdf.Page) -> None:
+        page.draw_rect(pymupdf.Rect(72, 100, 400, 124), color=(0, 0, 0), width=0.5)
+        _text(page, 76, 116, "Branch code:")
+
+    with pymupdf.open("pdf", _pdf(draw)) as doc:
+        page = doc[0]
+        text, drawings = flat._extract_text(page), flat._extract_drawings(page)
+        cells = drawings.rects + flat._grid_cells(drawings.horizontal, drawings.vertical)
+
+        assert flat._colon_candidates(text, drawings, cells, []) == []
+
+
+def test_colon_blank_needs_room() -> None:
+    """A colon at the end of the widest line leaves no room: no blank."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "The applicant declares the following:")
+
+    assert _run(_pdf(draw)).fields == []
+
+
+def test_colon_blank_running_into_a_drawn_entry_is_skipped() -> None:
+    """A label whose colon is followed by a drawn comb: the comb is the entry, no sliver."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "Account holder name and the full address of the branch here")
+        _text(page, 72, 140, "1.Name*:")
+        for i in range(10):
+            x = 140 + 14 * i
+            page.draw_rect(pymupdf.Rect(x, 128, x + 14, 144), color=(0, 0, 0), width=0.5)
+
+    (comb,) = _run(_pdf(draw)).fields
+
+    assert (comb.max_chars, comb.label_text) == (10, "1.Name*")
+
+
+def test_colon_printed_apart_still_labels_its_blank() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "Account holder name and the full address of the branch here")
+        _text(page, 72, 140, "2. NAME OF THE BANK")
+        _text(page, 250, 140, ":")
+
+    (blank,) = _run(_pdf(draw)).fields
+
+    assert blank.label_text == "2. NAME OF THE BANK"
