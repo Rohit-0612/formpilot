@@ -770,11 +770,52 @@ metric; from scratch (#21, #41) is the main signal. Δ is against the previous r
 |---|---|---|---|---|---|---|
 | Baseline v2 | `0ee9999` | 87.2 / 79.0 | 77.1 / 56.9 | 88.2 / 81.6 | 83.8 / 75.9 | — |
 | Fix 1 — D8 gap split (amended twice) | `f535a3f` | 87.3 / 79.3 (+0.0 / +0.3) | 77.1 / 56.9 (±0) | 88.2 / 81.9 (+0.0 / +0.4) | 83.8 / 76.2 (+0.1 / +0.3) | #1: TP 154 → 156, FN 36 → 34 (169 boxes); the 3- and 2-cell country-code parts found |
+| Fix 2 — rule 1, hinted rows | `9541889` | 88.5 / 84.2 (+1.3 / +4.9) | 77.1 / 56.9 (±0) | 89.5 / 87.4 (+1.3 / +5.5) | 85.2 / 81.1 (+1.4 / +4.9) | #1: TP 156 → 180, FP 13 → 9, FN 34 → 10 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 62.0 % → 92.0 % |
 
 Fix 1 history (labels v1, kept as evidence; reports committed): as first written
 (`step11-1-d8-gap-…-3833df9`) it regressed to 90.2 / 77.0 from 91.2 / 80.2 (#2 TP −10, #3 TP −10)
 and led to the second D8 amendment; capped (`step11-1b-d8-gap-capped-…-f535a3f`) it measured
 90.8 / 80.2 on labels v1. #25 is unchanged by fix 1 on both label versions.
+
+**Fix 2 — labelling rule 1, hinted rows** (`9541889`, report `step11-2-hinted-rows-20261021-9541889`).
+- **What the dev forms show.** The hints on #1 and #3 are grey text (`#939598`, luminance 0.58)
+  at the labels' size (6 pt; 5.6–5.9 pt on #3), one letter per cell; the label text is black or
+  dark blue (`#2A2076`, luminance 0.16; the lightest is 2 characters of `#1F497D` on #3, 0.27).
+  On the scored pages, all text lighter than luminance 0.3 is on #1 and #3, and it is all hints. The cells of a hinted row are identical 0.4 pt boxes:
+  nothing printed marks where one part ends.
+- **Rule as implemented** (the README's rule 1, not shaped to the labels): text with luminance
+  0.4–0.85 is a hint (white text, on a dark banner, stays text). A hint never hides its cell and
+  is never a label or context. A comb run is split into hinted parts: consecutive hinted cells
+  are one part; the empty cells between two parts are shared halfway, an odd middle cell going
+  to the earlier part; empty cells before the first / after the last part join it. A run of
+  repeated letters (`DDMMYYYY`, one letter per cell, each letter at least twice) splits per
+  letter (D8). Touching parts start at the previous cell's edge (drawn cell edges overlap by a
+  fraction of a point, which otherwise drops a part as overlapping).
+- **Tests.** The `flat_hinted_comb` strict xfail is removed (it passes). New unit tests: the
+  luminance band, the part split (halfway, odd middle cell, date-like runs, words such as `STD`
+  that stay one part), and hints that are neither labels nor hide their cells. Two eval tests
+  that used `flat_hinted_comb` as an imperfect detector now use a label file with an extra
+  spot.
+- **Effect.** Only #1 and #3 change (every other dev form's boxes are identical). From scratch
+  unchanged (no hints on #21 / #41); no regression.
+- **What is left on the hinted rows of #1** (the label questions below; nothing was changed):
+  page 1's date of birth (3 FP, 1 FN), name row 2's second part and the two STD rows (3 FN),
+  and page 4's six `INITIALS` boxes (6 FP).
+
+**Label questions from fix 2 (reported to the human 2026-10-21; open, no label changed).**
+1. **#1 page 1, `p0_l023` (date of birth).** 8 touching cells hinted `D D M M Y Y Y Y` are labelled
+   as one comb box. Rule 1 says a hinted date is three boxes, and the other seven hinted dates
+   on #1 and #3, built the same way (e.g. `p0_l000`–`p0_l002`, top right of the same page), are
+   labelled as three.
+2. **#1 page 4, six `INITIALS` boxes** (x 335.5–390.8, y 697–794, "for office use only"). Each box
+   has the word `INITIALS` printed in grey inside; none is labelled. Under the labelling rules
+   (grey-hinted cells are entry areas; office-use areas get a `text` box) they would each be a
+   `text` box.
+3. **Splits with no printed boundary** (consistent with the top rule, not with rule 1's wording):
+   the STD rows `p0_l118` / `p0_l119` and `p0_l120` / `p0_l121` (15 cells hinted `S T D` in the
+   first three, labelled 5 + 10) and name row 2 `p0_l018` / `p0_l019` (one `LASTNAME` hint in the
+   middle, labelled 21 + 18 cells). Rule 1 as written gives one box per row. Recorded as
+   detector misses unless the human decides otherwise.
 
 ## Remaining plan (hand-off, 2026-10-17)
 

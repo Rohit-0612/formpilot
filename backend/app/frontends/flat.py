@@ -65,8 +65,8 @@ MIN_SPLIT_GAP = 3.0
 SPLIT_GAP_FACTOR = 2.0
 # Labelling rule 1: grey hints printed inside entry cells ("D D M M Y Y Y Y", "F I R S T N A M E")
 # are not labels. Text whose luminance is in this band is a hint: label text on the dev forms is
-# black or dark blue (luminance <= 0.16), hints are grey (0.58); white text sits on a dark fill
-# (a heading banner) and stays text.
+# black, dark blue or blue (luminance <= 0.27), hints are grey (0.58); white text sits on a dark
+# fill (a heading banner) and stays text.
 HINT_LUMINANCE = (0.4, 0.85)
 MIN_BOX_HEIGHT = 6.0  # SPEC §6.7 minimum font size; smaller boxes are flagged
 # Labels.
