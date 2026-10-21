@@ -14,7 +14,7 @@ import pytest
 from app.ir.geometry import iou
 from app.ir.models import BBox, FieldKind
 from eval import detection
-from eval.detection import Box, Counts, count, match
+from eval.detection import Box, Counts, Macro, count, macro, match
 from eval.labelling.schema import LabelField, LabelFile, LabelKind, LabelPage, dump_label_file
 from eval.labelling.subset import ALL, DEV_SUBSET, subset_pages
 from tests.fixtures import pdfs
@@ -435,9 +435,14 @@ def test_reports_carry_the_numbers_and_the_dataset_notes(tmp_path: Path) -> None
     assert set(data["anchoring_check"]) == {"from_scratch", "prefilled"}
     assert data["forms_without_labels"] == ["06_lines"]
     assert data["dataset_notes"] == detection.DATASET_NOTES
+    per_form = {f["form"]: f["writing_spot"] for f in data["forms"]}
+    expected = macro([Counts(v["tp"], v["fp"], v["fn"]) for v in per_form.values()])
+    assert data["overall"]["macro"]["writing_spot"] == expected.as_dict()
+    assert data["anchoring_check"]["from_scratch"]["macro"]["writing_spot"]["forms_recall"] == 1
     markdown = md_path.read_text()
     for heading in (
         "## Overall",
+        "## Macro average",
         "## By kind (writing spot)",
         "## Anchoring check",
         "## Per form",
@@ -447,6 +452,27 @@ def test_reports_carry_the_numbers_and_the_dataset_notes(tmp_path: Path) -> None
     assert "no Hindi-only form" in markdown
     assert "06_lines: no label file" in markdown
     assert "21_hinted (from scratch)" in markdown
+
+
+def test_macro_weights_every_form_equally() -> None:
+    big, small = Counts(tp=90, fp=10, fn=0), Counts(tp=1, fp=1, fn=3)
+
+    # Pooled: 91 / 102 and 91 / 94, mostly the big form; macro: the mean of 0.9 and 0.5, of 1.0
+    # and 0.25.
+    assert macro([big, small]) == Macro(
+        precision=0.7, recall=0.625, forms_precision=2, forms_recall=2
+    )
+
+
+def test_macro_leaves_out_undefined_values() -> None:
+    no_predictions = Counts(tp=0, fp=0, fn=4)  # recall 0, no precision
+    no_labels = Counts(tp=0, fp=2, fn=0)  # precision 0, no recall
+    nothing = Counts()  # no scored boxes at all
+
+    result = macro([Counts(tp=3, fp=1, fn=1), no_predictions, no_labels, nothing])
+
+    assert result == Macro(precision=0.375, recall=0.375, forms_precision=2, forms_recall=2)
+    assert macro([]) == Macro(precision=None, recall=None, forms_precision=0, forms_recall=0)
 
 
 def test_report_without_labels_says_nothing_was_scored(tmp_path: Path) -> None:

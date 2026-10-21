@@ -8,7 +8,9 @@ For every PDF in eval/dataset/<split>/ that has a label file in eval/labels/:
   (eval/labelling/subset.py; labelled pages outside it are listed, not scored), match
   predicted and labelled boxes one-to-one and greedily;
 - TP = matched pairs, FP = unmatched predictions, FN = unmatched labels;
-  precision = TP / (TP + FP), recall = TP / (TP + FN), micro-averaged over pages and forms.
+  precision = TP / (TP + FP), recall = TP / (TP + FN), pooled (micro-averaged) over pages and
+  forms, and as a macro average: the unweighted mean of the per-form values, so a form with many
+  boxes does not dominate (docs/decisions/phase-2.md, "Macro average").
 
 Two match rules (docs/decisions/phase-2.md, "Writing-spot matching"):
 - primary, writing spot: same page, x-interval IoU >= 0.5, and vertical centres at most half the
@@ -160,6 +162,37 @@ class Counts:
         }
 
 
+@dataclass(frozen=True)
+class Macro:
+    """Unweighted mean of per-form precision and recall, and how many forms each mean covers."""
+
+    precision: float | None
+    recall: float | None
+    forms_precision: int  # forms with at least one predicted box
+    forms_recall: int  # forms with at least one labelled box
+
+    def as_dict(self) -> dict[str, float | int | None]:
+        return {
+            "precision": self.precision,
+            "recall": self.recall,
+            "forms_precision": self.forms_precision,
+            "forms_recall": self.forms_recall,
+        }
+
+
+def macro(per_form: Sequence[Counts]) -> Macro:
+    """A form without predictions has no precision and is left out of that mean; a form without
+    labels is left out of the recall mean."""
+    precisions = [c.precision for c in per_form if c.precision is not None]
+    recalls = [c.recall for c in per_form if c.recall is not None]
+    return Macro(
+        precision=sum(precisions) / len(precisions) if precisions else None,
+        recall=sum(recalls) / len(recalls) if recalls else None,
+        forms_precision=len(precisions),
+        forms_recall=len(recalls),
+    )
+
+
 def count(predicted: Sequence[Box], labelled: Sequence[Box], rule: Rule | float) -> Counts:
     tp = len(match(predicted, labelled, rule))
     return Counts(tp=tp, fp=len(predicted) - tp, fn=len(labelled) - tp)
@@ -307,11 +340,21 @@ class EvalResult:
     subset: Mapping[str, PageSelection] | None = None  # None: every labelled page is scored
     tag: str | None = None  # names the run in the report file name, e.g. "pre-step11-tuning"
 
+    def _selected(self, prefilled: bool | None) -> list[FormResult]:
+        return [
+            form
+            for form in self.forms
+            if prefilled is None or (form.prefilled_from is not None) == prefilled
+        ]
+
+    def macro(self, prefilled: bool | None = None) -> tuple[Macro, Macro]:
+        """Macro averages (writing spot, IoU >= 0.5) over the selected forms."""
+        forms = self._selected(prefilled)
+        return macro([f.at_spot for f in forms]), macro([f.at_match for f in forms])
+
     def total(self, prefilled: bool | None = None) -> "Totals":
         totals = Totals()
-        for form in self.forms:
-            if prefilled is not None and (form.prefilled_from is not None) != prefilled:
-                continue
+        for form in self._selected(prefilled):
             totals.spot.add(form.at_spot)
             totals.iou.add(form.at_match)
             totals.diagnostic.add(form.at_diagnostic)
@@ -368,10 +411,15 @@ def _has_ok_page(pdf: Path) -> bool:
 def report_json(result: EvalResult) -> dict[str, object]:
     def section(prefilled: bool | None) -> dict[str, object]:
         totals = result.total(prefilled)
+        spot_macro, iou_macro = result.macro(prefilled)
         return {
             "writing_spot": totals.spot.as_dict(),
             f"iou_{MATCH_IOU}": totals.iou.as_dict(),
             f"iou_{DIAGNOSTIC_IOU}": totals.diagnostic.as_dict(),
+            "macro": {
+                "writing_spot": spot_macro.as_dict(),
+                f"iou_{MATCH_IOU}": iou_macro.as_dict(),
+            },
             "kinds": totals.kinds.as_dict(),
         }
 
@@ -481,7 +529,25 @@ def report_markdown(result: EvalResult) -> str:
             _COUNTS_HEADER,
             _counts_row("all scored pages", totals.spot, totals.iou),
             "",
+            "## Macro average",
+            "",
+            "Mean of the per-form precision and recall, every form weighted equally (the table "
+            "above pools all boxes, so large forms dominate it). A form without predicted boxes "
+            "is left out of the precision mean, one without labelled boxes out of the recall "
+            "mean; n = forms in each mean.",
+            "",
+            "| | Precision | Recall | n (P / R) | "
+            f"Precision (IoU ≥ {MATCH_IOU}) | Recall (IoU ≥ {MATCH_IOU}) |",
+            "|---|--:|--:|--:|--:|--:|",
         ]
+        for name, flag in (("all forms", None), ("from scratch", False), ("pre-filled", True)):
+            spot_macro, iou_macro = result.macro(flag)
+            lines.append(
+                f"| {name} | {_pct(spot_macro.precision)} | {_pct(spot_macro.recall)} | "
+                f"{spot_macro.forms_precision} / {spot_macro.forms_recall} | "
+                f"{_pct(iou_macro.precision)} | {_pct(iou_macro.recall)} |"
+            )
+        lines.append("")
         k = totals.kinds.as_dict()
         lines += [
             "## By kind (writing spot)",

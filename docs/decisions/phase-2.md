@@ -795,6 +795,22 @@ touch. Written before re-measuring.
 is reported to the human — improvements and regressions, especially #1 and #25. The human's
 synthetic test form stays out of tuning.
 
+## Macro average (human request 2026-10-21; written before any number was computed)
+
+**Why (human).** #1 holds a large share of all labelled boxes on the scored pages, so the pooled
+(micro) precision and recall are mostly #1. A macro average weights every form equally.
+
+**Definition.** For each form, precision = TP / (TP + FP) and recall = TP / (TP + FN) over that
+form's scored pages (the per-form numbers the report already has). Macro precision is the
+unweighted mean of the per-form precisions; macro recall the mean of the per-form recalls. A form
+with no predicted boxes has no precision and is left out of the precision mean; a form with no
+labelled boxes is left out of the recall mean (a form with labels but no predictions counts with
+recall 0). Each mean states how many forms it covers. Computed for both metrics (writing spot,
+IoU ≥ 0.5), for all forms, from scratch and pre-filled. `make eval-detect` reports it next to the
+pooled numbers, which stay the primary summary in the report and the ablation table. Rows measured
+before the macro existed get it from the per-form counts in their committed reports, with the
+same function (`eval.detection.macro`); no detector is re-run for that.
+
 ## Step 11 — tuning on dev: ablation table (from baseline v3)
 
 **Baselines.** The committed pre-tuning report (`…pre-step11-tuning-20261017-2e70d9d`, labels v1)
@@ -819,13 +835,20 @@ labels differ), so every row of the current table is on the same labels.
 (labelling subset, current labels), report committed, row added here. Writing spot is the primary
 metric; from scratch (#21, #41) is the main signal. Δ is against the previous row.
 
-**Current table (labels v3).**
+**Current table (labels v3).** Pooled P / R unless the column says macro (writing spot, the
+mean over the 11 forms, each weighted equally; section "Macro average"). The macro values of
+these three rows come from the per-form counts in their committed reports; a fresh
+`make eval-detect` at `a200f52` (fix 2's detector) gives the same macro and pooled numbers.
 
-| Row | Commit | Writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
-|---|---|---|---|---|---|---|
-| Baseline v3 | `0ee9999` | 86.8 / 77.7 | 77.1 / 56.9 | 87.8 / 80.2 | 83.4 / 74.7 | — (comb recall 57.4 %, 58/101) |
-| Fix 1 — D8 gap split (amended twice) | `f535a3f` | 86.9 / 78.1 (+0.0 / +0.3) | 77.1 / 56.9 (±0) | 87.8 / 80.5 (+0.0 / +0.4) | 83.5 / 75.0 (+0.1 / +0.3) | #1: TP 152 → 154, FN 45 → 43 (167 → 169 boxes) |
-| Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.7 (+3.2 / +6.6) | 77.1 / 56.9 (±0) | 91.2 / 87.9 (+3.4 / +7.4) | 86.8 / 81.6 (+3.3 / +6.6) | #1: TP 154 → 189, FP 15 → 0, FN 43 → 8 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 59.4 % → 94.1 % (95/101) |
+| Row | Commit | Writing spot P / R (all) | Macro writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
+|---|---|---|---|---|---|---|---|
+| Baseline v3 | `0ee9999` | 86.8 / 77.7 | 88.3 / 77.2 | 77.1 / 56.9 | 87.8 / 80.2 | 83.4 / 74.7 | — (comb recall 57.4 %, 58/101) |
+| Fix 1 — D8 gap split (amended twice) | `f535a3f` | 86.9 / 78.1 (+0.0 / +0.3) | 88.4 / 77.3 (+0.0 / +0.1) | 77.1 / 56.9 (±0) | 87.8 / 80.5 (+0.0 / +0.4) | 83.5 / 75.0 (+0.1 / +0.3) | #1: TP 152 → 154, FN 45 → 43 (167 → 169 boxes) |
+| Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.7 (+3.2 / +6.6) | 89.3 / 79.7 (+0.9 / +2.4) | 77.1 / 56.9 (±0) | 91.2 / 87.9 (+3.4 / +7.4) | 86.8 / 81.6 (+3.3 / +6.6) | #1: TP 154 → 189, FP 15 → 0, FN 43 → 8 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 59.4 % → 94.1 % (95/101) |
+
+After fix 2 the macro recall (79.7 %) is 5 points below the pooled recall (84.7 %): the fixes so
+far helped #1 and #3, which hold most of the boxes; the smaller forms are unchanged. Macro from
+scratch / pre-filled after fix 2: 74.6 / 57.8 and 92.5 / 84.6 (writing spot; 2 and 9 forms).
 
 **History: labels v2** (superseded by the v3 table above; reports committed).
 
