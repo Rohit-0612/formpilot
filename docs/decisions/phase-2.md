@@ -587,6 +587,50 @@ labels) granted for these edits only.
   conversion (option A). All 11 files validate (schema, PDF SHA-256, page count,
   `verified_by_human`, `prefilled_from` null only for #21 / #41, every subset page labelled).
 
+### Third relabel by Claude Code (human request, 2026-10-21)
+
+Two annotation edits on #1, made in Label Studio by Claude Code at the human's request; like the
+earlier relabels, an exception to CLAUDE.md §6 granted for these edits only. They answer the
+label questions raised by fix 2 (below, under the ablation table).
+
+- **Decisions (human, 2026-10-21).** Based on the labelling rules and the printed form, not on the
+  detector's output.
+  - **#1 page 1, task 17, `p0_l023` (date of birth):** split into three `comb` boxes DD / MM /
+    YYYY, like the other hinted dates (rule 1; already pending from the human's earlier review).
+    New boxes at the label's height (y 279.3–290.5), outer edges kept (x 70.9 and 173.6), inner
+    edges at the printed cell edges x 97.5 and 123.0.
+  - **#1 page 4, task 20:** a `text` box for each of the six `INITIALS` boxes in the office-use
+    section (office-use rule; grey-hinted cells are entry areas), along the printed rectangles
+    (x 335.5–390.8; y 697.1, 714.6, 731.7, 748.3, 765.0, 781.7, each 12.8 pt high).
+  - **#1 page 1, task 17, name row 2 (`p0_l018` + `p0_l019`):** the human's rule was: keep the
+    21 + 18 split if a printed separator or thicker line marks it, otherwise merge into one comb
+    (rule 1). **Evidence: none.** The row is 39 identical cells, 12.75–12.76 pt wide, all
+    stroked 0.4 pt in the same dark blue; nothing is drawn at the split (x 339.9). The only
+    difference along the row is a white fill on the first 16 cells, which changes at x 276.1
+    (not at the split; invisible on the white page; row 1 has the same change). **Merged** into
+    one `comb` box, the exact union (x 72.0–569.5, y 241.6–254.3).
+  - **STD rows** (`p0_l118` / `p0_l119`, `p0_l120` / `p0_l121`): labels kept (5 + 10); recorded
+    as detector misses (Known limitations).
+- **How.** As before: a consistent backup of the Label Studio database first; the existing
+  annotations edited in place through Label Studio's data model (`Annotation.save()`), each edit
+  refused if the annotation had changed since the backup (Label Studio was restarted after a
+  Docker Desktop restart; its database was checked equal to the backup before editing).
+  Checked afterwards: only annotations 17 and 20 changed, each equal to the dry run; still one
+  annotation per task; no task data, pre-annotation, draft or other annotation changed. Boxes:
+  task 17 122 → 123 (−3 +4), task 20 68 → 74.
+- **Verified by the human (2026-10-21):** tasks 17 and 20 checked visually after reloading: the
+  date of birth is three combs, name row 2 is one comb, the six `INITIALS` boxes are there;
+  Update was not clicked anywhere. Export and conversion followed.
+- **Export and conversion (Claude Code, after the human's check) → labels v3:**
+  `label-studio export 1 JSON` → `~/Downloads/formpilot-dev-boxes-20261021-181323.json`; against
+  the v2 export only tasks 17 and 20 differ, one annotation per task, no task data changed.
+  `make label-convert … OVERWRITE=1`: label content changed only in #1 (page 1: the date of birth
+  1 comb → 3, name row 2 2 combs → 1; page 4: 6 `text` boxes added; 475 → 482 boxes), exactly
+  the planned boxes; the other 10 files differ only in `source` (the export's file name), kept as
+  converted (option A, as for the earlier conversions). All 11 files validate (schema, PDF
+  SHA-256, page count, `verified_by_human`, `prefilled_from` null only for #21 / #41, every
+  subset page labelled).
+
 ### Export and conversion run by Claude Code (human request, 2026-10-18)
 
 After the human had verified the labels by hand, Claude Code ran the export and the conversion
@@ -802,7 +846,7 @@ and led to the second D8 amendment; capped (`step11-1b-d8-gap-capped-…-f535a3f
   page 1's date of birth (3 FP, 1 FN), name row 2's second part and the two STD rows (3 FN),
   and page 4's six `INITIALS` boxes (6 FP).
 
-**Label questions from fix 2 (reported to the human 2026-10-21; open, no label changed).**
+**Label questions from fix 2 (reported to the human 2026-10-21; decided by the human the same day, see "Third relabel by Claude Code").**
 1. **#1 page 1, `p0_l023` (date of birth).** 8 touching cells hinted `D D M M Y Y Y Y` are labelled
    as one comb box. Rule 1 says a hinted date is three boxes, and the other seven hinted dates
    on #1 and #3, built the same way (e.g. `p0_l000`–`p0_l002`, top right of the same page), are
