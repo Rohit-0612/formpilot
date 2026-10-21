@@ -631,6 +631,44 @@ label questions raised by fix 2 (below, under the ablation table).
   SHA-256, page count, `verified_by_human`, `prefilled_from` null only for #21 / #41, every
   subset page labelled).
 
+### Fourth relabel by Claude Code, and the human's re-review of #21 and #41 (2026-10-21)
+
+- **A detector-prompted correction to a from-scratch form.** Fix 5 (blanks after a colon) found
+  two blanks on #21 page 2 that have no label: "Policy No:" and "Name of the Post Office:" at the
+  top of the discharge receipt (label question 4). The human decided they are entry areas (top
+  rule; like page 1's "2. POLICY NO. :", which is labelled) and asked Claude Code to add a `text`
+  box for each, in the existing annotation (task 2), as for the earlier relabels.
+- **Why this matters (human).** Corrections prompted by the detector only fix errors in the
+  detector's favour: a label the detector disagrees with gets looked at, and a missing label
+  where the detector also finds nothing is never noticed. On #21 and #41, the forms labelled
+  without pre-filled boxes and so the least biased signal, this pushes their numbers up. To
+  balance it, the human re-reviews #21 and #41 in Label Studio without detector boxes, against
+  the labelling rules, before the next export (below).
+- **The boxes** follow the human's own convention on that page, not the detector's box: for the
+  10 labelled boxes that directly follow a label ending in ":", the median start is 3.4 pt after
+  the colon, the median top 8.5 pt above the text baseline and the median bottom 0.1 pt below it;
+  the right end is the right edge of the receipt's own text lines just below (x 539.8; the
+  human's right ends on that page vary too much to follow). "Policy No:" → x 120.0–539.8, y
+  86.3–94.9; "Name of the Post Office:" → x 185.2–539.8, y 99.8–108.3. They overlap no existing
+  box.
+- **How.** As before: a consistent backup of the Label Studio database first; the existing
+  annotation (task 2) edited in place through Label Studio's data model, refused if it had
+  changed since the backup. Checked afterwards: only annotation 2 changed, equal to the dry run
+  (22 → 24 boxes); still one annotation per task; no task data, pre-annotation, draft or other
+  annotation changed.
+- **Verified by the human (2026-10-21):** the two new boxes on #21 page 2 are correct.
+- **Human re-review of #21 (tasks 1 and 2) and #41 (task 3) without detector boxes (2026-10-21):**
+  done against the labelling rules (these tasks never had pre-annotations); the human made no
+  other change. Checked in the Label Studio database: against the backup taken before the edit,
+  only annotation 2 differs, and it equals the edit. Export and conversion followed.
+- **Export and conversion (Claude Code, after the human's check) → labels v4:**
+  `label-studio export 1 JSON` → `~/Downloads/formpilot-dev-boxes-20261021-195101.json`; against
+  the v3 export only task 2 differs, one annotation per task, no task data changed.
+  `make label-convert … OVERWRITE=1`: label content changed only in #21 (page 2: the two `text`
+  boxes added, 45 → 47), exactly the planned boxes; the other 10 files differ only in `source`,
+  kept as converted (option A). All 11 files validate (schema, PDF SHA-256, page count,
+  `verified_by_human`, `prefilled_from` null only for #21 / #41, every subset page labelled).
+
 ### Export and conversion run by Claude Code (human request, 2026-10-18)
 
 After the human had verified the labels by hand, Claude Code ran the export and the conversion
@@ -929,7 +967,7 @@ from-scratch forms).
   (sentences introducing a list and a header-column table); and two that look like real blanks
   without labels (label question 4 below).
 
-**Label question from fix 5 (reported to the human 2026-10-21; open, no label changed).**
+**Label question from fix 5 (reported to the human 2026-10-21; decided the same day: add both boxes, see "Fourth relabel by Claude Code").**
 4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x
    120–545 and 185–545, y 82–108). Nothing is drawn after either colon; the policy number and the
    post office name are written there, as on page 1's "2. POLICY NO. :" (labelled). Under the top
