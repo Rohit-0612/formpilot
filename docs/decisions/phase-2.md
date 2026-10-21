@@ -795,20 +795,39 @@ touch. Written before re-measuring.
 is reported to the human — improvements and regressions, especially #1 and #25. The human's
 synthetic test form stays out of tuning.
 
-## Step 11 — tuning on dev: ablation table (from baseline v2)
+## Step 11 — tuning on dev: ablation table (from baseline v3)
 
 **Baselines.** The committed pre-tuning report (`…pre-step11-tuning-20261017-2e70d9d`, labels v1)
-is unchanged. After the second relabel (above), **baseline v2** is the original pre-Step-11
-detector (`0ee9999`, run from a temporary worktree; detection identical to the committed
-baseline) on the corrected labels: `eval/reports/phase2-detection-dev-pre-step11-tuning-v2-
-20261019-0ee9999.{json,md}`. The relabel alone moved the numbers (same detector): writing spot
-91.2 / 80.2 → 87.2 / 79.0, because the original detector gives one box per cell on the two rows
-that are now combs (#2, #3: TP −11 each, FP +11 each) and finds only one part of each split #1
-comb (FN +2). From scratch is unchanged by the relabel.
+is unchanged. Each relabel re-measures the earlier rows on the new labels with the detector they
+had, run from a temporary worktree at that commit (detection identical to the commit; only the
+labels differ), so every row of the current table is on the same labels.
+- **Labels v2** (second relabel): baseline v2 = the original pre-Step-11 detector (`0ee9999`) on
+  the corrected labels, `…pre-step11-tuning-v2-20261019-0ee9999`. The relabel alone moved the
+  numbers: writing spot 91.2 / 80.2 → 87.2 / 79.0, because the original detector gives one box per
+  cell on the two rows that are now combs (#2, #3: TP −11 each, FP +11 each) and finds only one
+  part of each split #1 comb (FN +2).
+- **Labels v3** (third relabel, 2026-10-21, after fix 2): baseline v3 =
+  `…pre-step11-tuning-v3-20261021-0ee9999`; fix 1 and fix 2 re-run as
+  `…step11-1-d8-gap-v3-20261021-f535a3f` and `…step11-2-hinted-rows-v3-20261021-9541889`. The
+  relabel alone (same detector): writing spot 87.2 / 79.0 → 86.8 / 77.7; only #1 changes (TP
+  154 → 152, FP 13 → 15, FN 36 → 45: the original detector finds none of the three date-of-birth
+  parts or the six `INITIALS` boxes, and neither of its two name-row-2 boxes matches the merged
+  comb).
+- From scratch is unchanged by both relabels.
 
 **Procedure.** One fix per commit; after each, `make eval-detect TAG=step11-<n>-…` on dev
-(labelling subset, labels v2), report committed, row added here. Writing spot is the primary
+(labelling subset, current labels), report committed, row added here. Writing spot is the primary
 metric; from scratch (#21, #41) is the main signal. Δ is against the previous row.
+
+**Current table (labels v3).**
+
+| Row | Commit | Writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
+|---|---|---|---|---|---|---|
+| Baseline v3 | `0ee9999` | 86.8 / 77.7 | 77.1 / 56.9 | 87.8 / 80.2 | 83.4 / 74.7 | — (comb recall 57.4 %, 58/101) |
+| Fix 1 — D8 gap split (amended twice) | `f535a3f` | 86.9 / 78.1 (+0.0 / +0.3) | 77.1 / 56.9 (±0) | 87.8 / 80.5 (+0.0 / +0.4) | 83.5 / 75.0 (+0.1 / +0.3) | #1: TP 152 → 154, FN 45 → 43 (167 → 169 boxes) |
+| Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.7 (+3.2 / +6.6) | 77.1 / 56.9 (±0) | 91.2 / 87.9 (+3.4 / +7.4) | 86.8 / 81.6 (+3.3 / +6.6) | #1: TP 154 → 189, FP 15 → 0, FN 43 → 8 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 59.4 % → 94.1 % (95/101) |
+
+**History: labels v2** (superseded by the v3 table above; reports committed).
 
 | Row | Commit | Writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
 |---|---|---|---|---|---|---|
@@ -825,8 +844,9 @@ and led to the second D8 amendment; capped (`step11-1b-d8-gap-capped-…-f535a3f
 - **What the dev forms show.** The hints on #1 and #3 are grey text (`#939598`, luminance 0.58)
   at the labels' size (6 pt; 5.6–5.9 pt on #3), one letter per cell; the label text is black or
   dark blue (`#2A2076`, luminance 0.16; the lightest is 2 characters of `#1F497D` on #3, 0.27).
-  On the scored pages, all text lighter than luminance 0.3 is on #1 and #3, and it is all hints. The cells of a hinted row are identical 0.4 pt boxes:
-  nothing printed marks where one part ends.
+  On the scored pages, all text lighter than luminance 0.3 is on #1 and #3, and it is all
+  hints. The cells of a hinted row are identical 0.4 pt boxes: nothing printed marks where one
+  part ends.
 - **Rule as implemented** (the README's rule 1, not shaped to the labels): text with luminance
   0.4–0.85 is a hint (white text, on a dark banner, stays text). A hint never hides its cell and
   is never a label or context. A comb run is split into hinted parts: consecutive hinted cells
@@ -842,9 +862,10 @@ and led to the second D8 amendment; capped (`step11-1b-d8-gap-capped-…-f535a3f
   spot.
 - **Effect.** Only #1 and #3 change (every other dev form's boxes are identical). From scratch
   unchanged (no hints on #21 / #41); no regression.
-- **What is left on the hinted rows of #1** (the label questions below; nothing was changed):
-  page 1's date of birth (3 FP, 1 FN), name row 2's second part and the two STD rows (3 FN),
-  and page 4's six `INITIALS` boxes (6 FP).
+- **What is left on the hinted rows of #1** on labels v2 (the label questions below): page 1's
+  date of birth (3 FP, 1 FN), name row 2's second part and the two STD rows (3 FN), and page 4's
+  six `INITIALS` boxes (6 FP). After the third relabel (labels v3) only the two STD rows' 5-cell
+  parts remain (2 FN, Known limitations); #1 has no false positive left.
 
 **Label questions from fix 2 (reported to the human 2026-10-21; decided by the human the same day, see "Third relabel by Claude Code").**
 1. **#1 page 1, `p0_l023` (date of birth).** 8 touching cells hinted `D D M M Y Y Y Y` are labelled
@@ -1052,6 +1073,12 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   so a process-wide lock lets each worker process analyse one PDF at a time (Step 8); other jobs
   wait for the lock. Throughput scales with worker processes, not with arq's concurrent jobs.
   Not measured yet.
+
+- **STD code parts are not split (Step 11, fix 2).** On #1 page 1 the two telephone rows are
+  15 touching cells hinted `S T D` in the first three; the labels split them 5 + 10 (STD code,
+  then number; the human's decision, top rule). Nothing printed marks the split, and labelling
+  rule 1 joins empty cells after the last hint to the last part, so the detector gives one
+  15-cell comb per row: 2 misses on dev. Splitting would need knowledge of STD code lengths.
 
 - **Searchable scans.** A scanned page with an OCR text layer (invisible text over a full-page
   image) has enough characters, so it is `ok`, but its entry boxes are part of the image, not
