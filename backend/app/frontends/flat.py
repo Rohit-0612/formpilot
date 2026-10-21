@@ -59,7 +59,10 @@ MIN_CELL_SIZE = 3.0
 MAX_BOX_PAGE_SHARE = 0.5
 CHECKBOX_SIZE = (5.0, 16.0)
 SQUARE_RATIO = (0.75, 1.33)
-COMB_CELL_MAX = (20.0, 25.0)  # width, height
+# Labelling rule 2 (Step 11, fix 3): cells up to 30 pt wide can hold one character each (#25's
+# date-of-birth cells are 27 pt). Chosen on dev: above the widest one-character cells labelled
+# as combs, below the nearest separate boxes (#1's 33 pt office-use boxes, which would merge).
+COMB_CELL_MAX = (30.0, 25.0)  # width, height
 # D8 as amended twice (docs/decisions/phase-2.md, 2026-10-19): a comb row splits where a gap is
 # larger than min(cell width, max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR x the median gap of that row)).
 MIN_SPLIT_GAP = 3.0
@@ -612,15 +615,17 @@ def _hinted_parts(hints: Sequence[str]) -> list[tuple[int, int]]:
 
     hints[i] is the hint printed in cell i ("" for none). Consecutive hinted cells are one part,
     except a date-like run of repeated letters ("DDMMYYYY"), which splits where the letter changes
-    (D8). The empty cells between two parts are shared halfway, an odd middle cell going to the
-    earlier part; empty cells before the first part and after the last part join it. A run
-    without hints is one part.
+    (D8), and a cell whose hint is a group ("DD"), which is a part of its own (rule 2). The empty
+    cells between two parts are shared halfway, an odd middle cell going to the earlier part;
+    empty cells before the first part and after the last part join it. A run without hints is
+    one part.
     """
     hinted: list[tuple[int, int]] = []
     for i, hint in enumerate(hints):
         if not hint:
             continue
-        if hinted and hinted[-1][1] == i:
+        group = len(hint) > 1  # a cell for a group ("DD"), not one character: its own part
+        if hinted and hinted[-1][1] == i and not group and len(hints[i - 1]) == 1:
             hinted[-1] = (hinted[-1][0], i + 1)
         else:
             hinted.append((i, i + 1))

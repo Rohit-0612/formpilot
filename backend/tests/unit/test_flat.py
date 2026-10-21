@@ -61,7 +61,7 @@ def _line(page: pymupdf.Page, x0: float, y: float, x1: float) -> None:
 
 # Labelling rules 1-3 (Step 5): the detector learns them in Step 11. Strict xfail, so the test
 # fails loudly once a rule is implemented and the marker must be removed.
-STEP_11_RULES = {"flat_wide_cells", "flat_label_inside"}
+STEP_11_RULES = {"flat_label_inside"}
 
 
 @pytest.mark.parametrize(
@@ -377,6 +377,28 @@ def test_hint_is_grey_text(color: int, hint: bool) -> None:
 )
 def test_hinted_parts(hints: str, parts: list[tuple[int, int]]) -> None:
     assert flat._hinted_parts([h if h != "." else "" for h in hints]) == parts
+
+
+def test_group_cells_are_parts_of_their_own() -> None:
+    """Rule 2: a cell hinted with a group ("DD") holds the group, so it is a field of its own."""
+    assert flat._hinted_parts(["DD", "MM", "YY"]) == [(0, 1), (1, 2), (2, 3)]
+    assert flat._hinted_parts(["DD", "", "MM"]) == [(0, 2), (2, 3)]
+
+
+def test_wide_group_cells_within_the_comb_width_are_not_merged() -> None:
+    """28 pt cells (narrow enough for comb cells) hinted with groups stay one field each."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 114, "Date")
+        for i, group in enumerate(("DD", "MM", "YY")):
+            x = 160 + 28 * i
+            page.draw_rect(pymupdf.Rect(x, 100, x + 28, 118), color=(0, 0, 0), width=0.5)
+            page.insert_text((x + 7, 113), group, fontname="helv", fontsize=7, color=(0.6,) * 3)
+
+    fields = _run(_pdf(draw)).fields
+
+    assert [(f.kind, f.max_chars) for f in fields] == [(FieldKind.TEXT, None)] * 3
+    assert fields[0].label_text == "Date"
 
 
 def test_hints_are_not_labels_and_do_not_hide_cells() -> None:
