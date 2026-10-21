@@ -61,7 +61,7 @@ def _line(page: pymupdf.Page, x0: float, y: float, x1: float) -> None:
 
 # Labelling rules 1-3 (Step 5): the detector learns them in Step 11. Strict xfail, so the test
 # fails loudly once a rule is implemented and the marker must be removed.
-STEP_11_RULES = {"flat_hinted_comb", "flat_wide_cells", "flat_label_inside"}
+STEP_11_RULES = {"flat_wide_cells", "flat_label_inside"}
 
 
 @pytest.mark.parametrize(
@@ -342,3 +342,56 @@ def test_checkbox_drawn_as_a_quad_is_detected() -> None:
     fields = _run(_pdf(draw)).fields
 
     assert [(f.kind, f.label_text) for f in fields] == [(FieldKind.CHECKBOX, "Passport")]
+
+
+# --- labelling rule 1: grey hints in comb cells (Step 11, fix 2) ----------------------------
+
+
+@pytest.mark.parametrize(
+    ("color", "hint"),
+    [
+        (0x000000, False),  # black label text
+        (0x2A2076, False),  # dark blue label text (dev form #1)
+        (0x939598, True),  # grey hints (dev forms #1 and #3)
+        (0x999999, True),  # the fixtures' grey
+        (0xFFFFFF, False),  # white text on a dark banner
+    ],
+)
+def test_hint_is_grey_text(color: int, hint: bool) -> None:
+    assert flat._is_hint(color) is hint
+
+
+@pytest.mark.parametrize(
+    ("hints", "parts"),
+    [
+        ("....", [(0, 4)]),  # no hints: one part
+        ("..STD..", [(0, 7)]),  # one hinted part takes the empty cells on both sides
+        ("..AB..CD..", [(0, 5), (5, 10)]),  # two empty cells between parts: 1 + 1
+        ("AB...CD", [(0, 4), (4, 7)]),  # three: the odd middle cell goes to the earlier part
+        ("ABCD", [(0, 4)]),  # adjacent different letters: one part (a word, not a date)
+        ("DDMMYYYY", [(0, 2), (2, 4), (4, 8)]),  # a hinted date: one part per letter (D8)
+        (".DDMMYY.", [(0, 3), (3, 5), (5, 8)]),
+        ("DMYY", [(0, 4)]),  # a single D or M is not a date group
+        ("YYYY", [(0, 4)]),
+    ],
+)
+def test_hinted_parts(hints: str, parts: list[tuple[int, int]]) -> None:
+    assert flat._hinted_parts([h if h != "." else "" for h in hints]) == parts
+
+
+def test_hints_are_not_labels_and_do_not_hide_cells() -> None:
+    """A hinted comb row is one entry; its hint letters are not the label of the field below."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 112, "PIN code")
+        for i, hint in enumerate("PINXXX"):
+            x = 160 + 14 * i
+            page.draw_rect(pymupdf.Rect(x, 100, x + 14, 116), color=(0, 0, 0), width=0.5)
+            page.insert_text((x + 4, 112), hint, fontname="helv", fontsize=7, color=(0.6,) * 3)
+        _line(page, 160, 130, 300)
+
+    fields = _run(_pdf(draw)).fields
+
+    comb, line = fields
+    assert (comb.kind, comb.max_chars, comb.label_text) == (FieldKind.TEXT, 6, "PIN code")
+    assert line.label_text is None  # not "P I N X X X"

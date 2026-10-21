@@ -4,7 +4,8 @@ Entry areas come from PyMuPDF only (no OpenCV in Phase 2):
 - leader runs in the text: underscores, dots and ellipses ("Name: ______", "Date ......");
 - drawn horizontal lines, including thin rectangles used as lines;
 - empty rectangles and empty table cells (cells rebuilt from horizontal and vertical lines);
-- comb rows of per-character cells, merged into one field (decision D8);
+- comb rows of per-character cells, merged into one field (decision D8), one field per hinted
+  part when the cells carry grey hints (labelling rule 1);
 - small squares: checkboxes.
 
 Box convention (docs/decisions/phase-2.md, Step 2): a line-type entry spans the line and rises
@@ -62,6 +63,11 @@ COMB_CELL_MAX = (20.0, 25.0)  # width, height
 # larger than min(cell width, max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR x the median gap of that row)).
 MIN_SPLIT_GAP = 3.0
 SPLIT_GAP_FACTOR = 2.0
+# Labelling rule 1: grey hints printed inside entry cells ("D D M M Y Y Y Y", "F I R S T N A M E")
+# are not labels. Text whose luminance is in this band is a hint: label text on the dev forms is
+# black or dark blue (luminance <= 0.16), hints are grey (0.58); white text sits on a dark fill
+# (a heading banner) and stays text.
+HINT_LUMINANCE = (0.4, 0.85)
 MIN_BOX_HEIGHT = 6.0  # SPEC §6.7 minimum font size; smaller boxes are flagged
 # Labels.
 LABEL_GAP_EM = 2.0  # words further apart than this (in font sizes) are separate phrases
@@ -138,6 +144,7 @@ class _PageText:
     lines: list[_TextLine]
     leaders: list[_Leader]
     median_size: float
+    hints: list[_Token] = field(default_factory=list)  # one per character; never labels
 
 
 # --- small geometry helpers ---------------------------------------------------------------
@@ -218,11 +225,19 @@ def _split_span(chars: list[dict], size: float) -> tuple[list[list[dict]], list[
     return words, runs
 
 
+def _is_hint(color: int) -> bool:
+    """Grey text, by its sRGB luminance (Rec. 709 weights on the encoded values)."""
+    r, g, b = ((color >> shift) & 0xFF for shift in (16, 8, 0))
+    luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    return HINT_LUMINANCE[0] <= luminance <= HINT_LUMINANCE[1]
+
+
 def _extract_text(page: pymupdf.Page) -> _PageText:
     flags = pymupdf.TEXTFLAGS_RAWDICT & ~pymupdf.TEXT_PRESERVE_IMAGES
     tokens: list[_Token] = []
     lines: list[_TextLine] = []
     leaders: list[_Leader] = []
+    hints: list[_Token] = []
     sizes: list[float] = []
 
     for block in page.get_text("rawdict", flags=flags)["blocks"]:
@@ -234,8 +249,12 @@ def _extract_text(page: pymupdf.Page) -> _PageText:
             for span in line["spans"]:
                 size = float(span["size"])
                 words, runs = _split_span(span["chars"], size)
-                tokens += [_token(word, size) for word in words]
                 leaders += [_leader(run, size) for run in runs]
+                if _is_hint(span.get("color", 0)):
+                    # Hints count per character: each one sits in its own comb cell.
+                    hints += [_token([char], size) for word in words for char in word]
+                    continue
+                tokens += [_token(word, size) for word in words]
                 words_in_line += ["".join(c["c"] for c in word) for word in words]
                 sizes += [size] * sum(len(word) for word in words)
                 line_size = max(line_size, size)
@@ -245,7 +264,7 @@ def _extract_text(page: pymupdf.Page) -> _PageText:
                 lines.append(_TextLine(text, tuple(line["bbox"]), line_size, line_bold))
 
     median_size = statistics.median(sizes) if sizes else 10.0
-    return _PageText(tokens, lines, _merge_leaders(leaders), median_size)
+    return _PageText(tokens, lines, _merge_leaders(leaders), median_size, hints)
 
 
 def _token(chars: list[dict], size: float) -> _Token:
@@ -512,7 +531,7 @@ def _box_candidates(drawings: _Drawings, text: _PageText, page_area: float) -> l
         if not any(other != rect and _contains(rect, other) for other, _ in boxes)
     ]
 
-    combs, singles = _group_combs([rect for rect, _ in boxes], text.tokens)
+    combs, singles = _group_combs([rect for rect, _ in boxes], text.tokens, text.hints)
     source_of = dict(boxes)
     candidates = combs
     for rect in singles:
@@ -524,14 +543,15 @@ def _box_candidates(drawings: _Drawings, text: _PageText, page_area: float) -> l
         ):
             candidates.append(_Candidate(rect, FieldKind.CHECKBOX, "checkbox", "checkbox"))
         else:
-            candidates.append(_Candidate(rect, FieldKind.TEXT, "box", source_of[rect]))
+            source = source_of.get(rect, "comb cell")  # a one-cell hinted part, trimmed
+            candidates.append(_Candidate(rect, FieldKind.TEXT, "box", source))
     return candidates
 
 
 def _group_combs(
-    rects: list[Rect], tokens: Sequence[_Token]
+    rects: list[Rect], tokens: Sequence[_Token], hints: Sequence[_Token] = ()
 ) -> tuple[list[_Candidate], list[Rect]]:
-    """Merge rows of small adjacent cells into comb fields (decision D8)."""
+    """Merge rows of small adjacent cells into comb fields (decision D8, labelling rule 1)."""
     small = [
         r for r in rects if r[2] - r[0] <= COMB_CELL_MAX[0] and r[3] - r[1] <= COMB_CELL_MAX[1]
     ]
@@ -554,15 +574,71 @@ def _group_combs(
         row.sort(key=lambda r: r[0])
         gaps = [b[0] - a[2] for a, b in pairwise(row)]
         split_gap = max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR * statistics.median(gaps or [0.0]))
-        run = [row[0]]
+        runs = [[row[0]]]
         for cell in row[1:]:
-            if _continues_comb(run[-1], cell, tokens, split_gap):
-                run.append(cell)
+            if _continues_comb(runs[-1][-1], cell, tokens, split_gap):
+                runs[-1].append(cell)
             else:
-                _close_comb(run, combs, singles)
-                run = [cell]
-        _close_comb(run, combs, singles)
+                runs.append([cell])
+        for run in runs:
+            for start, end in _hinted_parts([_hint_in(cell, hints) for cell in run]):
+                # Parts cut from one run share a cell edge; drawn edges can overlap by a
+                # fraction of a point, so a part starts where the previous cell ends.
+                left = run[start - 1][2] if start else None
+                _close_comb(run[start:end], combs, singles, left)
     return combs, singles
+
+
+def _hint_in(cell: Rect, hints: Sequence[_Token]) -> str:
+    inside = [
+        h
+        for h in hints
+        if cell[0] <= (h.rect[0] + h.rect[2]) / 2 <= cell[2] and cell[1] <= h.vcenter <= cell[3]
+    ]
+    return "".join(h.text for h in sorted(inside, key=lambda h: h.rect[0]))
+
+
+def _hinted_parts(hints: Sequence[str]) -> list[tuple[int, int]]:
+    """Split a comb run into its hinted parts (labelling rule 1), as [start, end) cell ranges.
+
+    hints[i] is the hint printed in cell i ("" for none). Consecutive hinted cells are one part,
+    except a date-like run of repeated letters ("DDMMYYYY"), which splits where the letter changes
+    (D8). The empty cells between two parts are shared halfway, an odd middle cell going to the
+    earlier part; empty cells before the first part and after the last part join it. A run
+    without hints is one part.
+    """
+    hinted: list[tuple[int, int]] = []
+    for i, hint in enumerate(hints):
+        if not hint:
+            continue
+        if hinted and hinted[-1][1] == i:
+            hinted[-1] = (hinted[-1][0], i + 1)
+        else:
+            hinted.append((i, i + 1))
+    parts = [part for start, end in hinted for part in _date_groups(hints, start, end)]
+    if not parts:
+        return [(0, len(hints))]
+    cuts = [end + (next_start - end + 1) // 2 for (_, end), (next_start, _) in pairwise(parts)]
+    bounds = [0, *cuts, len(hints)]
+    return list(pairwise(bounds))
+
+
+def _date_groups(hints: Sequence[str], start: int, end: int) -> list[tuple[int, int]]:
+    """Cells start..end hinted like "DDMMYYYY" (one letter per cell, every letter repeated) are
+    one group per letter; any other hinted run ("FIRSTNAME", "STD") is one group."""
+    letters = hints[start:end]
+    groups: list[tuple[int, int]] = []
+    for i, letter in enumerate(letters, start):
+        if groups and hints[groups[-1][0]] == letter:
+            groups[-1] = (groups[-1][0], i + 1)
+        else:
+            groups.append((i, i + 1))
+    date_like = (
+        len(groups) > 1
+        and all(len(letter) == 1 for letter in letters)
+        and all(group_end - group_start >= 2 for group_start, group_end in groups)
+    )
+    return groups if date_like else [(start, end)]
 
 
 def _continues_comb(prev: Rect, cell: Rect, tokens: Sequence[_Token], split_gap: float) -> bool:
@@ -583,11 +659,15 @@ def _continues_comb(prev: Rect, cell: Rect, tokens: Sequence[_Token], split_gap:
     return True
 
 
-def _close_comb(run: list[Rect], combs: list[_Candidate], singles: list[Rect]) -> None:
+def _close_comb(
+    run: list[Rect], combs: list[_Candidate], singles: list[Rect], left: float | None = None
+) -> None:
     if len(run) == 1:
-        singles.append(run[0])
+        cell = run[0]
+        singles.append(cell if left is None else (max(cell[0], left), *cell[1:]))
         return
-    union = (run[0][0], min(r[1] for r in run), run[-1][2], max(r[3] for r in run))
+    x0 = run[0][0] if left is None else max(run[0][0], left)
+    union = (x0, min(r[1] for r in run), run[-1][2], max(r[3] for r in run))
     combs.append(
         _Candidate(
             union,

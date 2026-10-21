@@ -260,14 +260,23 @@ def test_perfect_detector_on_a_fixture_scores_one(tmp_path: Path) -> None:
     assert totals.kinds.as_dict()["recall_by_labelled_kind"]["text"]["share"] == 1.0
 
 
-def test_rule_fixture_shows_the_step_11_gap(tmp_path: Path) -> None:
-    """Rule 1 is not implemented yet: the detector misses the hinted-cell fields."""
+def test_rule_1_fixture_is_found_end_to_end(tmp_path: Path) -> None:
+    """Labelling rule 1 (Step 11, fix 2): every hinted part is found under both metrics."""
     label = _label_file("flat_hinted_comb", "21_hinted", prefilled=SCRATCH)
     dataset, labels = _setup(tmp_path, {"21_hinted": ("flat_hinted_comb", label)})
 
-    at_match = detection.evaluate(dataset, labels, "dev", "flat@test").total().spot
+    totals = detection.evaluate(dataset, labels, "dev", "flat@test").total()
 
-    assert at_match.recall is not None and at_match.recall < 1.0
+    n = len(pdfs.get("flat_hinted_comb").fields)
+    assert totals.spot == totals.iou == Counts(tp=n, fp=0, fn=0)
+
+
+def _with_missed_spot(label: LabelFile) -> LabelFile:
+    """The label file plus one labelled spot where the fixture has no entry (bottom of page 0)."""
+    missed = LabelField(
+        id="p0_l999", page=0, bbox=(72.0, 780.0, 200.0, 792.0), kind=LabelKind.TEXT, comb=False
+    )
+    return label.model_copy(update={"fields": [*label.fields, missed]})
 
 
 def test_partial_labels_ocr_pages_and_forms_without_labels(tmp_path: Path) -> None:
@@ -295,7 +304,7 @@ def test_anchoring_check_separates_scratch_and_prefilled(tmp_path: Path) -> None
             "02_boxes": ("flat_boxes", _label_file("flat_boxes", "02_boxes")),
             "21_hinted": (
                 "flat_hinted_comb",
-                _label_file("flat_hinted_comb", "21_hinted", prefilled=SCRATCH),
+                _with_missed_spot(_label_file("flat_hinted_comb", "21_hinted", prefilled=SCRATCH)),
             ),
         },
     )
