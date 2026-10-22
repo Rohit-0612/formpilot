@@ -129,6 +129,12 @@ Deliverables
   (labelled `text`, Phase 2 labelling rules) while the AcroForm frontend skips signature
   widgets (Phase 2 Step 9). Decide one treatment for both (e.g. a `signature` field that is
   detected but never filled), record it, and cover both frontends with a test.
+- Together with that decision: signature areas above a caption with nothing drawn ("(Signature of
+  the candidate)" under empty space) are not detected by the flat frontend. This is Phase 2
+  Step 11's fix 8, deferred: 11 misses on dev, all on pre-filled forms, and false-positive risk
+  on the from-scratch forms (a "Signature of …" block heading on #41, an unlabelled signature
+  area on #21). Design its detection with the signature treatment, and measure it against the
+  from-scratch forms (`docs/decisions/phase-2.md`, "Step 11 — closing").
 - `eval/run_eval.py` with `--split`, `--mode rules|llm|hybrid`, `--provider`, `--record/--replay`;
   metrics: detection P/R, semantic accuracy; JSON + Markdown report.
 - `make eval` target.

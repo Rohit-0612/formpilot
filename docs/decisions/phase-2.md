@@ -1191,6 +1191,7 @@ it.
 | 1 | #3, page 2 | add a `text` box for the applicant's signature box (x 411–565, y 579–632; label question 5). Rule: a box whose text asks for a signature gets a `text` box even if it also mentions a thumb impression (`eval/labelling/README.md`, added 2026-10-22) | human, 2026-10-22 | against the detector (an added miss) |
 | 2 | #3, page 2 | remove `p1_l041` (`text`, 3.3 × 4.2 pt at x 55.8, y 444.8, over a vector-drawn letter; label question 6): an anchoring leftover from the pre-filled boxes. The human verifies it in Label Studio during v5 | human, 2026-10-22 | against the detector (its box becomes a false positive) |
 | 3 | #1, pages 5, 8, 9 | label from scratch (no pre-filled boxes) and add the three pages to the scored subset, as a held-out check of rule 3's precision (fix 4; see Known limitations). `subset.py` changes with the v5 conversion, not before. Any decision to tighten rule 3 waits for these v5 numbers | human, 2026-10-22 | neutral (new pages, labelled without the detector) |
+| 4 | #21, page 1 | decide blind in Label Studio: the space above "(Signature of authorized official of the Post Offc)" (caption at x 326–548, y 696; nothing drawn, not labelled). Under the labelling rules, signature and office-use areas get a `text` box. Found by the fix 8 scan | human, 2026-10-22 (to decide during v5) | against the detector if added (the detector does not box it now: recall falls) |
 
 **Label question from fix 5 (reported to the human 2026-10-21; decided the same day: add both boxes, see "Fourth relabel by Claude Code").**
 4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x
@@ -1213,6 +1214,73 @@ it.
    first three, labelled 5 + 10) and name row 2 `p0_l018` / `p0_l019` (one `LASTNAME` hint in the
    middle, labelled 21 + 18 cells). Rule 1 as written gives one box per row. Recorded as
    detector misses unless the human decides otherwise.
+
+## Step 11 — closing (human decision, 2026-10-22)
+
+**Tuning is closed at fix 7.** Fixes done, in order: 1, 2, 5, 3, 4, 6, 7, one commit each, each
+measured on the dev labels only. Fix 8 was not done (below). No test-set form was run.
+
+**Final ablation table, labels v4** (writing spot unless the column says IoU; full table with Δ
+and per-form changes: "Step 11 — tuning on dev: ablation table").
+
+| Row | Commit | Pooled P / R | Macro P / R | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R |
+|---|---|---|---|---|---|---|
+| Baseline v4 | `0ee9999` | 86.8 / 77.5 | 88.3 / 77.0 | 77.1 / 55.2 | 87.8 / 80.2 | 83.4 / 74.4 |
+| Fix 1 — D8 gap split | `f535a3f` | 86.9 / 77.8 | 88.4 / 77.1 | 77.1 / 55.2 | 87.8 / 80.5 | 83.5 / 74.8 |
+| Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.4 | 89.3 / 79.5 | 77.1 / 55.2 | 91.2 / 87.9 | 86.8 / 81.4 |
+| Fix 5 — blanks after a colon | `5fef220` | 89.7 / 88.3 | 89.4 / 85.2 | 81.1 / 89.6 | 90.9 / 88.1 | 84.0 / 82.6 |
+| Fix 3 — rule 2, wide cells | `c41510e` | 96.3 / 88.9 | 94.6 / 85.8 | 81.1 / 89.6 | 98.6 / 88.8 | 90.2 / 83.3 |
+| Fix 4 — rule 3, label inside a cell | `fdbb165` | 96.5 / 92.1 | 94.6 / 90.2 | 81.1 / 89.6 | 98.7 / 92.4 | 88.9 / 84.9 |
+| Fix 6 — rounded boxes | `9146cfb` | 97.8 / 92.1 | 97.3 / 90.2 | 90.9 / 89.6 | 98.7 / 92.4 | 90.1 / 84.9 |
+| **Fix 7 — hyphen leaders (final)** | `714c3d3` | **97.8 / 92.6** | **97.4 / 90.7** | **91.3 / 94.0** | **98.7 / 92.4** | **89.8 / 85.0** |
+
+Baseline v4 → fix 7, from the two reports:
+- pooled writing spot +10.9 / +15.1 (TP 482 → 576, FP 73 → 13, FN 140 → 46);
+- from scratch +14.2 / +38.8 (TP 37 → 63, FP 11 → 6, FN 30 → 4);
+- pre-filled +10.9 / +12.3;
+- macro +9.0 / +13.7.
+
+From-scratch IoU ≥ 0.5 precision ends 0.3 below the baseline (43.8 → 43.5 %). The colon blanks
+(fix 5) and hyphen leaders (fix 7) are 1.2 em high, while the hand-drawn boxes on #21 and #41
+are lower (the box-height convention); the writing spots match.
+
+All of these are dev numbers, measured on labels v4. The whole table is re-run once on labels v5
+(pending label fixes below).
+
+**Fix 8 (signature area above its caption) is deferred to Phase 3** (human decision, 2026-10-22).
+- It could help only pre-filled forms: at best +10 of the 11 misses of its kind (#2, #3, #25,
+  #30).
+- It risks 1–2 false positives on #21 and #41, our only from-scratch forms: #41's "Signature of
+  BPM/SPM/PM/ CPC in-Charge" is a block heading, and #21's "(Signature of authorized official of
+  the Post Offc)" has empty space above and no label (pending label fix 4).
+- It also overlaps the open Phase 3 signature decision (flat signature areas are boxed, AcroForm
+  signature widgets are skipped).
+- Signature-above-caption detection will be designed in Phase 3, together with that decision
+  (`docs/PLAN.md`, Phase 3).
+
+**Remaining errors at fix 7** (labels v4, scored dev pages: 46 misses, 13 false positives). The
+full inventory, with page, text and bbox for each, is in
+`eval/reports/phase2-detection-dev-step11-7-hyphen-leaders-20261022-714c3d3-inventory.md`.
+
+| Group | Misses | False positives | Forms | Status |
+|---|--:|--:|---|---|
+| Tables whose columns exist only as header text (E) | 19 | 3 | #23 | known limitation: needs table-structure inference |
+| Signature area above its caption, nothing drawn (D) | 11 | — | #2, #3, #25, #30 | deferred to Phase 3 (fix 8) |
+| Tick spots with no printed square (F) | 10 | — | #2, #41 | known limitation: nothing to detect |
+| Blank after a label without a colon ("To,", "Countersigned by", "(   )"), nothing drawn | 3 | — | #6, #23, #39 | known limitation |
+| STD code parts not split | 2 | — | #1 | known limitation (fix 2) |
+| Colon inside a frame (between fix 5's and fix 4's rules) | 1 | — | #3 | known limitation |
+| Headings ending in a colon | — | 5 | #21 ×2, #23 ×2, #41 | known limitation (fix 5) |
+| Empty "OR" separator column (J) | — | 3 | #21 | known limitation |
+| Dashed rules drawn across the page | — | 2 | #3 | known limitation |
+| **Total** | **46** | **13** | | |
+
+From scratch: #21 has 0 misses and 5 false positives, #41 4 misses and 1 false positive; none of
+them is in fix 8's scope.
+
+**OpenCV raster fallback: stays in Phase 6.** The pre-tuning error analysis found no miss caused
+by boxes drawn as images, and none of the fixes needed one. No new dependency was added in
+Step 11.
 
 ## Remaining plan (hand-off, 2026-10-17)
 
@@ -1429,6 +1497,16 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   Rule 3's precision must be checked on the test set (at the release measurement, when the
   human asks for it). The photo / thumb / signature words are English only; a Hindi-only photo
   box with its words printed inside could get a box.
+
+- **Flat detection errors left at the end of Step 11.** 46 misses and 13 false positives remain
+  on the scored dev pages (labels v4). They are grouped, with counts and status, in "Step 11 —
+  closing"; the full list is in the fix 7 report's inventory notes. The main ones:
+  - tables whose columns exist only as header text (needs table-structure inference);
+  - tick spots with no printed square;
+  - headings ending in a colon (fix 5);
+  - the empty "OR" separator column;
+  - blanks after a label without a colon;
+  - signature areas above a caption with nothing drawn (deferred to Phase 3).
 
 - **STD code parts are not split (Step 11, fix 2).** On #1 page 1 the two telephone rows are
   15 touching cells hinted `S T D` in the first three; the labels split them 5 + 10 (STD code,
