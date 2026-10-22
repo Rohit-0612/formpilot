@@ -1282,6 +1282,9 @@ them is in fix 8's scope.
 by boxes drawn as images, and none of the fixes needed one. No new dependency was added in
 Step 11.
 
+**Integration tests at the end of Step 11: done** (the last item of the Step 11 plan,
+2026-10-22). `make test-int` at `32c2c34`: 66 passed, 824 deselected.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
