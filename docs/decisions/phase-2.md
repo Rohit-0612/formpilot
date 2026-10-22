@@ -893,9 +893,11 @@ labels v4 and its report carries the macro average.
 | Fix 2 — rule 1, hinted rows | `9541889` | 90.1 / 84.4 (+3.2 / +6.6) | 89.3 / 79.5 (+0.9 / +2.4) | 77.1 / 55.2 (±0) | 91.2 / 87.9 (+3.4 / +7.4) | 86.8 / 81.4 (+3.3 / +6.6) | #1: TP 154 → 189, FP 15 → 0, FN 43 → 8 (169 → 189 boxes); #3: TP 57 → 63, FN 9 → 3 (70 → 76 boxes); comb recall 59.4 % → 94.1 % (95/101) |
 | Fix 5 — blanks after a colon (done before fixes 3 and 4, human decision) | `5fef220` | 89.7 / 88.3 (−0.3 / +3.9) | 89.4 / 85.2 (+0.1 / +5.7) | **81.1 / 89.6 (+4.0 / +34.3)** | 90.9 / 88.1 (−0.3 / +0.2) | 84.0 / 82.6 (−2.8 / +1.3) | #21: TP 25 → 44, FP 3 → 5, FN 22 → 3 (28 → 49 boxes); #41: TP 12 → 16, FP 8 → 9, FN 8 → 4 (20 → 25); #2: TP 31 → 32, FN 10 → 9 (42 → 43); #23: FP 3 → 5 (47 → 49); text recall 80.0 % (323/404) → 85.9 % (347/404) |
 | Fix 3 — rule 2, wide cells | `c41510e` | 96.3 / 88.9 (+6.6 / +0.6) | 94.6 / 85.8 (+5.2 / +0.5) | 81.1 / 89.6 (±0) | 98.6 / 88.8 (+7.7 / +0.7) | 90.2 / 83.3 (+6.3 / +0.6) | #25: TP 95 → 97, FP 20 → 0, FN 8 → 6 (115 → 97 boxes); #2: TP 32 → 33, FP 11 → 0, FN 9 → 8 (43 → 33); #3: TP 63 → 64, FP 13 → 2, FN 3 → 2 (76 → 66); comb recall 94.1 % → 98.0 % (99/101) |
+| Fix 4 — rule 3, label inside a cell | `fdbb165` | 96.5 / 92.1 (+0.1 / +3.2) | 94.6 / 90.2 (+0.0 / +4.4) | 81.1 / 89.6 (±0) | 98.7 / 92.4 (+0.1 / +3.6) | 88.9 / 84.9 (−1.4 / +1.6) | #30: TP 15 → 29, FN 16 → 2 (15 → 29 boxes); #1: TP 189 → 195, FN 8 → 2 (189 → 195 boxes on the scored pages); text recall 85.9 % (347/404) → 90.8 % (367/404) |
 
 After fix 5 the macro from scratch is 76.9 / 86.8 (2 forms) and the macro pre-filled 92.2 / 84.9
-(9 forms; writing spot). After fix 3: 76.9 / 86.8 and 98.5 / 85.6.
+(9 forms; writing spot). After fix 3: 76.9 / 86.8 and 98.5 / 85.6. After fix 4: 76.9 / 86.8 and
+98.5 / 90.9.
 
 **History: labels v3** (superseded by the v4 table above; reports committed). The macro values of
 the first three rows come from the per-form counts in their committed reports; a fresh
@@ -1014,6 +1016,76 @@ labels v4).
   #21 / #41). Comb precision stays 100 % (99/99).
 - **Known limitation.** A run of two or three separate boxes up to 30 pt wide, close together
   with no text between them, would be read as one comb; none on dev.
+
+**Fix 4 — labelling rule 3, label inside a cell** (`fdbb165`, report
+`step11-4-label-inside-20261022-fdbb165`; labels v4).
+- **What the dev forms show.**
+  - #30's 14 misses: a ruled table with one cell per row (x 55–562), the bilingual label at the
+    cell's left edge, then the blank. Two rows have a second phrase: "(Yes / No)" after the blank,
+    and "ई-मेल न० (E-Mail ID)" between two blanks. One miss is the second line of the office-use
+    box at the top of the page (the blank after "नामांकन संख्या :").
+  - #1 page 4's 6 remaining misses: signature boxes drawn as cells, with the caption
+    "(Signature of the Applicant/Thumb impression of the Applicant)" at the bottom; labelled above
+    the caption.
+  - #6's one miss, counted under rule 3 in the pre-tuning analysis, lies only inside the page
+    border, not in a cell of its own: not rule 3, unchanged.
+- **Rule** (the README's rule 3). In a drawn cell with text inside, a caption at the bottom (all
+  the text in the lower part, at least 2 em of space above it and less below it than above) leaves
+  the space above it as the entry, full cell width. Otherwise each text line that starts at the
+  cell's left edge (within 2 em) has a blank after each of its phrases, up to the next phrase or
+  the cell's edge (0.3 em from either), between the cell's other text lines; a blank needs at
+  least 5 em. The label is the phrase before the blank (or the caption). Skipped:
+  - frames (cells around other cells);
+  - the label cells of a table: another cell starts at the cell's right edge, on the same row,
+    and that cell is the entry;
+  - cells holding a drawn entry (a leader or a line);
+  - photo and thumb-impression boxes (the words "photo" / "thumb"), unless the text also asks for
+    a signature ("sign": #1's captions offer a signature or a thumb impression);
+  - a phrase that ends a sentence (a last word of four or more letters ending in a full stop, so
+    "No." is not one): a notice or an instruction, not a label.
+- **How the exclusions were chosen.** A read-only prototype over all scored pages listed every
+  candidate. Without exclusions it found the 14 #30 blanks and 49 false positives:
+  - 31 in table label cells (#2's left column, #6's nominee and guardian tables, #21's bank
+    table, #25's "State");
+  - centred headings and captions ("POSB account details", "(कार्यालय उपयोग हेतु)", #1's
+    applicant captions);
+  - #3's photo box;
+  - the headings of #1 page 4's witness cells, whose entries are drawn leaders;
+  - short trailing gaps: 4.4 em of cell padding after #30's "(Yes / No)", #2's "YES" / "NO" and
+    "(If applicable)". The smallest real blank is 9.4 em, so 5 em.
+
+  The caption case found #1's 6 signature boxes. As first written it also boxed the space above
+  text in the middle of a box (#1 page 1's rubber-stamp box, #3 page 2's signature box, neither
+  labelled), hence "less space below than above". The full-stop rule comes from the pinned
+  `flat_boxes` fixture (a framed notice, approved in Step 4 as no entry), not from dev: it changes
+  no dev candidate.
+- **Tests.** The `flat_label_inside` strict xfail is removed (it passes); it was the last one, so
+  `STEP_11_RULES` is gone. New unit tests (two labels in one cell, table label cells, room, centred
+  text and a stamp box, a cell with a drawn entry, a signature caption that mentions a thumb
+  impression, sentence ends); each one fails with its exclusion disabled (checked one by one).
+- **Effect.** On the scored pages only #1 and #30 change; no false positive added. From scratch
+  unchanged: no candidate on #21 or #41. IoU ≥ 0.5 finds 10 of the 20 new matches. The other 10
+  are the same writing spots with larger boxes: full cell height on #30's rows (27 pt; the labels
+  are 13–19 pt), and full cell width on #1's signature boxes (268 pt; the labels about 160).
+- **Outside the scored subset** (#1 pages 5, 8 and 9: not labelled, looked at on local renders
+  only, not tuned on): 7 boxes added, 1 removed.
+  - 3 look right: the signature boxes above the captions on page 5 (2) and page 9.
+  - 4 look wrong: on page 8, the space above a bottom-aligned "Yes" in a tall table row, the gap
+    after a bold heading row in a table ("C For Association of persons…"), and a blank in a
+    notes block after "…in Sl. No. 16." (a sentence ending in a number, which the full-stop rule
+    does not catch); on page 9, the trailing gap in a table header cell.
+  - Removed: page 9's "Date:" colon blank. It ran across the page through the drawn signature box,
+    so it now overlaps the new signature box and is dropped (it was the wrong shape before).
+
+  See Known limitations.
+
+**Label question from fix 4 (reported to the human 2026-10-22; open).**
+5. **#3 page 2, the applicant's signature box** (x 411–565, y 579–632, right of the arrow at the
+   bottom of the page). A drawn box with "Signature/Thumb impression of the Applicant" and
+   "Please sign in black ink only" printed in its middle; no label. Under the labelling rules
+   (signature areas get a `text` box) it would be a `text` box, as #1 page 4's applicant
+   signature cells are. The detector does not box it either (the text is in the middle of the
+   box, not a caption at its bottom), so the numbers above do not depend on the answer.
 
 **Label question from fix 5 (reported to the human 2026-10-21; decided the same day: add both boxes, see "Fourth relabel by Claude Code").**
 4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x
@@ -1238,6 +1310,14 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   **Possible future improvement:** detect comb cells by their shape rather than an absolute
   width: near-square cells (or cells of one repeated size) in a uniform row of several equal,
   touching cells, so the decision does not depend on how wide a form draws its cells.
+
+- **Rule 3 reads layout, not meaning (Step 11, fix 4).** Whether text in a cell is a label with a
+  blank after it, a heading, a table value or an instruction is decided from position only (left
+  edge, centred, bottom caption, a cell to the right, 5 em of room, a sentence-ending full stop).
+  On dev's scored pages this adds no false positive, but #1's unscored pages show 4 wrong boxes
+  (a bottom-aligned table value, a heading row and a header cell in tables, a notes block), so
+  the test set may show more. The photo / thumb / signature words are English only; a Hindi-only
+  photo box with its words printed inside could get a box.
 
 - **STD code parts are not split (Step 11, fix 2).** On #1 page 1 the two telephone rows are
   15 touching cells hinted `S T D` in the first three; the labels split them 5 + 10 (STD code,
