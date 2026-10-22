@@ -1104,7 +1104,7 @@ labels v4).
   #41's last false positive is the "Documents Enclosed:" colon blank (fix 5). The cells' labels
   are mostly empty or a neighbouring line's words, as before (label text is Phase 3's concern).
 
-**Label question from fix 6 (reported to the human 2026-10-22; open).**
+**Label question from fix 6 (reported to the human 2026-10-22; decided the same day: remove it, as pending label fix 2).**
 6. **#3 page 2, `p1_l041`** (`text`, x 55.8–59.1, y 444.8–449.0: 3.3 × 4.2 pt). It sits exactly
    on one of the page's small fill-only shapes, glyphs drawn as vector paths, which the detector
    rebuilds into a tiny cell; the label has the detector's box to the tenth of a point (#3 was
@@ -1136,7 +1136,9 @@ it.
 
 | # | Form, page | Correction | Decided | Direction |
 |---|---|---|---|---|
-| 1 | #3, page 2 | add a `text` box for the applicant's signature box (x 411–565, y 579–632; label question 5) | human, 2026-10-22 | against the detector (an added miss) |
+| 1 | #3, page 2 | add a `text` box for the applicant's signature box (x 411–565, y 579–632; label question 5). Rule: a box whose text asks for a signature gets a `text` box even if it also mentions a thumb impression (`eval/labelling/README.md`, added 2026-10-22) | human, 2026-10-22 | against the detector (an added miss) |
+| 2 | #3, page 2 | remove `p1_l041` (`text`, 3.3 × 4.2 pt at x 55.8, y 444.8, over a vector-drawn letter; label question 6): an anchoring leftover from the pre-filled boxes. The human verifies it in Label Studio during v5 | human, 2026-10-22 | against the detector (its box becomes a false positive) |
+| 3 | #1, pages 5, 8, 9 | label from scratch (no pre-filled boxes) and add the three pages to the scored subset, as a held-out check of rule 3's precision (fix 4; see Known limitations). `subset.py` changes with the v5 conversion, not before. Any decision to tighten rule 3 waits for these v5 numbers | human, 2026-10-22 | neutral (new pages, labelled without the detector) |
 
 **Label question from fix 5 (reported to the human 2026-10-21; decided the same day: add both boxes, see "Fourth relabel by Claude Code").**
 4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x

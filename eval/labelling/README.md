@@ -78,6 +78,10 @@ office-use fields so FormPilot never fills them).
 | photograph | no | — |
 | thumb impression | no | — |
 
+A box whose printed text asks for a signature gets a `text` box even if it also mentions a thumb
+impression ("Signature/Thumb impression of the Applicant"): the signature rule wins over the
+no-box rule for photo and thumb-impression areas.
+
 In the images, green is a box you draw and red dashed is an area that gets no box. They are
 rendered from synthetic test forms (`make label-images`). The same examples on the dev forms
 can be rendered locally with `make label-examples` (into `eval/labelling/examples/`, never
