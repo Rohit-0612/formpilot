@@ -59,23 +59,7 @@ def _line(page: pymupdf.Page, x0: float, y: float, x1: float) -> None:
 # --- against the fixtures' ground truth ---------------------------------------------------
 
 
-# Labelling rules 1-3 (Step 5): the detector learns them in Step 11. Strict xfail, so the test
-# fails loudly once a rule is implemented and the marker must be removed.
-STEP_11_RULES = {"flat_label_inside"}
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param(
-            name,
-            marks=pytest.mark.xfail(strict=True, reason="labelling rule not implemented (Step 11)"),
-        )
-        if name in STEP_11_RULES
-        else name
-        for name in FLAT_FIXTURES
-    ],
-)
+@pytest.mark.parametrize("name", FLAT_FIXTURES)
 def test_detected_fields_match_ground_truth(name: str) -> None:
     fixture = pdfs.get(name)
     fields = list(_run_fixture(name).fields)
@@ -470,3 +454,103 @@ def test_colon_printed_apart_still_labels_its_blank() -> None:
     (blank,) = _run(_pdf(draw)).fields
 
     assert blank.label_text == "2. NAME OF THE BANK"
+
+
+def _cell(page: pymupdf.Page, rect: tuple[float, float, float, float]) -> None:
+    page.draw_rect(pymupdf.Rect(rect), color=(0, 0, 0), width=0.5)
+
+
+def _centred(page: pymupdf.Page, cell: tuple[float, float, float, float], y: float, s: str) -> None:
+    _text(page, (cell[0] + cell[2] - pymupdf.get_text_length(s, "helv", 10)) / 2, y, s)
+
+
+def test_two_labels_in_one_cell_get_a_blank_each() -> None:
+    """Rule 3: each label inside a cell is followed by its own blank (dev form #30)."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _cell(page, (72, 100, 520, 124))
+        _text(page, 76, 116, "Mobile No.")
+        _text(page, 300, 116, "E-mail")
+
+    blanks = _run(_pdf(draw)).fields
+
+    assert [(f.label_text, f.bbox.x1 < 300) for f in blanks] == [
+        ("Mobile No.", True),
+        ("E-mail", False),
+    ]
+
+
+def test_label_cell_of_a_table_gets_no_blank() -> None:
+    """A label in its own cell, the entry in the next cell: only the next cell is an entry."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _cell(page, (72, 100, 200, 124))
+        _cell(page, (200, 100, 450, 124))
+        _text(page, 76, 116, "Name")
+
+    (entry,) = _run(_pdf(draw)).fields
+
+    assert (entry.bbox.x0, entry.label_text) == (200, "Name")
+
+
+def test_blank_inside_a_cell_needs_room() -> None:
+    """Padding after a label (here 4 em) is not a blank; 5 em are needed."""
+    label = "Date of birth"
+    right = 76 + pymupdf.get_text_length(label, "helv", 10) + 3 + 40 + 3
+
+    def draw(page: pymupdf.Page) -> None:
+        _cell(page, (72, 100, right, 124))
+        _text(page, 76, 116, label)
+
+    assert _run(_pdf(draw)).fields == []
+
+
+def test_centred_text_in_a_cell_is_not_a_label() -> None:
+    """A centred heading, and text in the middle of a box (a stamp box): no entry."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _cell(page, (72, 100, 400, 124))
+        _centred(page, (72, 100, 400, 124), 116, "Particulars of the account")
+        _cell(page, (72, 150, 300, 230))
+        _centred(page, (72, 150, 300, 230), 194, "Rubber stamp of the branch")
+
+    assert _run(_pdf(draw)).fields == []
+
+
+def test_cell_holding_a_drawn_entry_gets_no_blank() -> None:
+    """The leader inside the cell is the entry; rule 3 adds no blank after the heading (#1)."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _cell(page, (72, 100, 520, 140))
+        _text(page, 76, 116, "Details of the witness")
+        _text(page, 76, 134, "Name: " + "_" * 10)  # ends before the heading's blank
+
+    (leader,) = _run(_pdf(draw)).fields
+
+    assert (leader.label_text, leader.bbox.y1 > 120) == ("Name", True)
+
+
+def test_signature_caption_mentioning_a_thumb_impression_is_boxed() -> None:
+    """Sign or thumb: a person signs there, so the space above the caption is an entry (#1)."""
+    cell = (72.0, 100.0, 400.0, 170.0)
+    caption = "(Signature / Thumb impression of the applicant)"
+
+    def draw(page: pymupdf.Page) -> None:
+        _cell(page, cell)
+        _centred(page, cell, 165, caption)
+
+    (signature,) = _run(_pdf(draw)).fields
+
+    assert (signature.bbox.x0, signature.bbox.y0, signature.bbox.x1) == cell[:3]
+    assert 150 < signature.bbox.y1 < 160
+    assert signature.label_text == caption
+
+
+@pytest.mark.parametrize(
+    ("word", "ends"),
+    [("form.", True), ("only.", True), ("No.", False), ("Nos.", False), ("Name:", False)],
+)
+def test_sentence_end_is_not_an_abbreviation(word: str, ends: bool) -> None:
+    token = flat._Token(word, (0, 0, 10, 10), 10, 10)
+
+    assert flat._ends_sentence(token) is ends

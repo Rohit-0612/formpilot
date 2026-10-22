@@ -7,6 +7,7 @@ Entry areas come from PyMuPDF only (no OpenCV in Phase 2):
 - comb rows of per-character cells, merged into one field (decision D8), one field per hinted
   part when the cells carry grey hints (labelling rule 1);
 - small squares: checkboxes;
+- the empty part of a cell with its label printed inside (labelling rule 3, Step 11 fix 4);
 - blanks after a colon where nothing is drawn ("NAME OF THE BANK :  ", Step 11 fix 5).
 
 Box convention (docs/decisions/phase-2.md, Step 2): a line-type entry spans the line and rises
@@ -78,6 +79,15 @@ HINT_LUMINANCE = (0.4, 0.85)
 COLON_ENDINGS = (":", ":-")
 MIN_COLON_BLANK_EM = 3.0
 TABLE_BELOW_EM = 2.5
+# Labelling rule 3 (Step 11, fix 4): a label printed inside a drawn cell; the entry is the cell's
+# empty part. The label starts at the cell's left edge, and the blank after it needs room for a
+# short answer (on dev the real blanks are >= 9.4 em, a cell's padding after a trailing
+# "(Yes / No)" is 4.4 em). A caption at the bottom of a cell (a signature box) leaves the space
+# above it. Photo and thumb-impression boxes get no box: nothing is written there.
+MIN_INSIDE_BLANK_EM = 5.0
+INSIDE_LEFT_EM = 2.0
+CAPTION_SPACE_EM = 2.0
+NO_ENTRY_WORDS = ("photo", "thumb")
 MIN_BOX_HEIGHT = 6.0  # SPEC §6.7 minimum font size; smaller boxes are flagged
 # Labels.
 LABEL_GAP_EM = 2.0  # words further apart than this (in font sizes) are separate phrases
@@ -88,7 +98,7 @@ HEADING_SIZE_FACTOR = 1.15
 Rect = tuple[float, float, float, float]
 
 # Candidate priorities when boxes overlap: lower wins.
-_PRIORITY = {"checkbox": 0, "comb": 1, "box": 2, "line": 3, "leader": 4, "colon": 5}
+_PRIORITY = {"checkbox": 0, "comb": 1, "box": 2, "line": 3, "leader": 4, "inside": 5, "colon": 6}
 
 
 @dataclass(frozen=True)
@@ -510,12 +520,13 @@ def _line_candidates(drawings: _Drawings, text: _PageText) -> list[_Candidate]:
     return candidates
 
 
+def _in_cell(rect: Rect, token: _Token) -> bool:
+    cx = (token.rect[0] + token.rect[2]) / 2
+    return rect[0] <= cx <= rect[2] and rect[1] <= token.vcenter <= rect[3]
+
+
 def _has_text_inside(rect: Rect, tokens: Sequence[_Token]) -> bool:
-    for token in tokens:
-        cx = (token.rect[0] + token.rect[2]) / 2
-        if rect[0] <= cx <= rect[2] and rect[1] <= token.vcenter <= rect[3]:
-            return True
-    return False
+    return any(_in_cell(rect, token) for token in tokens)
 
 
 def _box_candidates(
@@ -691,6 +702,123 @@ def _close_comb(
             max_chars=len(run),
         )
     )
+
+
+def _inside_candidates(
+    text: _PageText, cells: list[Rect], taken: list[_Candidate]
+) -> list[_Candidate]:
+    """Labelling rule 3: a drawn cell with its label printed inside; the entry is the empty part.
+
+    A caption at the bottom of a cell (a signature box) leaves the space above it; otherwise each
+    line that starts at the cell's left edge has a blank after each of its phrases, up to the next
+    phrase or the cell's edge. Skipped: frames (cells around other cells), the label cells of a
+    table (a cell starts at their right edge: that cell is the entry), cells holding a drawn entry,
+    and photo and thumb-impression boxes.
+    """
+    unique: list[Rect] = []
+    for cell in cells:
+        if min(cell[2] - cell[0], cell[3] - cell[1]) < MIN_CELL_SIZE:
+            continue
+        if not any(_iou(cell, kept) > 0.9 for kept in unique):
+            unique.append(cell)
+
+    candidates: list[_Candidate] = []
+    for cell in unique:
+        tokens = [t for t in text.tokens if _in_cell(cell, t)]
+        if not tokens or any(other is not cell and _contains(cell, other) for other in unique):
+            continue
+        if any(
+            other is not cell and abs(other[0] - cell[2]) <= SNAP and _rows_overlap(other, cell)
+            for other in unique
+        ):
+            continue
+        if any(_contains(cell, c.rect) for c in taken):
+            continue
+        words = " ".join(t.text for t in tokens).lower()
+        if any(word in words for word in NO_ENTRY_WORDS) and "sign" not in words:
+            continue
+        for cand in _caption_blank(cell, tokens) or _blanks_after_labels(cell, tokens):
+            if not any(_intersection(cand.rect, c.rect) > 0 for c in taken):
+                candidates.append(cand)
+    return candidates
+
+
+def _text_rows(tokens: Sequence[_Token]) -> list[list[_Token]]:
+    """Tokens grouped into lines by baseline, each left to right."""
+    rows: list[list[_Token]] = []
+    for token in sorted(tokens, key=lambda t: (t.baseline, t.rect[0])):
+        for row in rows:
+            if abs(row[0].baseline - token.baseline) <= max(0.4 * token.size, SNAP):
+                row.append(token)
+                break
+        else:
+            rows.append([token])
+    return [sorted(row, key=lambda t: t.rect[0]) for row in rows]
+
+
+def _caption_blank(cell: Rect, tokens: Sequence[_Token]) -> list[_Candidate]:
+    """All the text at the bottom of the cell: the entry is the space above it."""
+    top, bottom = min(t.rect[1] for t in tokens), max(t.rect[3] for t in tokens)
+    space = top - cell[1]
+    if space < CAPTION_SPACE_EM * max(t.size for t in tokens) or cell[3] - bottom > 0.5 * space:
+        return []
+    caption = [t for row in _text_rows(tokens) for t in row]
+    rect = (cell[0], cell[1], cell[2], top)
+    return [
+        _Candidate(
+            rect,
+            FieldKind.TEXT,
+            "inside",
+            "space above a caption in a cell",
+            label=_clean_label(caption),
+        )
+    ]
+
+
+def _blanks_after_labels(cell: Rect, tokens: Sequence[_Token]) -> list[_Candidate]:
+    candidates = []
+    for row in _text_rows(tokens):
+        if row[0].rect[0] - cell[0] > INSIDE_LEFT_EM * row[0].size:
+            continue  # centred or right-aligned text: a heading, not a label
+        phrases = [[row[0]]]
+        for prev, token in pairwise(row):
+            if token.rect[0] - prev.rect[2] > LABEL_GAP_EM * max(prev.size, token.size):
+                phrases.append([token])
+            else:
+                phrases[-1].append(token)
+        for phrase, after in zip(phrases, [*phrases[1:], None], strict=True):
+            if _ends_sentence(phrase[-1]):
+                continue  # a notice or an instruction, not a label
+            size = phrase[-1].size
+            x0 = phrase[-1].rect[2] + 0.3 * size
+            x1 = (after[0].rect[0] if after else cell[2]) - 0.3 * size
+            if x1 - x0 < MIN_INSIDE_BLANK_EM * size:
+                continue
+            # Between the cell's other text lines above and below, where they reach the blank.
+            beside = [t for t in tokens if t.rect[2] > x0 and t.rect[0] < x1]
+            top = max(
+                (t.rect[3] for t in beside if t.rect[3] <= phrase[-1].rect[1] + 0.5),
+                default=cell[1],
+            )
+            bottom = min(
+                (t.rect[1] for t in beside if t.rect[1] >= phrase[-1].rect[3] - 0.5),
+                default=cell[3],
+            )
+            candidates.append(
+                _Candidate(
+                    (x0, top, x1, bottom),
+                    FieldKind.TEXT,
+                    "inside",
+                    "blank after a label in a cell",
+                    label=_clean_label(phrase),
+                )
+            )
+    return candidates
+
+
+def _ends_sentence(token: _Token) -> bool:
+    """A word ending in a full stop ends a sentence ("form."); abbreviations ("No.") do not."""
+    return token.text.endswith(".") and sum(ch.isalpha() for ch in token.text) > 3
 
 
 def _colon_candidates(
@@ -954,7 +1082,7 @@ def _label(cand: _Candidate, candidates: list[_Candidate], text: _PageText) -> s
 
 def _assign_text(candidates: list[_Candidate], text: _PageText) -> None:
     for cand in candidates:
-        if cand.label is None:  # colon blanks already have theirs
+        if cand.label is None:  # colon blanks and blanks inside cells already have theirs
             cand.label = _label(cand, candidates, text)
         cand.context = _context(cand, text)
         if cand.rect[3] - cand.rect[1] < MIN_BOX_HEIGHT:
@@ -977,9 +1105,11 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     page_area = abs(unrotated)
 
     grid = _grid_cells(drawings.horizontal, drawings.vertical)
+    cells = drawings.rects + grid
     candidates = _leader_candidates(text) + _line_candidates(drawings, text)
     candidates += _box_candidates(drawings, grid, text, page_area)
-    candidates += _colon_candidates(text, drawings, drawings.rects + grid, candidates)
+    candidates += _inside_candidates(text, cells, candidates)
+    candidates += _colon_candidates(text, drawings, cells, candidates)
     kept, dropped = _resolve_overlaps(candidates)
     _assign_text(kept, text)
     notes = [
