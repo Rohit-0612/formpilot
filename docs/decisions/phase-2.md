@@ -895,10 +895,11 @@ labels v4 and its report carries the macro average.
 | Fix 3 — rule 2, wide cells | `c41510e` | 96.3 / 88.9 (+6.6 / +0.6) | 94.6 / 85.8 (+5.2 / +0.5) | 81.1 / 89.6 (±0) | 98.6 / 88.8 (+7.7 / +0.7) | 90.2 / 83.3 (+6.3 / +0.6) | #25: TP 95 → 97, FP 20 → 0, FN 8 → 6 (115 → 97 boxes); #2: TP 32 → 33, FP 11 → 0, FN 9 → 8 (43 → 33); #3: TP 63 → 64, FP 13 → 2, FN 3 → 2 (76 → 66); comb recall 94.1 % → 98.0 % (99/101) |
 | Fix 4 — rule 3, label inside a cell | `fdbb165` | 96.5 / 92.1 (+0.1 / +3.2) | 94.6 / 90.2 (+0.0 / +4.4) | 81.1 / 89.6 (±0) | 98.7 / 92.4 (+0.1 / +3.6) | 88.9 / 84.9 (−1.4 / +1.6) | #30: TP 15 → 29, FN 16 → 2 (15 → 29 boxes); #1: TP 189 → 195, FN 8 → 2 (189 → 195 boxes on the scored pages); text recall 85.9 % (347/404) → 90.8 % (367/404) |
 | Fix 6 — rounded boxes | `9146cfb` | 97.8 / 92.1 (+1.3 / +0.0) | 97.3 / 90.2 (+2.7 / +0.0) | **90.9 / 89.6 (+9.8 / ±0)** | 98.7 / 92.4 (±0) | 90.1 / 84.9 (+1.2 / +0.0) | #41: TP 16 → 16, FP 9 → 1, FN 4 → 4 (25 → 17 boxes); text precision 94.6 % → 96.6 % |
+| Fix 7 — hyphen leaders | `714c3d3` | 97.8 / 92.6 (+0.0 / +0.5) | 97.4 / 90.7 (+0.1 / +0.6) | **91.3 / 94.0 (+0.4 / +4.5)** | 98.7 / 92.4 (±0) | 89.8 / 85.0 (−0.3 / +0.2) | #21: TP 44 → 47, FP 5 → 5, FN 3 → 0 (49 → 52 boxes); text recall 90.8 % (367/404) → 91.6 % (370/404) |
 
 After fix 5 the macro from scratch is 76.9 / 86.8 (2 forms) and the macro pre-filled 92.2 / 84.9
 (9 forms; writing spot). After fix 3: 76.9 / 86.8 and 98.5 / 85.6. After fix 4: 76.9 / 86.8 and
-98.5 / 90.9. After fix 6: 92.0 / 86.8 and 98.5 / 90.9.
+98.5 / 90.9. After fix 6: 92.0 / 86.8 and 98.5 / 90.9. After fix 7: 92.3 / 90.0 and 98.5 / 90.9.
 
 **History: labels v3** (superseded by the v4 table above; reports committed). The macro values of
 the first three rows come from the per-form counts in their committed reports; a fresh
@@ -1103,6 +1104,57 @@ labels v4).
   false positives gone. From scratch precision 81.1 → 90.9 % (writing spot), recall unchanged.
   #41's last false positive is the "Documents Enclosed:" colon blank (fix 5). The cells' labels
   are mostly empty or a neighbouring line's words, as before (label text is Phase 3's concern).
+
+**Fix 7 — hyphen leaders** (`714c3d3`, report `step11-7-hyphen-leaders-20261022-714c3d3`; labels
+v4; plan shown to and approved by the human before any code, 2026-10-22).
+- **What the dev forms show.** After fix 6, #21 (from scratch) had 3 misses, all printed as runs
+  of hyphens (U+002D), and no hyphen-related false positive:
+  - page 1 `p0_l018`: 58 hyphens alone on their line (x 324–501), a signature line above
+    "(Signature of the Nominee* /Claimant)";
+  - page 2 `p1_l003`: "from the `----------------------`(Name of Insurance Company)", the run
+    touching the next word;
+  - page 2 `p1_l004`: "Account No.,`---- -----------------`", two runs one space apart.
+- **Risk scan before the rule** (read-only; runs of 2 or more of U+002D, U+2010–U+2015, U+2212
+  and the full-width forms):
+  - On every scored dev page, the only runs are these four, all on #21. There is no dash
+    separator, text table rule, `---` placeholder or `--` anywhere else, and none on the unscored
+    pages either.
+  - The dev forms have 166 single dashes (`E-mail`, `Rs.2,00,000/-`, `Date:-`, ranges such as
+    `2023-24`).
+  - So the false-positive risks have no real example on dev and are covered by synthetic negative
+    tests only.
+- **Rule.**
+  - Hyphens, the Unicode hyphen, en and em dashes are leader characters.
+  - A run of at most 3 dots and fewer than 4 dashes stays in the word, so `E-mail`, `2023-24`,
+    `/-`, `:-` (fix 5's colon ending), `Rs.-` and a `---` placeholder remain text. Before, dots
+    alone did this; text without dashes extracts as before.
+  - A leader counts with at least 4 dashes after the usual merge (runs on one baseline at most
+    0.5 em apart).
+  - A dash leader with no word containing a letter or digit on its row is a separator, not an
+    entry, when it spans at least 80 % of the page's text width, or when `+` / `|` joints sit on
+    its row (a table rule drawn in text). 80 % is a judgement value: dev has no separator to tune
+    it on. #21's signature line, alone on its row, spans 37 %.
+  - Underscore and dot leaders are unchanged.
+- **Tests.**
+  - New fixture `flat_hyphen_leaders`: a labelled run, a run touching the next word, two runs
+    merged, an en-dash run, and a signature dash line above its caption. It fails without the fix.
+  - Negative tests: short dash runs stay in their words and give no field; `H. No. --- ,
+    Sector 4` gives none (fails with a minimum of 3); a dash line across the text width gives
+    none; a `+-----+-----+` table rule gives none; and a wide dash line after a label stays an
+    entry.
+  - Each test was checked to fail with its guard disabled.
+- **Effect.**
+  - Only #21 changes, on every dev form and page (scored or not): 3 boxes added, none removed,
+    and the 3 misses found. From scratch writing spot: recall 89.6 → 94.0 %, precision 90.9 →
+    91.3 %. #41 and every pre-filled form are unchanged.
+  - **IoU ≥ 0.5 precision dips** (overall 90.1 → 89.8 %, from scratch 43.9 → 43.5 %). Only 1 of
+    the 3 new matches (`p1_l004`) also matches at IoU ≥ 0.5; the other two reach 0.485 and 0.49,
+    because the hand-drawn boxes are about 0.5–0.75 × the detector's 1.2 em line height. This is
+    the box-height convention, as in fix 5, not a detection error.
+  - One existing #21 box (the underscore line under `p1_l003`) has a different label text: "from
+    the" instead of "from the ----------------------(Name", since the dashes are no longer a word.
+    The new signature line's label is the line above ("…may fill in the claim form."), not its
+    caption below, as for every leader (label text is Phase 3's concern).
 
 **Label question from fix 6 (reported to the human 2026-10-22; decided the same day: remove it, as pending label fix 2).**
 6. **#3 page 2, `p1_l041`** (`text`, x 55.8–59.1, y 444.8–449.0: 3.3 × 4.2 pt). It sits exactly
