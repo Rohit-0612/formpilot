@@ -1079,13 +1079,30 @@ labels v4).
 
   See Known limitations.
 
-**Label question from fix 4 (reported to the human 2026-10-22; open).**
+**Label question from fix 4 (reported to the human 2026-10-22; decided the same day: add the box, as a pending label fix).**
 5. **#3 page 2, the applicant's signature box** (x 411–565, y 579–632, right of the arrow at the
    bottom of the page). A drawn box with "Signature/Thumb impression of the Applicant" and
    "Please sign in black ink only" printed in its middle; no label. Under the labelling rules
    (signature areas get a `text` box) it would be a `text` box, as #1 page 4's applicant
    signature cells are. The detector does not box it either (the text is in the middle of the
    box, not a caption at its bottom), so the numbers above do not depend on the answer.
+
+   **Decision (human, 2026-10-22):** yes, under the labelling rules it is a `text` box, the same
+   as #1 page 4's. This correction goes **against** the detector, not in its favour: the detector
+   does not find the box, so adding it adds a miss (#3 recall falls). Not edited now; it is the
+   first entry in "Pending label fixes".
+
+**Pending label fixes** (human decision 2026-10-22). Label corrections decided during Step 11
+are collected here and not applied one by one. At the end of Step 11 they are applied once, as
+**labels v5**, by Claude Code in Label Studio (existing annotations only, backup first), verified
+by the human in Label Studio before export, then exported, converted and committed; the whole
+ablation table is then re-run once on v5 (each row from a worktree at its commit), keeping the v4
+table as history. Each entry records whether the correction favours the detector or goes against
+it.
+
+| # | Form, page | Correction | Decided | Direction |
+|---|---|---|---|---|
+| 1 | #3, page 2 | add a `text` box for the applicant's signature box (x 411–565, y 579–632; label question 5) | human, 2026-10-22 | against the detector (an added miss) |
 
 **Label question from fix 5 (reported to the human 2026-10-21; decided the same day: add both boxes, see "Fourth relabel by Claude Code").**
 4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x
@@ -1314,10 +1331,16 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 - **Rule 3 reads layout, not meaning (Step 11, fix 4).** Whether text in a cell is a label with a
   blank after it, a heading, a table value or an instruction is decided from position only (left
   edge, centred, bottom caption, a cell to the right, 5 em of room, a sentence-ending full stop).
-  On dev's scored pages this adds no false positive, but #1's unscored pages show 4 wrong boxes
-  (a bottom-aligned table value, a heading row and a header cell in tables, a notes block), so
-  the test set may show more. The photo / thumb / signature words are English only; a Hindi-only
-  photo box with its words printed inside could get a box.
+  On dev's scored pages this adds no false positive. #1's unscored pages 5, 8 and 9 (not
+  labelled, not tuned on, judged by eye on local renders) are the first held-out sign of rule 3's
+  precision on unseen pages:
+  - **7 new boxes, 4 of them wrong:** a bottom-aligned table value, a heading row and a header
+    cell in tables, and a notes block. The other 3 are signature boxes.
+  - **1 entry lost:** page 9's "Date:" colon blank, which now overlaps the new signature box.
+
+  Rule 3's precision must be checked on the test set (at the release measurement, when the
+  human asks for it). The photo / thumb / signature words are English only; a Hindi-only photo
+  box with its words printed inside could get a box.
 
 - **STD code parts are not split (Step 11, fix 2).** On #1 page 1 the two telephone rows are
   15 touching cells hinted `S T D` in the first three; the labels split them 5 + 10 (STD code,
