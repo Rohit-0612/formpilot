@@ -3,7 +3,8 @@
 Entry areas come from PyMuPDF only (no OpenCV in Phase 2):
 - leader runs in the text: underscores, dots and ellipses ("Name: ______", "Date ......");
 - drawn horizontal lines, including thin rectangles used as lines;
-- empty rectangles and empty table cells (cells rebuilt from horizontal and vertical lines);
+- empty rectangles (also with rounded corners) and empty table cells (cells rebuilt from
+  horizontal and vertical lines);
 - comb rows of per-character cells, merged into one field (decision D8), one field per hinted
   part when the cells carry grey hints (labelling rule 1);
 - small squares: checkboxes;
@@ -364,7 +365,14 @@ def _extract_drawings(page: pymupdf.Page) -> _Drawings:
 
     for drawing in page.get_drawings():
         stroked = drawing.get("color") is not None and "s" in (drawing.get("type") or "")
-        for item in drawing["items"]:
+        items: list[tuple] = []
+        for path in _subpaths(drawing["items"]):
+            box = _rounded_box(path) if stroked else None
+            if box is None:
+                items += path
+            else:
+                add_rect_like(box, stroked)  # its straight edges are sides, not writing lines
+        for item in items:
             if item[0] == "l":
                 p1, p2 = item[1], item[2]
                 if abs(p1.y - p2.y) <= AXIS_TOLERANCE and abs(p1.x - p2.x) > AXIS_TOLERANCE:
@@ -379,6 +387,49 @@ def _extract_drawings(page: pymupdf.Page) -> _Drawings:
                 add_rect_like(item[1].rect, stroked)
 
     return _Drawings(_merge_segments(horizontal), _merge_segments(vertical), rects)
+
+
+def _subpaths(items: list[tuple]) -> list[list[tuple]]:
+    """A drawing's items split into connected runs of lines and curves; "re" and "qu" items
+    stand alone."""
+    paths: list[list[tuple]] = []
+    for item in items:
+        previous = paths[-1][-1] if paths else None
+        if (
+            item[0] in ("l", "c")
+            and previous is not None
+            and previous[0] in ("l", "c")
+            and abs(item[1] - previous[-1]) <= AXIS_TOLERANCE
+        ):
+            paths[-1].append(item)
+        else:
+            paths.append([item])
+    return paths
+
+
+def _rounded_box(path: list[tuple]) -> pymupdf.Rect | None:
+    """A closed run of lines and curves whose straight lines all lie on its bounding box: a box
+    with rounded corners (dev form #41), or None. A shape of curves only (a circle) is not."""
+    kinds = {item[0] for item in path}
+    if kinds != {"l", "c"} or abs(path[0][1] - path[-1][-1]) > AXIS_TOLERANCE:
+        return None
+    box = pymupdf.Rect(path[0][1], path[0][1])
+    for item in path:
+        for point in item[1:]:
+            box |= point
+    for kind, p1, p2, *_ in path:
+        if kind != "l":
+            continue
+        on_side = (
+            abs(p1.y - p2.y) <= AXIS_TOLERANCE
+            and min(abs(p1.y - box.y0), abs(p1.y - box.y1)) <= AXIS_TOLERANCE
+        ) or (
+            abs(p1.x - p2.x) <= AXIS_TOLERANCE
+            and min(abs(p1.x - box.x0), abs(p1.x - box.x1)) <= AXIS_TOLERANCE
+        )
+        if not on_side:
+            return None
+    return box
 
 
 def _is_axis_aligned(quad: pymupdf.Quad) -> bool:

@@ -560,6 +560,47 @@ def flat_colon_blanks() -> PdfFixture:
     )
 
 
+def flat_rounded_boxes() -> PdfFixture:
+    """Boxes with rounded corners, drawn as lines and curves (Step 11, fix 6; dev form #41).
+
+    Each one is a box like a drawn rectangle: its straight edges are sides, never writing lines.
+    """
+    doc = _new_doc(A4)
+    page = doc[0]
+    fields: list[ExpectedField] = []
+
+    def rounded(box: Box) -> None:
+        page.draw_rect(pymupdf.Rect(box), color=(0, 0, 0), width=0.5, radius=0.1)
+
+    for i, label in enumerate(
+        ("1. Policy document", "2. Proof of identity", "3. Proof of address")
+    ):
+        baseline = 120.0 + 30 * i
+        _text(page, 72, baseline, label)
+        cell = (300.0, baseline - 10, 324.0, baseline + 1)
+        rounded(cell)
+        fields.append(ExpectedField(0, cell, FieldKind.TEXT, label))
+
+    _text(page, 72, 222, "Married")
+    tick = (120.0, 213.0, 130.0, 223.0)
+    rounded(tick)
+    fields.append(ExpectedField(0, tick, FieldKind.CHECKBOX, "Married"))
+
+    _text(page, 72, 250, "Remarks")
+    remarks = (72.0, 260.0, 400.0, 300.0)
+    rounded(remarks)
+    fields.append(ExpectedField(0, remarks, FieldKind.TEXT, "Remarks"))
+
+    return PdfFixture(
+        "flat_rounded_boxes",
+        "Boxes with rounded corners: one box each, no writing line on their edges (fix 6)",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
 def flat_multiline() -> PdfFixture:
     """Entries spanning several writing lines: one field per line (Phase 2 convention)."""
     doc = _new_doc(A4)
@@ -1060,6 +1101,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_comb,
         flat_comb_gap_groups,
         flat_colon_blanks,
+        flat_rounded_boxes,
         flat_multiline,
         flat_hinted_comb,
         flat_wide_cells,

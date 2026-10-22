@@ -554,3 +554,27 @@ def test_sentence_end_is_not_an_abbreviation(word: str, ends: bool) -> None:
     token = flat._Token(word, (0, 0, 10, 10), 10, 10)
 
     assert flat._ends_sentence(token) is ends
+
+
+def test_a_circle_is_not_a_rounded_box() -> None:
+    """Curves only: no straight side, so not a box (fix 6 is about rectangles)."""
+    with pymupdf.open("pdf", _pdf(lambda p: p.draw_circle((200, 200), 6, color=(0, 0, 0)))) as d:
+        (drawing,) = d[0].get_drawings()
+
+    assert [flat._rounded_box(path) for path in flat._subpaths(drawing["items"])] == [None]
+
+
+def test_unstroked_rounded_shape_is_left_as_before() -> None:
+    """Fix 6 covers drawn outlines only: a fill-only rounded shape (on dev, glyphs drawn as paths
+    and a logo) is no box, and its straight edges stay plain segments, as before the fix."""
+
+    def draw(page: pymupdf.Page) -> None:
+        page.draw_rect(
+            pymupdf.Rect(72, 100, 200, 140), color=None, fill=(0.8, 0.8, 0.8), radius=0.1
+        )
+
+    with pymupdf.open("pdf", _pdf(draw)) as doc:
+        drawings = flat._extract_drawings(doc[0])
+
+    assert drawings.rects == []
+    assert sorted(round(s.pos) for s in drawings.horizontal) == [100, 140]
