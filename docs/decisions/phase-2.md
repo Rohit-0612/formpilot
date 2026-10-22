@@ -894,10 +894,11 @@ labels v4 and its report carries the macro average.
 | Fix 5 — blanks after a colon (done before fixes 3 and 4, human decision) | `5fef220` | 89.7 / 88.3 (−0.3 / +3.9) | 89.4 / 85.2 (+0.1 / +5.7) | **81.1 / 89.6 (+4.0 / +34.3)** | 90.9 / 88.1 (−0.3 / +0.2) | 84.0 / 82.6 (−2.8 / +1.3) | #21: TP 25 → 44, FP 3 → 5, FN 22 → 3 (28 → 49 boxes); #41: TP 12 → 16, FP 8 → 9, FN 8 → 4 (20 → 25); #2: TP 31 → 32, FN 10 → 9 (42 → 43); #23: FP 3 → 5 (47 → 49); text recall 80.0 % (323/404) → 85.9 % (347/404) |
 | Fix 3 — rule 2, wide cells | `c41510e` | 96.3 / 88.9 (+6.6 / +0.6) | 94.6 / 85.8 (+5.2 / +0.5) | 81.1 / 89.6 (±0) | 98.6 / 88.8 (+7.7 / +0.7) | 90.2 / 83.3 (+6.3 / +0.6) | #25: TP 95 → 97, FP 20 → 0, FN 8 → 6 (115 → 97 boxes); #2: TP 32 → 33, FP 11 → 0, FN 9 → 8 (43 → 33); #3: TP 63 → 64, FP 13 → 2, FN 3 → 2 (76 → 66); comb recall 94.1 % → 98.0 % (99/101) |
 | Fix 4 — rule 3, label inside a cell | `fdbb165` | 96.5 / 92.1 (+0.1 / +3.2) | 94.6 / 90.2 (+0.0 / +4.4) | 81.1 / 89.6 (±0) | 98.7 / 92.4 (+0.1 / +3.6) | 88.9 / 84.9 (−1.4 / +1.6) | #30: TP 15 → 29, FN 16 → 2 (15 → 29 boxes); #1: TP 189 → 195, FN 8 → 2 (189 → 195 boxes on the scored pages); text recall 85.9 % (347/404) → 90.8 % (367/404) |
+| Fix 6 — rounded boxes | `9146cfb` | 97.8 / 92.1 (+1.3 / +0.0) | 97.3 / 90.2 (+2.7 / +0.0) | **90.9 / 89.6 (+9.8 / ±0)** | 98.7 / 92.4 (±0) | 90.1 / 84.9 (+1.2 / +0.0) | #41: TP 16 → 16, FP 9 → 1, FN 4 → 4 (25 → 17 boxes); text precision 94.6 % → 96.6 % |
 
 After fix 5 the macro from scratch is 76.9 / 86.8 (2 forms) and the macro pre-filled 92.2 / 84.9
 (9 forms; writing spot). After fix 3: 76.9 / 86.8 and 98.5 / 85.6. After fix 4: 76.9 / 86.8 and
-98.5 / 90.9.
+98.5 / 90.9. After fix 6: 92.0 / 86.8 and 98.5 / 90.9.
 
 **History: labels v3** (superseded by the v4 table above; reports committed). The macro values of
 the first three rows come from the per-form counts in their committed reports; a fresh
@@ -1078,6 +1079,39 @@ labels v4).
     so it now overlaps the new signature box and is dropped (it was the wrong shape before).
 
   See Known limitations.
+
+**Fix 6 — rounded boxes** (`9146cfb`, report `step11-6-rounded-boxes-20261022-9146cfb`; labels v4).
+- **What the dev form shows.** #41's 8 Yes / No / NA cells (24 × 11 pt, orange outline) are
+  rounded rectangles drawn as four lines and four corner curves, not as `re` items. The extractor
+  saw only the straight lines: the top and bottom edges (20.3 pt) became two drawn lines, and the
+  short sides, cut off by the corner curves 1.8 pt away, did not touch them, so they were not
+  taken for table rules. The bottom line's entry matched the label; the top line's entry, above
+  the cell, was a false positive (8 of #41's 9).
+- **Rule.** A stroked, closed run of lines and curves whose straight lines all lie on its
+  bounding box (a box with rounded corners or rounded ends) is handled like a drawn rectangle:
+  one box (or checkbox), structural edges that are never writing lines. Curves-only shapes
+  (circles) are not boxes.
+- **Scope: stroked outlines only.** A read-only count over the dev forms found such shapes on
+  #41 (8, stroked), #1 (1, a fill-only logo) and #3 page 2 (80, fill-only: glyphs drawn as
+  paths). Applying the rule to fill-only shapes too would drop their straight edges as segments;
+  on dev that removes one box on #3 page 2, a 3.3 × 4.2 pt box that matches a label (label
+  question 6 below). Fill-only shapes are left as before, so the fix changes #41 only.
+- **Tests.** New fixture `flat_rounded_boxes` (three rounded cells, a rounded checkbox, a rounded
+  remarks box): it fails without the fix. Unit tests: a circle is no box; a fill-only rounded
+  shape is left as before (fails without the stroke condition).
+- **Effect.** Only #41 changes: each cell is now one box (16 boxes → 8), every match kept, 8
+  false positives gone. From scratch precision 81.1 → 90.9 % (writing spot), recall unchanged.
+  #41's last false positive is the "Documents Enclosed:" colon blank (fix 5). The cells' labels
+  are mostly empty or a neighbouring line's words, as before (label text is Phase 3's concern).
+
+**Label question from fix 6 (reported to the human 2026-10-22; open).**
+6. **#3 page 2, `p1_l041`** (`text`, x 55.8–59.1, y 444.8–449.0: 3.3 × 4.2 pt). It sits exactly
+   on one of the page's small fill-only shapes, glyphs drawn as vector paths, which the detector
+   rebuilds into a tiny cell; the label has the detector's box to the tenth of a point (#3 was
+   pre-filled). Nobody writes in a 3 pt area, so it looks like a kept pre-filled box rather than
+   an entry area. Removing it would go **against** the detector (its box would become a false
+   positive). Fix 6 does not touch it (fill-only shapes are left as before), so the numbers above
+   do not depend on the answer.
 
 **Label question from fix 4 (reported to the human 2026-10-22; decided the same day: add the box, as a pending label fix).**
 5. **#3 page 2, the applicant's signature box** (x 411–565, y 579–632, right of the arrow at the
