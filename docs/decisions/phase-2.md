@@ -1229,6 +1229,16 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   wait for the lock. Throughput scales with worker processes, not with arq's concurrent jobs.
   Not measured yet.
 
+- **The 30 pt comb cell limit was chosen on dev with a narrow margin (Step 11, fix 3).** It must
+  let #25's 27 pt one-character cells form a comb and must keep #1's 33 pt separate office-use
+  boxes apart; 30 pt is the only round value checked that does both, and the margin is 3 pt on
+  either side. It is a dev-tuned threshold and must be checked on the test set (at the release
+  measurement, when the human asks for it). A run of two or three separate boxes up to 30 pt
+  wide, close together with no text between them, would be read as one comb; none on dev.
+  **Possible future improvement:** detect comb cells by their shape rather than an absolute
+  width: near-square cells (or cells of one repeated size) in a uniform row of several equal,
+  touching cells, so the decision does not depend on how wide a form draws its cells.
+
 - **STD code parts are not split (Step 11, fix 2).** On #1 page 1 the two telephone rows are
   15 touching cells hinted `S T D` in the first three; the labels split them 5 + 10 (STD code,
   then number; the human's decision, top rule). Nothing printed marks the split, and labelling
