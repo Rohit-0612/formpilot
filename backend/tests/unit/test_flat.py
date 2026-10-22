@@ -578,3 +578,57 @@ def test_unstroked_rounded_shape_is_left_as_before() -> None:
 
     assert drawings.rects == []
     assert sorted(round(s.pos) for s in drawings.horizontal) == [100, 140]
+
+
+def test_short_dash_runs_stay_in_the_words() -> None:
+    """Fix 7: one to three dashes are text ("2023-24", "E-mail", "/-"), never a leader."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "Financial year 2023-24 (E-mail) Rs. 2,00,000/-")
+
+    with pymupdf.open("pdf", _pdf(draw)) as doc:
+        words = [t.text for t in flat._extract_text(doc[0]).tokens]
+
+    assert {"2023-24", "(E-mail)", "2,00,000/-"} <= set(words)
+    assert _run(_pdf(draw)).fields == []
+
+
+def test_three_dashes_in_an_address_are_text() -> None:
+    """A "---" placeholder is no entry; MIN_HYPHENS is 4."""
+
+    def draw(page: pymupdf.Page) -> None:
+        page.insert_text((72, 100), "H. No. --- , Sector 4", fontname="helv", fontsize=12)
+
+    assert _run(_pdf(draw)).fields == []
+
+
+def test_dash_line_across_the_text_width_is_a_separator() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "Section A")
+        _text(page, 72, 120, "-" * 130)
+        _text(page, 72, 140, "Section B")
+
+    assert _run(_pdf(draw)).fields == []
+
+
+def test_wide_dash_line_after_a_label_is_an_entry() -> None:
+    """Words on the row make it an entry, however wide (the separator rule needs an empty row)."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "Remarks " + "-" * 120)
+
+    (entry,) = _run(_pdf(draw)).fields
+
+    assert entry.label_text == "Remarks"
+
+
+def test_table_rule_drawn_with_dashes_is_not_an_entry() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _text(
+            page, 72, 100, "Please write the name and the age of every member of the family below."
+        )
+        _text(page, 72, 120, "+" + "-" * 12 + "+" + "-" * 12 + "+")
+        _text(page, 72, 134, "| Name")
+        _text(page, 72, 148, "+" + "-" * 12 + "+" + "-" * 12 + "+")
+
+    assert _run(_pdf(draw)).fields == []

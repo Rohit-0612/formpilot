@@ -1,7 +1,8 @@
 """Flat (text-layer) PDF frontend: detect entry areas and their labels (SPEC §6.1).
 
 Entry areas come from PyMuPDF only (no OpenCV in Phase 2):
-- leader runs in the text: underscores, dots and ellipses ("Name: ______", "Date ......");
+- leader runs in the text: underscores, dots and ellipses ("Name: ______", "Date ......"), and
+  dashes ("Policy No. -----------", Step 11 fix 7);
 - drawn horizontal lines, including thin rectangles used as lines;
 - empty rectangles (also with rounded corners) and empty table cells (cells rebuilt from
   horizontal and vertical lines);
@@ -47,10 +48,19 @@ STAGE = "frontend.flat"
 
 ROW_HEIGHT_FACTOR = 1.2
 # Leaders: weight in dots per character; "…" counts as three dots.
-LEADER_WEIGHT = {"_": 1, ".": 1, "…": 3}
+DOTS = {".": 1, "…": 3}
+# Dashes (Step 11, fix 7; dev form #21's "-----------"): fewer than MIN_HYPHENS in a row are
+# text ("E-mail", "2023-24", "/-", ":-"). A dash line with no words on its row is a separator
+# when it spans SEPARATOR_WIDTH_SHARE of the text width (a judgement value: dev has no
+# separator), or a table rule when "+" / "|" joints sit on its row.
+HYPHENS = frozenset("-\u2010\u2013\u2014")  # hyphen, Unicode hyphen, en and em dash
+LEADER_WEIGHT = {"_": 1, **DOTS} | dict.fromkeys(HYPHENS, 1)
 MIN_UNDERSCORES = 3
 MIN_DOT_WEIGHT = 5
+MIN_HYPHENS = 4
 MIN_LEADER_WIDTH = 10.0
+SEPARATOR_WIDTH_SHARE = 0.8
+TABLE_JOINTS = frozenset("+|")
 # Drawn lines and boxes.
 MIN_LINE_LENGTH = 15.0
 MAX_LINE_THICKNESS = 2.0
@@ -132,6 +142,7 @@ class _Leader:
     size: float
     underscores: int
     dot_weight: int
+    hyphens: int
 
 
 @dataclass(frozen=True)
@@ -200,9 +211,12 @@ def _vertical_overlap(a: Rect, b: Rect) -> float:
 # --- text ---------------------------------------------------------------------------------
 
 
-def _is_punctuation_dots(run: list[dict]) -> bool:
-    """One to three dots belong to the text ("No.", "e.g.", "true.", "..."), not a leader."""
-    return len(run) <= 3 and all(char["c"] == "." for char in run)
+def _stays_in_word(run: list[dict]) -> bool:
+    """Short punctuation belongs to the text, not a leader: up to three dots ("No.", "e.g.",
+    "...") and fewer than MIN_HYPHENS dashes ("E-mail", "2023-24", "/-", ":-", "---")."""
+    dots = sum(1 for char in run if char["c"] == ".")
+    dashes = sum(1 for char in run if char["c"] in HYPHENS)
+    return dots + dashes == len(run) and dots <= 3 and dashes < MIN_HYPHENS
 
 
 def _split_span(chars: list[dict], size: float) -> tuple[list[list[dict]], list[list[dict]]]:
@@ -216,7 +230,7 @@ def _split_span(chars: list[dict], size: float) -> tuple[list[list[dict]], list[
         nonlocal word, run
         if not run:
             return
-        if _is_punctuation_dots(run):
+        if _stays_in_word(run):
             word.extend(run)
         else:
             if word:
@@ -285,7 +299,8 @@ def _extract_text(page: pymupdf.Page) -> _PageText:
                 lines.append(_TextLine(text, tuple(line["bbox"]), line_size, line_bold))
 
     median_size = statistics.median(sizes) if sizes else 10.0
-    return _PageText(tokens, lines, _merge_leaders(leaders), median_size, hints)
+    leaders = [leader for leader in _merge_leaders(leaders) if not _is_separator(leader, tokens)]
+    return _PageText(tokens, lines, leaders, median_size, hints)
 
 
 def _token(chars: list[dict], size: float) -> _Token:
@@ -303,7 +318,8 @@ def _leader(chars: list[dict], size: float) -> _Leader:
         baseline=chars[0]["origin"][1],
         size=size,
         underscores=sum(1 for c in chars if c["c"] == "_"),
-        dot_weight=sum(LEADER_WEIGHT[c["c"]] for c in chars if c["c"] != "_"),
+        dot_weight=sum(LEADER_WEIGHT[c["c"]] for c in chars if c["c"] in DOTS),
+        hyphens=sum(1 for c in chars if c["c"] in HYPHENS),
     )
 
 
@@ -324,15 +340,35 @@ def _merge_leaders(leaders: list[_Leader]) -> list[_Leader]:
                 max(last.size, leader.size),
                 last.underscores + leader.underscores,
                 last.dot_weight + leader.dot_weight,
+                last.hyphens + leader.hyphens,
             )
         else:
             merged.append(leader)
     return [
         leader
         for leader in merged
-        if (leader.underscores >= MIN_UNDERSCORES or leader.dot_weight >= MIN_DOT_WEIGHT)
+        if (
+            leader.underscores >= MIN_UNDERSCORES
+            or leader.dot_weight >= MIN_DOT_WEIGHT
+            or leader.hyphens >= MIN_HYPHENS
+        )
         and leader.x1 - leader.x0 >= MIN_LEADER_WIDTH
     ]
+
+
+def _is_separator(leader: _Leader, tokens: Sequence[_Token]) -> bool:
+    """A dash line with no words on its row is a printed separator when it spans most of the
+    text width, or a table rule drawn in text when "+" / "|" joints sit on its row."""
+    if not leader.hyphens:
+        return False
+    row = [t for t in tokens if abs(t.baseline - leader.baseline) <= max(0.4 * leader.size, SNAP)]
+    if any(ch.isalnum() for t in row for ch in t.text):
+        return False
+    if any(set(t.text) <= TABLE_JOINTS for t in row):
+        return True
+    left = min((t.rect[0] for t in tokens), default=leader.x0)
+    right = max((t.rect[2] for t in tokens), default=leader.x1)
+    return leader.x1 - leader.x0 >= SEPARATOR_WIDTH_SHARE * (right - left)
 
 
 # --- drawings -----------------------------------------------------------------------------
@@ -527,7 +563,12 @@ def _row_height(size: float) -> float:
 def _leader_candidates(text: _PageText) -> list[_Candidate]:
     candidates = []
     for leader in text.leaders:
-        kind = "underscore run" if leader.underscores >= leader.dot_weight else "dot leader"
+        counts = {
+            "underscore run": leader.underscores,
+            "dot leader": leader.dot_weight,
+            "hyphen leader": leader.hyphens,
+        }
+        kind = max(counts, key=counts.__getitem__)  # ties: the earlier kind, as before
         rect = (leader.x0, leader.baseline - _row_height(leader.size), leader.x1, leader.baseline)
         candidates.append(
             _Candidate(rect, FieldKind.TEXT, "leader", kind, writing_line=leader.baseline)

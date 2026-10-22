@@ -601,6 +601,58 @@ def flat_rounded_boxes() -> PdfFixture:
     )
 
 
+# Helvetica's en dash is 556/1000 em wide (Adobe AFM).
+EN_DASH = "\u2013"
+EN_DASH_WIDTH = 0.556 * FONT_SIZE
+
+
+def flat_hyphen_leaders() -> PdfFixture:
+    """Runs of dashes are leaders (Step 11, fix 7; dev form #21).
+
+    Two runs one space apart are one entry, a run may touch the next word, and a dash line
+    alone on its row (a signature line above its caption) is an entry too.
+    """
+    doc = _new_doc(A4)
+    page = doc[0]
+    _text(page, 72, 90, "Please fill in the details below and sign above your name.")
+
+    fields = [_labelled_leader(page, 0, 72, 120, "Policy No.", "-" * 24)]
+
+    run = "-" * 16
+    _text(page, 72, 150, f"from the {run}(Name of the company)")
+    x0 = 72 + _width("from the ")
+    fields.append(
+        ExpectedField(0, _line_box(x0, x0 + _width(run), 150), FieldKind.TEXT, "from the")
+    )
+
+    runs = "---- " + "-" * 14
+    _text(page, 72, 180, f"Account No.,{runs}")
+    x0 = 72 + _width("Account No.,")
+    fields.append(
+        ExpectedField(0, _line_box(x0, x0 + _width(runs), 180), FieldKind.TEXT, "Account No.,")
+    )
+
+    _winansi_text(page, 72, 210, "Place " + EN_DASH * 12)
+    x0 = 72 + _width("Place ")
+    fields.append(
+        ExpectedField(0, _line_box(x0, x0 + 12 * EN_DASH_WIDTH, 210), FieldKind.TEXT, "Place")
+    )
+
+    line = "-" * 30
+    _text(page, 300, 250, line)
+    _text(page, 300, 264, "(Signature of the claimant)")
+    fields.append(ExpectedField(0, _line_box(300, 300 + _width(line), 250), FieldKind.TEXT))
+
+    return PdfFixture(
+        "flat_hyphen_leaders",
+        "Runs of dashes are leaders: merged, touching a word, alone on a row (fix 7)",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
 def flat_multiline() -> PdfFixture:
     """Entries spanning several writing lines: one field per line (Phase 2 convention)."""
     doc = _new_doc(A4)
@@ -1102,6 +1154,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_comb_gap_groups,
         flat_colon_blanks,
         flat_rounded_boxes,
+        flat_hyphen_leaders,
         flat_multiline,
         flat_hinted_comb,
         flat_wide_cells,
