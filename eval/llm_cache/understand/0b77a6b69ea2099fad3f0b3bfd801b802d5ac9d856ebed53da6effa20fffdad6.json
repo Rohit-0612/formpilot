@@ -1,0 +1,3 @@
+{
+ "response": "{\n  \"fields\": [\n    {\n      \"id\": \"p0_f024\",\n      \"semantic_type\": \"current_address_line1\",\n      \"confidence\": 0.9\n    },\n    {\n      \"id\": \"p0_f025\",\n      \"semantic_type\": \"father_name\",\n      \"confidence\": 0.9\n    }\n  ]\n}"
+}

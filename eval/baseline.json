@@ -1,0 +1,9 @@
+{
+  "understanding": {
+    "mode": "hybrid",
+    "report": "phase3-understanding-dev-hybrid-tuned-20261026-97a5205.json",
+    "accuracy": 0.6431297709923665,
+    "accuracy_fillable": 0.5809128630705395,
+    "reference_labels": "Claude-written (P3-D6)"
+  }
+}

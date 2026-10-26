@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples label-images eval-detect
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -67,6 +67,20 @@ label-convert:
 	@test -n "$(EXPORT)" || (echo "usage: make label-convert EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
 	$(EVAL_PY) eval.labelling.convert "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
 
+## Blind semantic-type labelling (Phase 3): write the local labelling page (gitignored)
+label-semantic:
+	$(EVAL_PY) eval.labelling.semantic sheet
+
+## Merge a semantic-label export into eval/labels/ (only semantic_type is written)
+label-semantic-merge:
+	@test -n "$(EXPORT)" || (echo "usage: make label-semantic-merge EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
+	$(EVAL_PY) eval.labelling.semantic merge "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
+
+## Write semantic reference labels (Claude-written, decision P3-D6) into eval/labels_semantic/
+label-semantic-reference:
+	@test -n "$(EXPORT)" || (echo "usage: make label-semantic-reference EXPORT=path/to/export.json BY='who labelled'" && exit 2)
+	$(EVAL_PY) eval.labelling.semantic reference "$(EXPORT)" --by "$(BY)" $(if $(OVERWRITE),--overwrite,)
+
 ## Render the README example images from the synthetic fixtures (committed)
 label-images:
 	$(EVAL_PY) eval.labelling.examples --synthetic
@@ -79,3 +93,8 @@ label-examples:
 ## Optional TAG=<name> names the run, e.g. make eval-detect TAG=pre-step11-tuning
 eval-detect:
 	$(EVAL_PY) eval.detection --split dev $(if $(TAG),--tag $(TAG),)
+
+## Understanding eval on the dev split (Phase 3): MODE=hybrid|llm|rules; replays the recorded model
+## answers by default, RECORD=1 asks the model (Ollama) and records them, LIVE=1 skips the cache
+eval:
+	$(EVAL_PY) eval.run_eval --split dev --mode $(or $(MODE),hybrid) --cache $(if $(RECORD),record,$(if $(LIVE),off,replay)) $(if $(TAG),--tag $(TAG),) $(if $(BASELINE),--write-baseline,)

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "form": "32_niftem_student_declaration_form",
+  "label_file_sha256": "e9f6e2a4c4859723b934b8a9c17d7e3fbc6010fc1f136ea3b4b70089a7a2a343",
+  "labelled_by": "Claude Code (claude-opus-5-5), 2026-10-26, blind to the model's output; from page renders only",
+  "labels": {
+    "p0_l000": "full_name",
+    "p0_l001": "other",
+    "p0_l002": "date_of_birth",
+    "p0_l003": "father_name",
+    "p0_l004": "other",
+    "p0_l005": "mother_name",
+    "p0_l006": "other",
+    "p0_l007": "enrollment_number",
+    "p0_l008": "aadhaar",
+    "p0_l009": "full_name",
+    "p0_l010": "signature",
+    "p0_l011": "date_of_filling",
+    "p0_l012": "other",
+    "p0_l013": "signature",
+    "p0_l014": "date_of_filling",
+    "p0_l015": "other"
+  }
+}

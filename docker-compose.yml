@@ -40,6 +40,8 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-formpilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-formpilot}
       REDIS_URL: redis://redis:6379/0
       STORAGE_ROOT: /data/storage
+      # Ollama runs on the host, not in compose (SPEC §9).
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,6 +78,8 @@ services:
     command: ["arq", "app.jobs.worker.WorkerSettings"]
     env_file: .env
     environment: *backend-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # the host's Ollama, also on Linux
     volumes:
       - storage:/data/storage
     depends_on: *backend-depends-on

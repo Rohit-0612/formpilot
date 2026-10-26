@@ -87,6 +87,56 @@ rendered from synthetic test forms (`make label-images`). The same examples on t
 can be rendered locally with `make label-examples` (into `eval/labelling/examples/`, never
 committed, like the forms themselves).
 
+## Semantic types (Phase 3, written blind)
+
+> **Human decision, 2026-10-26:** for the dev forms, the semantic reference labels are written by
+> Claude Code (blind to the model's output) in `eval/labels_semantic/`, with no human labelling.
+> The tool below stays available for a human to label or audit later.
+
+For each **text or comb field** on the scored pages (567 fields; checkboxes are not labelled), you
+choose what the field asks a person to write, from the fixed list of semantic types (SPEC §5).
+You see only the page around the field, with the field outlined in red: no detector output and
+no model answer (written blind, SPEC §10). The rule keywords and the model prompt were frozen
+before you start (commit `c7c7bd9`), and they are not changed while you label.
+
+**How:**
+1. `make label-semantic`, then open `eval/labelling/work/semantic/index.html` in a browser.
+2. Type to search the list, then press Enter: the type is saved and the next field opens.
+   - Alt+Left / Alt+Right move between fields.
+   - "Next unlabelled" (Alt+U) jumps to the first field without a type.
+3. Progress is kept in the browser. Use **Export JSON** now and then as a backup; **Import**
+   restores it.
+4. When done, export once more and run
+   `make label-semantic-merge EXPORT=~/Downloads/semantic-labels-<time>.json` (or ask Claude
+   Code to run it). It writes only `semantic_type` into the label files, and refuses an export
+   that no longer matches them.
+
+**Conventions:**
+- Choose what the **form asks for** in that box, whatever its section (an office-use box asking
+  for a date is `date_of_filling`; a box for a signature is `signature`).
+- Address: a single address line or box is `*_address_line1`; a second line is
+  `*_address_line2`. `current_*` vs `permanent_*` follows the form's heading; "present" and
+  "correspondence" mean current.
+- A box that asks for something not in the list (policy number, nominee's name, cause of death,
+  an office reference) is `other`. A box that asks for two things at once ("Father's / Husband's
+  name") is also `other`.
+- `unknown` only when you cannot tell what the box asks for.
+- A comb row is labelled like a text box: what goes into the whole row.
+
+Applied while writing the Claude reference labels (2026-10-26; decision P3-D6), in addition to the
+above:
+- Label for **the person filling the form**. On a claim form the claimant is the nominee, so
+  "Name of nominee" there is `full_name`. Data about anyone else (a deceased member, the nominee
+  on a nomination form, a witness, a parent signing their own undertaking, an official) is
+  `other`, except the person's own relatives' types (`father_name`, `mother_name`,
+  `guardian_name`, `spouse_name`).
+- A name asked **in Hindi** is `other`: a value from the profile in English cannot fill it.
+- Each part of a split date (`DD`, `MM`, `YYYY`, or "this __ day of __") gets the date's type.
+- A signing space is `signature` whoever signs (applicant, witness, official), including an
+  official's initials box. A seal or stamp space is `other`.
+- A ruled line with nothing to write on it (a separator under a section) is `unknown`.
+- A comb for the country code of a phone number gets the phone's type.
+
 ## Labelling order
 
 1. **#21 and #41 from scratch** — these tasks have no pre-filled boxes (anchoring check, below).
@@ -203,4 +253,5 @@ delete `eval/labelling/work/` until the labels are converted and committed.
 | `convert.py` | `make label-convert`: Label Studio JSON export → `eval/labels/<form>.json` |
 | `schema.py` | the label file format, validated on every read and write |
 | `subset.py` | the labelling subset: which dev pages the detection eval scores |
+| `semantic.py`, `semantic_sheet.html` | `make label-semantic`: the blind semantic-type labelling page (local only); `make label-semantic-merge`: its export into the label files (`semantic_type` only) |
 | `examples.py` | `make label-images`: the images above, from synthetic fixtures (committed in `images/`); `make label-examples`: the same on the dev forms (local only) |

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "form": "41_india_post_pli_name_change_form",
+  "label_file_sha256": "58e9b6ee7c80aec3b059e73018b226ee4f82922d3ded3b0c38ea8472719c229c",
+  "labelled_by": "Claude Code (claude-opus-5-5), 2026-10-26, blind to the model's output; from page renders only",
+  "labels": {
+    "p0_l000": "other",
+    "p0_l001": "other",
+    "p0_l002": "date_of_filling",
+    "p0_l007": "other",
+    "p0_l008": "other",
+    "p0_l009": "other",
+    "p0_l010": "other",
+    "p0_l011": "other",
+    "p0_l012": "other",
+    "p0_l013": "other",
+    "p0_l014": "other",
+    "p0_l015": "other",
+    "p0_l016": "date_of_filling",
+    "p0_l017": "other",
+    "p0_l018": "other",
+    "p0_l019": "other"
+  }
+}

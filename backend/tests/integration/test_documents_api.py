@@ -79,7 +79,10 @@ async def _count(engine: AsyncEngine, model: type) -> int:
 
 
 async def test_upload_analyze_and_read_back(
-    client_for: ClientFactory, live_settings: Settings, capsys: pytest.CaptureFixture[str]
+    client_for: ClientFactory,
+    live_settings: Settings,
+    engine: AsyncEngine,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     client = await client_for()
     fixture = pdfs.get("flat_boxes")
@@ -114,6 +117,14 @@ async def test_upload_analyze_and_read_back(
     ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
     assert ir["document_id"] == document_id
     assert len(ir["fields"]) == len(fixture.fields)
+    # Version 2 (understanding, rules only in tests) is the one served.
+    assert {e["pass_name"] for e in ir["trace"]} == {"frontend.flat", "understand"}
+    assert any(f["semantic_method"] == "rule" for f in ir["fields"])
+    async with make_sessionmaker(engine)() as session:
+        versions = await session.scalars(
+            select(FormIRVersion.version).where(FormIRVersion.document_id == uuid.UUID(document_id))
+        )
+        assert sorted(versions) == [1, 2]
 
     page = await client.get(f"{DOCS}/{document_id}/pages/0.png")
     assert page.status_code == 200
@@ -132,6 +143,7 @@ async def test_upload_analyze_and_read_back(
     logs = capsys.readouterr()
     assert '"event": "document_uploaded"' in logs.out
     assert '"event": "document_analyzed"' in logs.out
+    assert '"event": "document_understood"' in logs.out
     assert SECRET_NAME not in logs.out + logs.err
     assert "234567890124" not in logs.out + logs.err
 
@@ -271,20 +283,23 @@ async def test_other_users_get_404_and_anonymous_users_401(
 async def test_ir_values_are_masked_in_the_response_but_not_in_the_database(
     client_for: ClientFactory, live_settings: Settings, engine: AsyncEngine
 ) -> None:
-    """Phase 2 IRs have no values yet, so a later IR version with values is written directly."""
+    """IRs have no values before Phase 4, so a later IR version with values is written directly
+    (the worker writes versions 1 and 2: detection, then understanding)."""
     client = await client_for()
     document_id = uuid.UUID(
         (await _upload(client, pdfs.get("flat_boxes").data)).json()["document_id"]
     )
     await _run_worker(live_settings)
     async with make_sessionmaker(engine)() as session:
-        version_1 = await session.scalar(select(FormIRVersion.ir_json))
+        version_1 = await session.scalar(
+            select(FormIRVersion.ir_json).where(FormIRVersion.version == 1)
+        )
         assert version_1 is not None
         fields = version_1["fields"]
         fields[0] |= {"semantic_type": "aadhaar", "value": "2345 6789 0124"}
         fields[1] |= {"semantic_type": "other", "value": "ABCDE1234F"}  # defence in depth
         fields[2] |= {"semantic_type": "full_name", "value": "Asha Verma"}
-        session.add(FormIRVersion(document_id=document_id, version=2, ir_json=version_1))
+        session.add(FormIRVersion(document_id=document_id, version=3, ir_json=version_1))
         await session.commit()
 
     ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
@@ -292,6 +307,6 @@ async def test_ir_values_are_masked_in_the_response_but_not_in_the_database(
     assert [f["value"] for f in ir["fields"][:3]] == ["XXXX0124", "XXXX234F", "Asha Verma"]
     async with make_sessionmaker(engine)() as session:
         stored = await session.scalar(
-            select(FormIRVersion.ir_json).where(FormIRVersion.version == 2)
+            select(FormIRVersion.ir_json).where(FormIRVersion.version == 3)
         )
     assert stored is not None and stored["fields"][0]["value"] == "2345 6789 0124"

@@ -1,4 +1,9 @@
-"""The analyze job: uploaded PDF -> Form IR version 1 + page images (worker only, SPEC §11).
+"""The analyze job: uploaded PDF -> Form IR version 1 + page images, then the understanding pass
+-> Form IR version 2 (worker only, SPEC §11).
+
+Version 1 (detection) is stored and the document is `ready` before understanding starts, so a
+slow or failing LLM never loses the detected fields. Understanding gets a deadline inside the
+job timeout; LLM batches due after it are skipped (their fields stay unknown).
 
 Errors are exception classes whose names become the job's error code (run_tracked records the
 class name); GET /documents/{id} turns them into readable messages (documents.py).
@@ -10,7 +15,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pymupdf
 from sqlalchemy import update
@@ -22,7 +27,10 @@ from app.frontends import acroform, flat
 from app.frontends.detect import detect
 from app.frontends.page_images import render_pages
 from app.ir.models import FormIR, SourceKind
+from app.llm.factory import provider_from_settings
 from app.logging import get_logger
+from app.passes import understand
+from app.passes.context import PassContext
 from app.storage.base import Storage
 
 log = get_logger(__name__)
@@ -30,6 +38,8 @@ log = get_logger(__name__)
 # PyMuPDF is not thread-safe, even across documents: one PDF at a time per worker process. The
 # work runs in a thread so the event loop (and arq's health check) stays responsive.
 _PYMUPDF_LOCK = threading.Lock()
+# Time kept free at the end of the job timeout for storing IR version 2.
+UNDERSTAND_MARGIN = timedelta(seconds=30)
 
 
 class AnalysisError(Exception):
@@ -117,6 +127,7 @@ async def analyze_document(
         raise DocumentNotAnalyzableError
 
     doc_log = log.bind(document_id=str(document_id), job_id=str(job_id))
+    job_started = datetime.now(UTC)
     began = time.perf_counter()
     try:
         data = await storage.get(original_key(document_id))
@@ -157,6 +168,40 @@ async def analyze_document(
         fields=len(result.ir.fields),
         duration_ms=round((time.perf_counter() - began) * 1000, 1),
     )
+
+    deadline = job_started + timedelta(seconds=settings.job_timeout_seconds) - UNDERSTAND_MARGIN
+    began = time.perf_counter()
+    understood = await asyncio.to_thread(_understand, result.ir, settings, deadline)
+    async with sessionmaker() as session:
+        session.add(
+            FormIRVersion(
+                document_id=document_id, version=2, ir_json=understood.model_dump(mode="json")
+            )
+        )
+        await session.commit()
+    doc_log.info(
+        "document_understood",
+        by_rule=sum(1 for f in understood.fields if f.semantic_method == "rule"),
+        by_llm=sum(1 for f in understood.fields if f.semantic_method == "llm"),
+        never_fill=sum(1 for f in understood.fields if f.no_fill_reason is not None),
+        duration_ms=round((time.perf_counter() - began) * 1000, 1),
+    )
+
+
+def _understand(ir: FormIR, settings: Settings, deadline: datetime) -> FormIR:
+    """Blocking (LLM calls): runs in a thread, outside the PyMuPDF lock."""
+    provider = provider_from_settings(settings)
+    try:
+        ctx = PassContext(
+            clock=lambda: datetime.now(UTC),
+            provider=provider,
+            review_threshold=settings.understand_review_threshold,
+            deadline=deadline,
+        )
+        return understand.run(ir, ctx)
+    finally:
+        if provider is not None:
+            provider.close()
 
 
 async def _mark_failed(

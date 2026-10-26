@@ -668,6 +668,21 @@
           "status": {
             "$ref": "#/components/schemas/FieldStatus",
             "default": "detected"
+          },
+          "no_fill_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "office_use",
+                  "signature"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Fill Reason"
           }
         },
         "additionalProperties": false,

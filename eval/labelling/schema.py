@@ -21,6 +21,7 @@ from app.ir.semantic_types import SemanticType
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATASET_DIR = REPO_ROOT / "eval" / "dataset"
 LABELS_DIR = REPO_ROOT / "eval" / "labels"
+REFERENCE_DIR = REPO_ROOT / "eval" / "labels_semantic"
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -98,3 +99,27 @@ def load_label_file(path: Path) -> LabelFile:
 
 def dump_label_file(label_file: LabelFile) -> str:
     return json.dumps(label_file.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n"
+
+
+class SemanticReference(_Model):
+    """Semantic reference labels for one form's text and comb fields (Phase 3, decision P3-D6).
+
+    Written by Claude Code, blind to the model's output, in eval/labels_semantic/; frozen once
+    written. The boxes they label are those of the human label file whose SHA-256 is recorded.
+    """
+
+    schema_version: Literal[1] = 1
+    form: str = Field(min_length=1)
+    label_file_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    labelled_by: str = Field(min_length=1)
+    labels: dict[str, SemanticType]  # label field id -> semantic type
+
+
+def load_reference(path: Path) -> SemanticReference:
+    return SemanticReference.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def dump_reference(reference: SemanticReference) -> str:
+    data = reference.model_dump(mode="json")
+    data["labels"] = dict(sorted(data["labels"].items()))
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"

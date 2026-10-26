@@ -112,6 +112,11 @@ If a nested instruction file (e.g. web/CLAUDE.md) conflicts with this file, this
 
 - `eval/labels/` is ground truth written by a human. **Never create, edit or "fix" label files.**
   If a label looks wrong, report it; the human decides.
+- **Semantic reference labels** (human decision, 2026-10-26) may be written by Claude Code in
+  `eval/labels_semantic/`, never in `eval/labels/`:
+  - blind to the model's output;
+  - frozen once written (a label that looks wrong is reported, not changed);
+  - always reported as Claude-written, in every eval report and in the README.
 - The dataset is split into `dev/` and `test/`. Tune prompts and thresholds only on `dev/`.
   Report `test/` numbers only when the human asks for a release measurement.
 - Every eval run writes a JSON + Markdown report to `eval/reports/`. CI compares against

@@ -10,7 +10,8 @@ import pytest
 from app.frontends import acroform
 from app.frontends.detect import detect
 from app.ir.coords import PageGeometry, pdf_rect_to_bbox
-from app.ir.models import BBox, FormIR, TextLayer
+from app.ir.models import BBox, FieldKind, FormIR, TextLayer
+from app.ir.semantic_types import SemanticType
 from tests.fixtures import pdfs
 
 DOCUMENT_ID = uuid.UUID("00000000-0000-4000-8000-000000000009")
@@ -134,3 +135,31 @@ def test_raw_pdf_rects_converted_with_coords_equal_the_ir_boxes(name: str) -> No
             checked += 1
     # Every widget but the push button: 6 in fillable_basic (two of them radio buttons).
     assert checked == {"fillable_basic": 6, "fillable_rotated": 1}[name]
+
+
+def test_signature_widget_is_a_text_field_that_is_never_filled() -> None:
+    """P3-D1: like a flat signature box, a TEXT field; its widget type makes it a signature."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 690), "Signature of the applicant", fontname="helv", fontsize=10)
+    for name, field_type, rect in (
+        ("name", pymupdf.PDF_WIDGET_TYPE_TEXT, (72, 100, 272, 118)),
+        ("sign", pymupdf.PDF_WIDGET_TYPE_SIGNATURE, (72, 700, 272, 740)),
+    ):
+        widget = pymupdf.Widget()
+        widget.field_name, widget.field_type, widget.rect = name, field_type, pymupdf.Rect(rect)
+        page.add_widget(widget)
+    with pymupdf.open("pdf", doc.tobytes()) as reopened:
+        ir = acroform.run(reopened, detect(reopened), DOCUMENT_ID, AT)
+
+    by_name = {f.native_name: f for f in ir.fields}
+    sign = by_name["sign"]
+    assert (sign.kind, sign.semantic_type, sign.no_fill_reason) == (
+        FieldKind.TEXT,
+        SemanticType.SIGNATURE,
+        "signature",
+    )
+    assert (sign.semantic_method, sign.semantic_confidence, sign.max_chars) == ("rule", 1.0, None)
+    assert by_name["name"].no_fill_reason is None
+    assert by_name["name"].semantic_method == "none"
+    assert (sign.id, "detected Signature widget") in [(e.field_id, e.change) for e in ir.trace]
