@@ -182,8 +182,10 @@ Teach-back
 
 Goal: every field gets a semantic type, and we can measure how well.
 
-Human tasks first
-- [ ] Add semantic types to the dev form label files (`eval/labels/`), written blind.
+Reference labels first
+- [ ] Semantic reference labels for the dev forms, written blind by Claude Code in
+      `eval/labels_semantic/` (human decision, 2026-10-26: no human labelling or audit; reports
+      say the labels are Claude-written).
 
 Deliverables
 - `llm/provider.py` (interface), `ollama.py` (local default), `fake.py`, `cache.py`

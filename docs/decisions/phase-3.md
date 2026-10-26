@@ -111,5 +111,33 @@ export whose fields no longer match (id, page, box, kind), and it never replaces
 Scope: 567 text and comb fields on the scored pages. The labelling conventions are in
 `eval/labelling/README.md`.
 
+### P3-D6. Semantic reference labels written by Claude Code (human decision, 2026-10-26)
+
+**Decision.** The human asked Claude Code to do the labelling and everything after it, so that no
+manual work is needed, and chose "Claude only, no human audit" over two alternatives:
+- Claude labels with a 60-field blind human audit (about 10 minutes);
+- the human labels a 150-field sample (15–20 minutes).
+
+How the labels are made:
+- Claude Code labels the 567 text and comb fields of the scored dev pages in
+  `eval/labels_semantic/`, from the same crops a human would see (the field outlined in red on
+  its page), following the conventions in `eval/labelling/README.md`.
+- `eval/labels/` (the human's boxes) is not touched.
+
+**Trade-off, stated in every report and in the README.** Semantic accuracy measures agreement
+between `qwen3:8b` (through the rules and the prompt) and reference labels written by a
+different, much larger model. It is not accuracy against human ground truth.
+
+**Safeguards.**
+- **Blind:** the understanding pass is not run on the dev forms before the labels are written,
+  and no model answer is looked at.
+  - Disclosure: an earlier smoke run on #21 (P3-D3) showed the predicted types of 12 of its 52
+    fields.
+  - The rules and the prompt were frozen before labelling (P3-D4).
+- **Frozen:** once committed, the labels are not changed during tuning. A label that looks wrong
+  is listed, not edited.
+- **Separate:** stored apart from the human labels, each file with `labelled_by` and the SHA-256 of
+  the label file whose boxes it labels.
+
 ## In my own words
 

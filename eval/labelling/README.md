@@ -89,6 +89,10 @@ committed, like the forms themselves).
 
 ## Semantic types (Phase 3, written blind)
 
+> **Human decision, 2026-10-26:** for the dev forms, the semantic reference labels are written by
+> Claude Code (blind to the model's output) in `eval/labels_semantic/`, with no human labelling.
+> The tool below stays available for a human to label or audit later.
+
 For each **text or comb field** on the scored pages (567 fields; checkboxes are not labelled), you
 choose what the field asks a person to write, from the fixed list of semantic types (SPEC §5).
 You see only the page around the field, with the field outlined in red: no detector output and

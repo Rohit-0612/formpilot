@@ -408,7 +408,11 @@ Metrics:
 | Questions per form | number of questions vs number of fields needing input |
 | Latency / cost | per form, per provider |
 
-Labelling protocol: the semantic-type labels are written **blind** (predictions hidden). Bounding
+Labelling protocol: the semantic-type labels are written **blind** (predictions hidden). Human
+decision 2026-10-26: the semantic reference labels are written by Claude Code, blind to the
+model's output, in `eval/labels_semantic/` (the human's box labels in `eval/labels/` are
+unchanged). They are frozen once written. Semantic accuracy is therefore agreement with
+Claude-written reference labels, and every report and the README say so. Bounding
 boxes may start from the detector's output but every box must be checked and adjusted by a human;
 each label file records `"verified_by_human": true`.
 
