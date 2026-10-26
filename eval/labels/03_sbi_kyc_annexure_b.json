@@ -4,7 +4,7 @@
   "pdf_sha256": "609d65f6f32ca6c265c8dc4010145fdcdb20021335991386b16b9cd5f4df6266",
   "verified_by_human": true,
   "prefilled_from": "flat@5fe80d0",
-  "source": "label-studio 1.23.2, formpilot-dev-boxes-20261021-195101.json",
+  "source": "label-studio 1.23.2, formpilot-dev-boxes-20261026-124015.json",
   "labelled_pages": [
     0,
     1
@@ -2362,20 +2362,6 @@
       "id": "p1_l041",
       "page": 1,
       "bbox": [
-        55.77799987792969,
-        444.8499755859375,
-        59.0979995727539,
-        449.0399780273438
-      ],
-      "kind": "text",
-      "comb": false,
-      "max_chars": null,
-      "semantic_type": null
-    },
-    {
-      "id": "p1_l042",
-      "page": 1,
-      "bbox": [
         323.7099914550781,
         443.1099853515625,
         588.8399658203126,
@@ -2387,7 +2373,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l043",
+      "id": "p1_l042",
       "page": 1,
       "bbox": [
         273.7083656173878,
@@ -2401,7 +2387,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l044",
+      "id": "p1_l043",
       "page": 1,
       "bbox": [
         300.99393477550746,
@@ -2415,7 +2401,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l045",
+      "id": "p1_l044",
       "page": 1,
       "bbox": [
         326.5741558612446,
@@ -2429,7 +2415,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l046",
+      "id": "p1_l045",
       "page": 1,
       "bbox": [
         72.02400207519531,
@@ -2443,7 +2429,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l047",
+      "id": "p1_l046",
       "page": 1,
       "bbox": [
         132.0,
@@ -2457,7 +2443,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l048",
+      "id": "p1_l047",
       "page": 1,
       "bbox": [
         357.78997802734375,
@@ -2471,7 +2457,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l049",
+      "id": "p1_l048",
       "page": 1,
       "bbox": [
         358.12309520032045,
@@ -2485,7 +2471,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l050",
+      "id": "p1_l049",
       "page": 1,
       "bbox": [
         385.4086643584401,
@@ -2499,7 +2485,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l051",
+      "id": "p1_l050",
       "page": 1,
       "bbox": [
         409.28353737179475,
@@ -2513,7 +2499,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l052",
+      "id": "p1_l051",
       "page": 1,
       "bbox": [
         148.64999389648438,
@@ -2527,7 +2513,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l053",
+      "id": "p1_l052",
       "page": 1,
       "bbox": [
         240.74999999999997,
@@ -2541,7 +2527,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l054",
+      "id": "p1_l053",
       "page": 1,
       "bbox": [
         308.6499938964844,
@@ -2555,7 +2541,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l055",
+      "id": "p1_l054",
       "page": 1,
       "bbox": [
         372.3999938964844,
@@ -2569,7 +2555,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l056",
+      "id": "p1_l055",
       "page": 1,
       "bbox": [
         417.24999999999994,
@@ -2583,7 +2569,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l057",
+      "id": "p1_l056",
       "page": 1,
       "bbox": [
         275.08404541015625,
@@ -2597,7 +2583,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l058",
+      "id": "p1_l057",
       "page": 1,
       "bbox": [
         350.13809204101557,
@@ -2611,7 +2597,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l059",
+      "id": "p1_l058",
       "page": 1,
       "bbox": [
         424.17999267578125,
@@ -2625,7 +2611,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l060",
+      "id": "p1_l059",
       "page": 1,
       "bbox": [
         490.9000244140625,
@@ -2639,7 +2625,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l061",
+      "id": "p1_l060",
       "page": 1,
       "bbox": [
         27.47999954223633,
@@ -2653,7 +2639,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l062",
+      "id": "p1_l061",
       "page": 1,
       "bbox": [
         288.02001953125,
@@ -2667,7 +2653,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l063",
+      "id": "p1_l062",
       "page": 1,
       "bbox": [
         33.599998474121094,
@@ -2681,7 +2667,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l064",
+      "id": "p1_l063",
       "page": 1,
       "bbox": [
         395.640752792735,
@@ -2695,7 +2681,7 @@
       "semantic_type": null
     },
     {
-      "id": "p1_l065",
+      "id": "p1_l064",
       "page": 1,
       "bbox": [
         419.51562580608964,

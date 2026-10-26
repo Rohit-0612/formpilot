@@ -14,8 +14,10 @@ ALL: Literal["all"] = "all"
 type PageSelection = Literal["all"] | tuple[int, ...]
 
 # PDF stem in eval/dataset/dev/ -> pages to score, 1-based as in a PDF viewer, or ALL.
+# #1 pages 5, 8 and 9 were added with labels v5 (human, 2026-10-22) as a held-out check of
+# labelling rule 3's precision (Step 11, fix 4).
 DEV_SUBSET: Mapping[str, PageSelection] = {
-    "01_sbi_account_opening_form": (1, 4),
+    "01_sbi_account_opening_form": (1, 4, 5, 8, 9),
     "02_sbi_kyc_annexure_a": ALL,
     "03_sbi_kyc_annexure_b": (2,),
     "06_union_bank_nomination_form": ALL,

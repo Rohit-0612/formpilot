@@ -4,7 +4,7 @@
   "pdf_sha256": "394cfea2341c993cc0a72cf37bfd7ef5ce593c5682ebab2bbb22f4134da2f7b5",
   "verified_by_human": true,
   "prefilled_from": null,
-  "source": "label-studio 1.23.2, formpilot-dev-boxes-20261021-195101.json",
+  "source": "label-studio 1.23.2, formpilot-dev-boxes-20261026-124015.json",
   "labelled_pages": [
     0,
     1
@@ -318,6 +318,20 @@
       "id": "p0_l021",
       "page": 0,
       "bbox": [
+        328.1634712164405,
+        667.2054405233257,
+        539.235750825137,
+        690.3155441301172
+      ],
+      "kind": "text",
+      "comb": false,
+      "max_chars": null,
+      "semantic_type": null
+    },
+    {
+      "id": "p0_l022",
+      "page": 0,
+      "bbox": [
         138.88774882002875,
         687.0954237635952,
         214.24174020110812,
@@ -329,7 +343,7 @@
       "semantic_type": null
     },
     {
-      "id": "p0_l022",
+      "id": "p0_l023",
       "page": 0,
       "bbox": [
         376.769956905397,

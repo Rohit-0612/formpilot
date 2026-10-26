@@ -108,7 +108,7 @@ The detection eval scores only these dev pages (1-based, as in a PDF viewer):
 | Form | Pages scored |
 |---|---|
 | #2, #6, #21, #23, #25, #30, #32, #39, #41 | all |
-| #1 | 1 and 4 |
+| #1 | 1, 4, 5, 8 and 9 (5, 8, 9 added with labels v5) |
 | #3 | 2 |
 
 The subset is fixed in `subset.py` and applied by `make eval-detect`. If a label file marks

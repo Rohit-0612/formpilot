@@ -396,8 +396,9 @@ def test_subset_errors_stop_the_run(tmp_path: Path) -> None:
 
 
 def test_dev_subset_is_the_human_decision_in_zero_based_pages() -> None:
-    """Human, 2026-10-17: #1 pages 1 and 4, #3 page 2, nine forms in full."""
-    assert subset_pages(DEV_SUBSET, "01_sbi_account_opening_form", 9) == {0, 3}
+    """Human, 2026-10-17: #1 pages 1 and 4, #3 page 2, nine forms in full; with labels v5
+    (human, 2026-10-22) #1 pages 5, 8 and 9 too, the held-out check of rule 3."""
+    assert subset_pages(DEV_SUBSET, "01_sbi_account_opening_form", 9) == {0, 3, 4, 7, 8}
     assert subset_pages(DEV_SUBSET, "03_sbi_kyc_annexure_b", 2) == {1}
     full = {form for form, pages in DEV_SUBSET.items() if pages == ALL}
     assert {form[:2] for form in full} == {"02", "06", "21", "23", "25", "30", "32", "39", "41"}

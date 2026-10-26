@@ -849,7 +849,7 @@ pooled numbers, which stay the primary summary in the report and the ablation ta
 before the macro existed get it from the per-form counts in their committed reports, with the
 same function (`eval.detection.macro`); no detector is re-run for that.
 
-## Step 11 — tuning on dev: ablation table (from baseline v4)
+## Step 11 — tuning on dev: ablation table (from baseline v5)
 
 **Baselines.** The committed pre-tuning report (`…pre-step11-tuning-20261017-2e70d9d`, labels v1)
 is unchanged. Each relabel re-measures the earlier rows on the new labels with the detector they
@@ -876,15 +876,78 @@ labels differ), so every row of the current table is on the same labels.
   (#21 TP 42 → 44, FP 7 → 5; from scratch 78.4 / 89.2 → 81.1 / 89.6). This is the bias the human
   pointed out: a detector-prompted correction can only move the numbers in the detector's favour;
   the human's re-review of #21 and #41 without detector boxes found nothing else to change.
+- **Labels v5** (the pending label fixes, applied once at the end of Step 11; export
+  `formpilot-dev-boxes-20261026-124015.json`, see "Pending label fixes"), together with a
+  **subset change**: #1 pages 5, 8 and 9 are scored (`subset.py`, the held-out check of rule 3).
+  - All eight rows were re-run as `…-v5-20261026-<commit>`, each from a worktree at its commit
+    with the current eval code and subset.
+  - A fresh run of the main tree (fix 7's detector) gives results identical to the fix 7 row.
+  - The relabel and subset change alone (fix 7): pooled 97.8 / 92.6 → 95.1 / 92.4, from scratch
+    91.3 / 94.0 → 91.3 / 92.6. Three forms change:
+    - #1: TP 195 → 265, FP 0 → 19, FN 2 → 8. The three new pages, where the detector does worse
+      (page 8 has no entry area and 10 detector boxes; rule 3's holdout result is below the
+      table), and page 9's name row split into three combs.
+    - #3: TP 64 → 63, FP 2 → 3. `p1_l041` was removed, so the detector's 3 pt box became a false
+      positive: a correction against the detector.
+    - #21: FN 0 → 1. The official's signature area was added, and the detector does not find it:
+      also against the detector.
 - From scratch was unchanged by the v2 and v3 relabels.
 
 **Procedure.** One fix per commit; after each, `make eval-detect TAG=step11-<n>-…` on dev
 (labelling subset, current labels), report committed, row added here. Writing spot is the primary
 metric; from scratch (#21, #41) is the main signal. Δ is against the previous row.
 
-**Current table (labels v4).** Pooled P / R unless the column says macro (writing spot, the
-mean over the 11 forms, each weighted equally; section "Macro average"). Every row was run on
-labels v4 and its report carries the macro average.
+**Current table (labels v5, scored subset with #1 pages 5, 8, 9).** Writing spot unless the
+column says IoU; pooled unless it says macro.
+- In the value columns, Δ (in brackets) is against the **same row on labels v4**, i.e. the effect
+  of the relabel and the subset change.
+- The last column lists the per-form changes against the **previous v5 row**, i.e. the fix
+  itself.
+
+| Row | Commit | Writing spot P / R (all) | Macro writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed vs previous v5 row (writing spot) |
+|---|---|---|---|---|---|---|---|
+| Baseline v5 | `0ee9999` | 85.7 / 77.2 (−1.2 / −0.3) | 87.9 / 76.9 (−0.5 / −0.1) | 77.1 / 54.4 (+0.0 / −0.8) | 86.4 / 79.7 (−1.4 / −0.5) | 82.7 / 74.5 (−0.8 / +0.1) | — (TP 539, FP 90, FN 159) |
+| Fix 1 — D8 gap split | `f535a3f` | 85.7 / 77.5 (−1.2 / −0.3) | 87.9 / 76.9 (−0.5 / −0.2) | 77.1 / 54.4 (+0.0 / −0.8) | 86.4 / 80.0 (−1.4 / −0.5) | 82.7 / 74.8 (−0.8 / +0.0) | #1: TP 210 → 212, FN 63 → 61 |
+| Fix 2 — rule 1, hinted rows | `9541889` | 89.0 / 84.5 (−1.1 / +0.1) | 88.7 / 79.2 (−0.6 / −0.3) | 77.1 / 54.4 (+0.0 / −0.8) | 89.9 / 87.8 (−1.3 / −0.2) | 86.1 / 81.8 (−0.7 / +0.5) | #1: TP 212 → 255, FP 31 → 14, FN 61 → 18; #3: TP 56 → 62, FN 9 → 3 |
+| Fix 5 — blanks after a colon | `5fef220` | 88.5 / 88.1 (−1.2 / −0.2) | 88.8 / 84.9 (−0.7 / −0.4) | **81.1 / 88.2 (+0.0 / −1.3)** | 89.4 / 88.1 (−1.5 / −0.0) | 83.5 / 83.1 (−0.5 / +0.5) | #21: TP 25 → 44, FP 3 → 5, FN 23 → 4; #41: TP 12 → 16, FP 8 → 9, FN 8 → 4; #1: TP 255 → 256, FP 14 → 16, FN 18 → 17; #2: TP 31 → 32, FN 10 → 9; #23: FP 3 → 5 |
+| Fix 3 — rule 2, wide cells | `c41510e` | 94.2 / 88.7 (−2.1 / −0.2) | 93.9 / 85.4 (−0.7 / −0.4) | 81.1 / 88.2 (+0.0 / −1.3) | 95.9 / 88.7 (−2.7 / −0.1) | 88.9 / 83.7 (−1.4 / +0.4) | #25: TP 95 → 97, FP 20 → 0, FN 8 → 6; #2: TP 32 → 33, FP 11 → 0, FN 9 → 8; #3: TP 62 → 63, FP 14 → 3, FN 3 → 2 |
+| Fix 4 — rule 3, label inside a cell | `fdbb165` | 94.0 / 92.0 (−2.5 / −0.1) | 93.9 / 89.8 (−0.7 / −0.4) | 81.1 / 88.2 (+0.0 / −1.3) | 95.6 / 92.4 (−3.1 / −0.1) | 87.3 / 85.4 (−1.6 / +0.5) | #30: TP 15 → 29, FN 16 → 2; #1: TP 256 → 265, **FP 16 → 19**, FN 17 → 8 |
+| Fix 6 — rounded boxes | `9146cfb` | 95.1 / 92.0 (−2.7 / −0.1) | 96.6 / 89.8 (−0.7 / −0.4) | **90.9 / 88.2 (+0.0 / −1.3)** | 95.6 / 92.4 (−3.1 / −0.1) | 88.3 / 85.4 (−1.8 / +0.5) | #41: FP 9 → 1 |
+| Fix 7 — hyphen leaders | `714c3d3` | **95.1 / 92.4 (−2.7 / −0.2)** | **96.6 / 90.4 (−0.7 / −0.4)** | **91.3 / 92.6 (+0.0 / −1.4)** | **95.6 / 92.4 (−3.1 / −0.1)** | 88.1 / 85.5 (−1.8 / +0.5) | #21: TP 44 → 47, FN 4 → 1 |
+
+After fix 7 on v5: macro from scratch 92.3 / 89.0 (2 forms), macro pre-filled 97.6 / 90.7
+(9 forms). Fix 7, final counts: TP 645, FP 33, FN 53.
+
+By kind:
+- text recall 91.0 % (386/424), precision 93.5 %;
+- comb recall 96.5 % (138/143), precision 95.8 %;
+- checkbox recall 92.4 % (121/131), precision 100 %.
+
+**Held-out check of rule 3 (fix 4) on #1 pages 5, 8, 9** (labels v5; the pages were not used for
+tuning).
+- **Rule 3 boxes:** 7 on these pages, **3 correct: precision 42.9 %.**
+  - Correct: the two signature boxes on page 5 and the one on page 9.
+  - Wrong: page 8's space above a bottom-aligned "Yes", its heading row "C For Association of
+    persons…" and its notes block, and page 9's table header cell.
+
+  This is the same 3 / 4 split the by-eye judgement found (fix 4 note).
+- **Effect of fix 4 against fix 3 on #1 as a whole:** TP +9, FP +3.
+  - Page 4's six signature cells account for 6 of the matches; the holdout pages for the other
+    3.
+  - The +3 false positives are the 4 wrong rule 3 boxes minus page 9's page-wide "Date:" colon
+    blank, which fix 4 dropped. That blank was itself a false positive: the v5 label there,
+    `p8_l066` (x 41.9–212.3), is too short for it to match.
+  - On v5, fix 4 therefore lowers pooled precision by 0.2 and pre-filled precision by 0.3; on
+    v4 it raised both by 0.1.
+- **The whole holdout (#1 pages 5, 8, 9) at fix 7:** TP 70, FP 19, FN 6. Page 8 (instructions
+  only, 0 labels) gets 10 detector boxes, 3 of them from rule 3.
+- **Caveat** (human, 2026-10-22): two of the three holdout pages (5 and 9) are re-reviewed
+  pre-filled pages from `flat@5fe80d0` (before fix 4), so the holdout is not fully unbiased; only
+  page 8 was labelled from scratch.
+
+**History: labels v4** (superseded by the v5 table above; reports committed). Pooled P / R unless
+the column says macro (writing spot, the mean over the 11 forms, each weighted equally; section
+"Macro average"). Every row was run on labels v4 and its report carries the macro average.
 
 | Row | Commit | Writing spot P / R (all) | Macro writing spot P / R (all) | From scratch P / R | Pre-filled P / R | IoU ≥ 0.5 P / R (all) | Forms changed (writing spot) |
 |---|---|---|---|---|---|---|---|
@@ -1069,8 +1132,10 @@ labels v4).
   unchanged: no candidate on #21 or #41. IoU ≥ 0.5 finds 10 of the 20 new matches. The other 10
   are the same writing spots with larger boxes: full cell height on #30's rows (27 pt; the labels
   are 13–19 pt), and full cell width on #1's signature boxes (268 pt; the labels about 160).
-- **Outside the scored subset** (#1 pages 5, 8 and 9: not labelled, looked at on local renders
-  only, not tuned on): 7 boxes added, 1 removed.
+- **Outside the scored subset** (#1 pages 5, 8 and 9, looked at on local renders only, not tuned
+  on): 7 boxes added, 1 removed. (First written as "not labelled": wrong. These pages had
+  submitted pre-filled boxes from `flat@5fe80d0` and were only outside the subset. They are scored
+  from labels v5: see "Held-out check of rule 3".)
   - 3 look right: the signature boxes above the captions on page 5 (2) and page 9.
   - 4 look wrong: on page 8, the space above a bottom-aligned "Yes" in a tall table row, the gap
     after a bold heading row in a table ("C For Association of persons…"), and a blank in a
@@ -1178,6 +1243,12 @@ v4; plan shown to and approved by the human before any code, 2026-10-22).
    does not find the box, so adding it adds a miss (#3 recall falls). Not edited now; it is the
    first entry in "Pending label fixes".
 
+   **Changed by the human during v5 (2026-10-26):** the applicant's writing spot is the empty area
+   to the left of the caption box, where the printed arrow points (between the PHOTO box and the
+   arrow). The caption rectangle (x 411–565, y 579–632) is only an instruction label and gets
+   **no** box. That area was already labelled in v4: `p1_l047` (`text`, 132.0, 581.1, 361.0,
+   633.1). So no edit was needed and the counts above do not move.
+
 **Pending label fixes** (human decision 2026-10-22). Label corrections decided during Step 11
 are collected here and not applied one by one. At the end of Step 11 they are applied once, as
 **labels v5**, by Claude Code in Label Studio (existing annotations only, backup first), verified
@@ -1192,6 +1263,22 @@ it.
 | 2 | #3, page 2 | remove `p1_l041` (`text`, 3.3 × 4.2 pt at x 55.8, y 444.8, over a vector-drawn letter; label question 6): an anchoring leftover from the pre-filled boxes. The human verifies it in Label Studio during v5 | human, 2026-10-22 | against the detector (its box becomes a false positive) |
 | 3 | #1, pages 5, 8, 9 | label from scratch (no pre-filled boxes) and add the three pages to the scored subset, as a held-out check of rule 3's precision (fix 4; see Known limitations). `subset.py` changes with the v5 conversion, not before. Any decision to tighten rule 3 waits for these v5 numbers | human, 2026-10-22 | neutral (new pages, labelled without the detector) |
 | 4 | #21, page 1 | decide blind in Label Studio: the space above "(Signature of authorized official of the Post Offc)" (caption at x 326–548, y 696; nothing drawn, not labelled). Under the labelling rules, signature and office-use areas get a `text` box. Found by the fix 8 scan | human, 2026-10-22 (to decide during v5) | against the detector if added (the detector does not box it now: recall falls) |
+
+**All four applied as labels v5** (2026-10-22 to 2026-10-26).
+- **Export.** `formpilot-dev-boxes-20261026-124015.json`, taken by Claude Code from the live
+  project after the human's checks; converted with `make label-convert … OVERWRITE=1`.
+- **Diff against the v4 export:** only tasks 1, 24, 25 and 27 changed, as listed below.
+  - The label files changed only on #1 (482 → 477 fields), #3 (192 → 191) and #21 (47 → 48).
+  - Every file's `source` line names the new export, as at every conversion.
+- **Two earlier exports were not converted:** `project-1-at-2026-10-22-18-41-ca445175.json` and
+  `…20261023-002821/-003137.json`. Task 27 was still unchanged in them.
+
+| # | Status | Provenance |
+|---|---|---|
+| 1 | **already satisfied in v4, no edit** | The human changed the fix during v5: the writing spot is the empty area the printed arrow points to, left of the caption box, and the caption rectangle gets no box. `p1_l047` (132.0, 581.1, 361.0, 633.1) already covers it (label question 5). |
+| 2 | **applied** | Human decision, applied by Claude Code through the Label Studio database (the human's deletion in the browser had not been saved): `p1_f043` (= `p1_l041`) removed from annotation 27, 66 → 65 regions, refusing unless exactly that region went and the annotation was unchanged since 2026-10-19 13:53. Database backup first, and only annotation 27 differed from it afterwards. **Verified by the human** in Label Studio before the export. The backup was in the session scratchpad and was later lost when `/tmp` was cleared; the v4 export keeps the annotation's earlier state. |
+| 3 | **applied, with a caveat** | #1 pages 5, 8, 9 added to `subset.py` (and the README's subset table); the pages were labelled by the human in Label Studio. Task 21 (page 5): the pre-filled boxes re-reviewed and kept as correct (9 boxes). Task 24 (page 8): relabelled from scratch, all 6 pre-filled boxes deleted; the page has no entry area (an instructions-only reference table). Task 25 (page 9): the pre-filled boxes re-reviewed; only the name row changed, split by rule 1 into first / middle / last name combs (1 comb + 1 text box → 3 combs; 66 → 67). **Caveat:** 2 of the 3 holdout pages are re-reviewed pre-filled pages from `flat@5fe80d0` (before fix 4), so the holdout is not fully unbiased. |
+| 4 | **applied: box added** (the human's blind decision) | Task 1 (#21 page 1): one `text` box at (328.2, 667.2, 539.2, 690.3), the space above the caption. Against the detector: #21 FN 0 → 1. |
 
 **Label question from fix 5 (reported to the human 2026-10-21; decided the same day: add both boxes, see "Fourth relabel by Claude Code").**
 4. **#21 page 2, "Policy No:" and "Name of the Post Office:"** (top of the discharge receipt, x
@@ -1244,8 +1331,15 @@ From-scratch IoU ≥ 0.5 precision ends 0.3 below the baseline (43.8 → 43.5 %)
 (fix 5) and hyphen leaders (fix 7) are 1.2 em high, while the hand-drawn boxes on #21 and #41
 are lower (the box-height convention); the writing spots match.
 
-All of these are dev numbers, measured on labels v4. The whole table is re-run once on labels v5
-(pending label fixes below).
+All of these are dev numbers, measured on labels v4.
+
+**Re-run on labels v5** (2026-10-26, with #1 pages 5, 8, 9 now scored; the table is in the
+ablation section):
+- Fix 7 measures 95.1 / 92.4 pooled, 91.3 / 92.6 from scratch and 95.6 / 92.4 pre-filled
+  (TP 645, FP 33, FN 53).
+- Rule 3's precision on the held-out pages is 3 / 7.
+
+The remaining-errors inventory below is the v4 one.
 
 **Fix 8 (signature area above its caption) is deferred to Phase 3** (human decision, 2026-10-22).
 - It could help only pre-filled forms: at best +10 of the 11 misses of its kind (#2, #3, #25,
@@ -1490,15 +1584,19 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 - **Rule 3 reads layout, not meaning (Step 11, fix 4).** Whether text in a cell is a label with a
   blank after it, a heading, a table value or an instruction is decided from position only (left
   edge, centred, bottom caption, a cell to the right, 5 em of room, a sentence-ending full stop).
-  On dev's scored pages this adds no false positive. #1's unscored pages 5, 8 and 9 (not
-  labelled, not tuned on, judged by eye on local renders) are the first held-out sign of rule 3's
+  On dev's tuning pages this adds no false positive. #1 pages 5, 8 and 9 (not tuned on; at the
+  time outside the scored subset and judged by eye) are the first held-out sign of rule 3's
   precision on unseen pages:
   - **7 new boxes, 4 of them wrong:** a bottom-aligned table value, a heading row and a header
     cell in tables, and a notes block. The other 3 are signature boxes.
-  - **1 entry lost:** page 9's "Date:" colon blank, which now overlaps the new signature box.
+  - **1 entry lost:** page 9's "Date:" colon blank, which now overlaps the new signature box. It
+    did not match its label either, so it costs nothing in the score.
 
-  Rule 3's precision must be checked on the test set (at the release measurement, when the
-  human asks for it). The photo / thumb / signature words are English only; a Hindi-only photo
+  **Measured on labels v5** (the three pages scored): rule 3 precision on them is **3 / 7 =
+  42.9 %**, and fix 4 adds 3 matches and 3 false positives there. Two of the three pages are
+  re-reviewed pre-filled pages, so the check is not fully unbiased. Any decision to tighten rule 3
+  is the human's, on these numbers. Rule 3's precision must also be checked on the test set (at
+  the release measurement, when the human asks for it). The photo / thumb / signature words are English only; a Hindi-only photo
   box with its words printed inside could get a box.
 
 - **Flat detection errors left at the end of Step 11.** 46 misses and 13 false positives remain
