@@ -127,7 +127,7 @@ Teach-back questions (human answers in `phase-1.md`)
 
 ---
 
-## Phase 2 — Form IR and flat-PDF frontend  ← CURRENT
+## Phase 2 — Form IR and flat-PDF frontend
 
 Goal: upload a flat (text-layer) PDF and see its detected fields as a Form IR.
 
@@ -174,11 +174,11 @@ Teach-back
 1. Why is there one IR instead of letting each input type have its own pipeline?
 2. Why do we store IR versions append-only?
 
-**Gate 2:** — [ ] passed
+**Gate 2:** — [x] passed (the human's decision, 2026-10-26)
 
 ---
 
-## Phase 3 — Field understanding + eval harness
+## Phase 3 — Field understanding + eval harness  ← CURRENT
 
 Goal: every field gets a semantic type, and we can measure how well.
 
