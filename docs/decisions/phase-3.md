@@ -323,6 +323,16 @@ The gate is the human's.
 Recorded in the close-out commit message (`make lint`, `make test`, `make test-int`; CI on the
 branch).
 
+### Status at hand-off (2026-10-27)
+- M1 is done; PR #3 (`phase-3-understanding` → `main`) is open and mergeable, waiting for the
+  human's Gate 3 and merge.
+- The human added a Groq API key to their local `.env` (gitignored, never committed). Whether
+  Groq's sign-up asked for a card is not recorded yet; P3-D2's condition still applies.
+- **Next steps:**
+  1. the human merges PR #3 and ticks Gate 3;
+  2. `GroqProvider` (only if the free tier needed no card);
+  3. the M2 (Phase 4) plan for approval.
+
 ## Notes for the next phase
 
 - **M2 (Phase 4: vault, matching, questions, answers, validation, fit)** starts with one plan
