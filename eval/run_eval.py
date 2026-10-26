@@ -147,6 +147,9 @@ def evaluate_form(
         ir = flat.run(doc, detection, document_id, FIXED_TIME)
     ok = {i for i, page in enumerate(detection.pages) if page.text_layer is TextLayer.OK}
     pages = set(subset_pages(subset, pdf.stem, len(detection.pages))) & set(label.labelled_pages)
+    # Only scored pages are compared; LLM batches are per page, so the rest changes nothing.
+    scored = pages & ok
+    ir = ir.model_copy(update={"fields": [f for f in ir.fields if f.bbox.page in scored]})
     understood = understand_form(ir, mode, provider)
 
     result = FormResult(form=label.form, from_scratch=label.prefilled_from is None)
@@ -155,7 +158,7 @@ def evaluate_form(
         for e in understood.trace
         if e.pass_name == understand.STAGE and e.field_id is None and "LLM" in e.change
     ]
-    for page in sorted(pages & ok):
+    for page in sorted(scored):
         fields = [f for f in understood.fields if f.bbox.page == page]
         labels = [f for f in label.fields if f.page == page]
         predicted = [Box(f.bbox, _predicted_kind(f.kind, f.max_chars)) for f in fields]
