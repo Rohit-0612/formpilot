@@ -100,6 +100,11 @@ def test_rule_matches(label: str, context: str | None, expected: SemanticType) -
         ("City", None, "current or permanent: no hint"),
         ("I hereby declare that the information given above is true", None, "keyword too small"),
         ("Policy No.", None, "no keyword"),
+        ("Issue Date", None, "the keyword 'date' is only half the label"),
+        ("Name", "2. PARTICULARS OF NOMINEE/S", "about another person"),
+        ("Name of witness", None, "about another person"),
+        ("Student's name in Hindi", None, "asks in Hindi"),
+        ("2. Maiden Name", None, "not the person's current name"),
         (None, None, "no label"),
     ],
 )

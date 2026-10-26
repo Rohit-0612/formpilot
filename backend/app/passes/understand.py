@@ -41,6 +41,8 @@ _STOPWORDS = frozenset(
     | {"with", "is", "as", "on", "at", "by", "please", "if", "any"}
     # format and writing instructions: "(DD/MM/YYYY)", "(in block / capital letters)"
     | {"dd", "mm", "yyyy", "yy", "block", "capital", "letters"}
+    # generic suffixes: "Aadhar No." is about Aadhaar (tuning, 2026-10-26)
+    | {"no", "number"}
 )
 # A leading "1.", "2)", "(a)", "b.", "(iv)": numbering, not part of the label.
 _ENUMERATOR = re.compile(r"^\s*\(?(\d{1,3}|[a-z]|[ivx]{1,4})[.)]\s*")
@@ -53,6 +55,20 @@ OFFICE_USE_PHRASES = (
     "bank use only",
     "karyalaya upyog",
     "कार्यालय उपयोग",
+)
+# A label or heading about someone other than the person filling the form, or asking in Hindi:
+# the rules never type it (a profile value would be wrong); the LLM decides (tuning, 2026-10-26).
+OTHER_PERSON_WORDS = (
+    "nominee",
+    "witness",
+    "deceased",
+    "appointee",
+    "related person",
+    "maiden",
+    "organisation",
+    "organization",
+    "hindi",
+    "हिन्दी",
 )
 _PERMANENT_HINTS = ("permanent", "sthayi", "sthai", "स्थायी")
 _CURRENT_HINTS = (
@@ -128,11 +144,13 @@ def _address_variant(candidates: set[SemanticType], field: Field) -> SemanticTyp
 def rule_match(field: Field) -> SemanticType | None:
     """The unique strong keyword match of the field's label, or None (then the LLM decides).
 
-    Strong: the longest matching keyword covers at least half of the label's content words, and
-    no other type matches words outside it ("Father's/Husband's name" is ambiguous).
+    Strong: the longest matching keyword covers more than half of the label's content words
+    ("Issue Date" is not the date of filling), and no other type matches words outside it
+    ("Father's/Husband's name" is ambiguous). Labels or headings about another person, or asking
+    in Hindi, are left to the LLM.
     """
     label = tokens(field.label_text)
-    if not label:
+    if not label or _has_any(f"{field.label_text} {field.context_text or ''}", OTHER_PERSON_WORDS):
         return None
     matches: list[tuple[set[int], SemanticType]] = []
     for keyword, semantic_type in _keywords():
@@ -143,7 +161,7 @@ def rule_match(field: Field) -> SemanticType | None:
         return None
     longest = max(len(span) for span, _ in matches)
     best_spans = [span for span, _ in matches if len(span) == longest]
-    if 2 * longest < len(label) or any(span != best_spans[0] for span in best_spans):
+    if 2 * longest <= len(label) or any(span != best_spans[0] for span in best_spans):
         return None
     best = best_spans[0]
     winners = {t for span, t in matches if span == best}
