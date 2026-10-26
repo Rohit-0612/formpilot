@@ -159,3 +159,19 @@ def test_reports_say_the_reference_labels_are_claude_written(
     assert json.loads(json_path.read_text())["reference_labels"] == run_eval.DISCLOSURE
     assert run_eval.DISCLOSURE in md_path.read_text()
     assert "| All forms | 80.0 % (4/5) | 75.0 % (3/4) |" in md_path.read_text()
+
+
+def test_command_line_runs_rules_mode_and_writes_reports(
+    folders: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset, labels, references = folders
+    monkeypatch.setattr(run_eval, "DATASET_DIR", dataset.parent)
+    monkeypatch.setattr(run_eval, "LABELS_DIR", labels)
+    monkeypatch.setattr(run_eval, "REFERENCE_DIR", references)
+    monkeypatch.setattr(run_eval, "REPORTS_DIR", tmp_path / "reports")
+    monkeypatch.setattr(run_eval, "DEV_SUBSET", {FORM: "all"})
+    monkeypatch.setattr(run_eval, "detector_version", lambda: "flat@test")
+    dataset.rename(dataset.parent / "dev")
+
+    assert run_eval.main(["--mode", "rules", "--tag", "cli"]) == 0
+    assert len(list((tmp_path / "reports").glob("phase3-understanding-dev-rules-cli-*.json"))) == 1

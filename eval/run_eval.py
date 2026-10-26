@@ -424,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tag", default=None)
     parser.add_argument("--write-baseline", action="store_true")
     args = parser.parse_args(argv)
-    configure_logging("WARNING", log_json=False)
+    configure_logging("WARNING", json=False)
 
     provider = (
         None
