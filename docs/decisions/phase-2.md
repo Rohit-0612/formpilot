@@ -1379,6 +1379,35 @@ Step 11.
 **Integration tests at the end of Step 11: done** (the last item of the Step 11 plan,
 2026-10-22). `make test-int` at `32c2c34`: 66 passed, 824 deselected.
 
+## v1 re-scope and milestone gates (human decision, 2026-10-26)
+
+**Why.** Phase 2 took about two weeks, mostly because of process: a stop after every step, an
+ablation row per fix, and five relabels. The human wants a complete, measured, live v1 soon
+(placement season) without lowering quality.
+
+**Decisions.**
+- **v1 scope** (PLAN.md "v1 scope and milestones", SPEC §2):
+  - v1 is flat PDFs end to end, plus from the old Phase 7: a live demo, the CI eval gate, and a
+    detection release measurement on the 6 test forms, labelled from scratch before the README.
+  - After v1: AcroForm filling, drag/resize in review, fix 8, Phase 6 (OCR), Phase 7's provider
+    comparison.
+  - LLM parsing of free-text answers stays in v1 (SPEC §6.5).
+  - "Questions per form" is reported, not gated.
+- **Milestone gates** (CLAUDE.md §1): one approved plan per milestone, covering its IR / database
+  / API changes and dependencies. Stops happen only at the milestone's end, for an unplanned
+  decision, under the stuck rule, or on a metric drop.
+- **"In my own words" checkpoint** at the end of every milestone (about 10 minutes); the final
+  teach-back comes before the README.
+- **Privacy invariant** (CLAUDE.md §3, SPEC §11):
+  - Values of the sensitive types (D2) and of the phone types never reach a remote LLM provider.
+  - Non-sensitive free text (such as an address) may, and the README says so.
+  - Groq is used only if its free tier needs no card or payment; Ollama stays the local default.
+- **Public demo rules** (SPEC §11): synthetic forms only, with a visible banner; the 24 h expiry
+  on everything; no real documents seeded. The deploy platform is decided in the M4 plan.
+- **Language:** repository files stay in English.
+
+**Also corrected:** CLAUDE.md §3 listed four sensitive types; D2 had added `voter_id`.
+
 ## Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan

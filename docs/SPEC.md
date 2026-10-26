@@ -27,10 +27,24 @@ harness gated in CI.*
 
 ## 2. Scope
 
-**v1 (Phases 1–5):** flat (text-layer) PDFs end to end. The fillable (AcroForm) path is kept as a
-small secondary path, tested on synthetic fixtures.
-**v2 (Phases 6–7):** scanned PDFs and pages with unusable text layers, via OCR; provider
-comparison, CI eval gate, deploy.
+**v1 (Phases 1–5 and 5b; human decision, 2026-10-26):** flat (text-layer) PDFs end to end:
+detection, understanding, vault and matching, validation, questions and answers (free-text
+answers parsed by the LLM, §6.5), review and confirm, overlay rendering and download.
+
+v1 also includes:
+- a live demo (synthetic forms only, §11);
+- the CI eval gate;
+- a detection release measurement on the test split.
+
+The fillable (AcroForm) path is **detection only** in v1, tested on synthetic fixtures.
+
+**After v1:**
+- AcroForm filling;
+- drag/resize of boxes in review;
+- signature areas above a caption with nothing drawn;
+- scanned PDFs and pages with unusable text layers, via OCR (Phase 6);
+- provider comparison (Phase 7).
+
 **Stretch (Phase 8):** photo of a paper form (perspective correction + numbered guide), MCP server.
 
 Scope set after the Phase 0 reality check: 0 of 20 collected real forms were fillable (17 flat,
@@ -217,7 +231,7 @@ using PyMuPDF drawings, with an OpenCV fallback on a rasterized page. Associate 
 with the nearest label (same row to the left, else directly above). Sanity checks: entry boxes
 must not overlap each other; boxes smaller than the minimum font height are flagged.
 
-**scanned.py (v2).** Rasterize at 300 DPI, OCR with Tesseract (`eng` + `hin`) to get
+**scanned.py (after v1).** Rasterize at 300 DPI, OCR with Tesseract (`eng` + `hin`) to get
 words with boxes, detect lines/boxes with OpenCV, then reuse the flat.py association logic.
 Also used for pages whose text layer fails the quality check.
 
@@ -281,16 +295,16 @@ to the minimum (default 6 pt); if it still does not fit, flag `fits_box=false` f
 ### 6.8 Review (UI)
 
 PDF rendered page by page with field boxes overlaid (colour by status). Side panel per field:
-label, value, source badge, confidence, validation messages, edit box, confirm button. For flat
-and scanned forms the user can drag/resize a box (`USER_EDIT` recorded in trace). Bulk action:
-"confirm all fields with no warnings".
+label, value, source badge, confidence, validation messages, edit box, confirm button. After v1:
+for flat and scanned forms the user can drag/resize a box (`USER_EDIT` recorded in trace); in v1
+the user edits values, not boxes. Bulk action: "confirm all fields with no warnings".
 
 ### 6.9 Rendering (backends)
 
 - `overlay.py` (primary renderer in v1): draw text inside the bbox with the fit-pass font size;
   checkboxes get an "X".
-- `acroform_fill.py` (secondary): write values into widgets (checkbox → its on-value), regenerate
-  appearances, optional flatten.
+- `acroform_fill.py` (secondary, after v1): write values into widgets (checkbox → its on-value),
+  regenerate appearances, optional flatten.
 - `guide.py` (stretch): numbered markers on the page image plus a list "Box 3: write ...".
 Only `CONFIRMED` fields are rendered.
 
@@ -357,13 +371,13 @@ that no response contains a plain `FormIR`.
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic | |
 | Jobs | Redis + arq | async, lighter than Celery |
 | PDF | PyMuPDF | read widgets, words with coordinates, drawings, rendering. **AGPL-3.0**: the repo is public and licensed AGPL-3.0 |
-| OCR (v2) | Tesseract via pytesseract | `eng` + `hin` language packs, both required |
-| Vision (v2) | OpenCV | lines, boxes, perspective |
-| LLM | `LLMProvider` interface: `OllamaProvider` (default, local), `GroqProvider` (optional API), `FakeProvider` (tests) | model name from config; start with a 7–8B instruct model, fall back to 3B on low-RAM machines |
+| OCR (after v1) | Tesseract via pytesseract | `eng` + `hin` language packs, both required |
+| Vision (after v1) | OpenCV | lines, boxes, perspective |
+| LLM | `LLMProvider` interface: `OllamaProvider` (default, local), `GroqProvider` (optional API, only if its free tier needs no card or payment), `FakeProvider` (tests); sensitive and phone values never reach a remote provider (§11) | model name from config; start with a 7–8B instruct model, fall back to 3B on low-RAM machines |
 | LLM cache | recorded responses keyed by hash(provider, model, prompt, schema) | makes CI eval deterministic and free |
 | Frontend | Next.js (App Router), TypeScript, Tailwind, TanStack Query, pdf page images from API | types generated with `openapi-typescript` |
 | Tests | pytest, Playwright (one happy-path e2e) | |
-| Infra | Docker Compose, GitHub Actions, Makefile | deploy on a free tier in Phase 7 |
+| Infra | Docker Compose, GitHub Actions, Makefile | deploy on a free tier in Phase 5b (v1) |
 
 ## 10. Evaluation
 
@@ -403,6 +417,13 @@ each label file records `"verified_by_human": true`.
 - Vault encrypted at rest (Fernet, key from env). This protects the database dump; it is not
   end-to-end encryption and the README says so.
 - Sensitive types masked in responses, never logged, saved to the vault only on explicit opt-in.
+- **Remote LLM providers never receive sensitive values** (human decision, 2026-10-26). Values
+  of the sensitive types (`aadhaar`, `pan`, `bank_account_number`, `passport_number`,
+  `voter_id`) and of the phone types (`phone_mobile`, `phone_alternate`) are never sent to a
+  remote provider. Free-text answer parsing (§6.5) may send non-sensitive free text, such as an
+  address; the README's privacy section says so. Enforced at the provider layer and tested.
+- **Public demo:** synthetic forms only, with a visible banner saying so; the 24 h expiry
+  applies to everything in the demo; no real documents are seeded.
 - Uploads and outputs expire after 24 h (arq cron). `DELETE` removes files immediately.
 - PDFs are opened only in the worker, never in the API process.
 

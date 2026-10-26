@@ -24,7 +24,16 @@ If a nested instruction file (e.g. web/CLAUDE.md) conflicts with this file, this
   Never start the next phase, even if the current one looks done. The human marks a gate as passed.
 - **Plan before code.** For every task, first state: which files will change, why, and how it
   will be tested. Wait for approval on anything that touches the Form IR schema, the database
-  schema, or a public API contract.
+  schema, or a public API contract (given once in the milestone plan, see below).
+- **Milestone gates** (human decision, 2026-10-26; milestones in `docs/PLAN.md`):
+  - Plan each milestone once, naming up front every Form IR, database or public API change and
+    every new dependency. The human's approval of that plan covers them.
+  - Then build the whole milestone without stopping after each step. Every logical change is
+    still its own commit, tested, pushed and green on all three CI jobs.
+  - Stop and ask only at the end of the milestone, for a decision the approved plan does not
+    cover, under the stuck rule, or when a metric drops.
+  - Time-box tuning loops (at most one session per metric).
+  - When the human says "stop", stop.
 - **Small steps, small commits.** One logical change per commit, conventional commit messages
   (`feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`). Run the tests before every commit.
 - **"Done" means verified.** Never say a task is done unless you ran the relevant tests and they
@@ -38,7 +47,8 @@ If a nested instruction file (e.g. web/CLAUDE.md) conflicts with this file, this
   alternative you considered.
 - **End of phase:** draft `docs/decisions/phase-N.md` (what was built, alternatives considered,
   why this choice, known limitations). Leave the section "In my own words" empty — the human
-  writes it.
+  writes it. At the end of every milestone, give the human a short "In my own words" checkpoint
+  (a few questions, about 10 minutes). The final teach-back comes before the README is written.
 
 ## 2. Architecture invariants (never break these)
 
@@ -65,9 +75,15 @@ If a nested instruction file (e.g. web/CLAUDE.md) conflicts with this file, this
 
 - Never commit real personal data. Fixtures and eval personas are synthetic only.
 - Never log field **values**. Log document ids, field ids, pass names, timings.
-- Sensitive semantic types (`aadhaar`, `pan`, `bank_account_number`, `passport_number`) are
-  never saved to the profile vault unless the user opts in for that specific field; they are
-  masked in API responses by default.
+- Sensitive semantic types (`aadhaar`, `pan`, `bank_account_number`, `passport_number`,
+  `voter_id`; decision D2) are never saved to the profile vault unless the user opts in for that
+  specific field; they are masked in API responses by default.
+- **Never send sensitive values to a remote LLM provider.** Values of the sensitive types and of
+  the phone types (`phone_mobile`, `phone_alternate`) are never sent to a remote provider (e.g.
+  Groq). Free-text answer parsing may send non-sensitive free text (such as an address); the
+  README's privacy section says so. Enforced at the provider layer and covered by a test.
+- The public demo uses synthetic forms only (with a visible banner saying so), applies the 24 h
+  expiry to everything, and seeds no real documents.
 - Uploaded files and outputs expire (default 24 h) and are deleted by a scheduled job.
 
 ## 4. Code conventions
