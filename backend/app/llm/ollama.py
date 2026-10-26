@@ -12,6 +12,8 @@ import httpx
 from app.llm.provider import LLMError, LLMProvider, LLMRequest
 
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "host.docker.internal"})
+# Ollama's default context (4096 tokens) is too small for the understanding prompt plus a batch.
+NUM_CTX = 8192
 
 
 def is_cloud_model(model: str) -> bool:
@@ -27,7 +29,7 @@ class OllamaProvider(LLMProvider):
         base_url: str,
         model: str,
         *,
-        timeout_seconds: float = 120.0,
+        timeout_seconds: float = 300.0,
         client: httpx.Client | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -49,7 +51,7 @@ class OllamaProvider(LLMProvider):
             "format": request.schema,  # Ollama constrains the output to this JSON schema
             "stream": False,
             "think": False,  # reasoning models (qwen3) answer directly
-            "options": {"temperature": 0},
+            "options": {"temperature": 0, "num_ctx": NUM_CTX},
         }
         try:
             response = self._client.post(f"{self.base_url}/api/chat", json=body)

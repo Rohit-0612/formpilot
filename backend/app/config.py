@@ -71,7 +71,7 @@ class Settings(DatabaseSettings, QueueSettings):
     llm_provider: Literal["none", "ollama"] = "none"
     ollama_base_url: str = "http://localhost:11434"
     llm_model: str = "qwen3:8b"
-    llm_timeout_seconds: float = Field(default=120.0, gt=0)
+    llm_timeout_seconds: float = Field(default=300.0, gt=0)
     # Fields whose semantic confidence is below this get status NEEDS_REVIEW (SPEC §6.2)
     understand_review_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
 

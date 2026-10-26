@@ -107,7 +107,7 @@ def test_ollama_sends_a_schema_constrained_deterministic_chat() -> None:
     assert body["model"] == "qwen3:8b"
     assert body["format"] == SCHEMA
     assert body["stream"] is False and body["think"] is False
-    assert body["options"] == {"temperature": 0}
+    assert body["options"] == {"temperature": 0, "num_ctx": 8192}
     assert [m["role"] for m in body["messages"]] == ["system", "user"]
 
 
