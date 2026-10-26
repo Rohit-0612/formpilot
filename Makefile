@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -93,3 +93,8 @@ label-examples:
 ## Optional TAG=<name> names the run, e.g. make eval-detect TAG=pre-step11-tuning
 eval-detect:
 	$(EVAL_PY) eval.detection --split dev $(if $(TAG),--tag $(TAG),)
+
+## Understanding eval on the dev split (Phase 3): MODE=hybrid|llm|rules; replays the recorded model
+## answers by default, RECORD=1 asks the model (Ollama) and records them, LIVE=1 skips the cache
+eval:
+	$(EVAL_PY) eval.run_eval --split dev --mode $(or $(MODE),hybrid) --cache $(if $(RECORD),record,$(if $(LIVE),off,replay)) $(if $(TAG),--tag $(TAG),) $(if $(BASELINE),--write-baseline,)
