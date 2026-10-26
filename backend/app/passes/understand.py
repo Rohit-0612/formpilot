@@ -4,7 +4,8 @@
    match sets the type (method "rule", confidence 0.95). Current vs permanent address comes from
    the section heading or the label.
 2. LLM: the fields the rules could not place, batched per page (at most LLM_BATCH per request),
-   output constrained to the SemanticType enum and validated with Pydantic; one retry with the
+   output constrained to the SemanticType enum and validated with Pydantic (prompt v2 since the
+   Phase 3 tuning; v1 is kept for the pre-tuning reports); one retry with the
    validation error, then `unknown` (invariant 4). The request holds printed form text only.
 3. Never filled (decision P3-D1): signature fields and fields under an office-use heading get a
    `no_fill_reason` and status SKIPPED; fields below the review threshold get NEEDS_REVIEW.
@@ -33,7 +34,7 @@ from app.passes.context import PassContext
 STAGE = "understand"
 RULE_CONFIDENCE = 0.95  # SPEC §6.2
 LLM_BATCH = 20  # fields per request: short answers, and dense pages (120 fields) are split
-PROMPT_FILE = Path(__file__).resolve().parent.parent / "llm" / "prompts" / "understand_v1.md"
+PROMPT_FILE = Path(__file__).resolve().parent.parent / "llm" / "prompts" / "understand_v2.md"
 
 # Words that carry no meaning for matching ("Name of the applicant" ~ "applicant name").
 _STOPWORDS = frozenset(
