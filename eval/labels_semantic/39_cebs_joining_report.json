@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "form": "39_cebs_joining_report",
+  "label_file_sha256": "d36d9e427be3352a24678039e7c42e6cbac8f68433e12f12c524ea68eb5c222b",
+  "labelled_by": "Claude Code (claude-opus-5-5), 2026-10-26, blind to the model's output; from page renders only",
+  "labels": {
+    "p0_l000": "full_name",
+    "p0_l001": "date_of_filling",
+    "p0_l002": "other",
+    "p0_l003": "other",
+    "p0_l004": "other",
+    "p0_l005": "date_of_filling",
+    "p0_l006": "other",
+    "p0_l007": "other",
+    "p0_l008": "full_name"
+  }
+}

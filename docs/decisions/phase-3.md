@@ -139,5 +139,22 @@ different, much larger model. It is not accuracy against human ground truth.
 - **Separate:** stored apart from the human labels, each file with `labelled_by` and the SHA-256 of
   the label file whose boxes it labels.
 
+**How they were written (2026-10-26).**
+- From renders of each scored page, every labelled text or comb box outlined and numbered: the
+  form only, no model answer. The understanding pass was not run on the dev forms before.
+- All 567 fields, in one sitting; files in `eval/labels_semantic/` (11 forms).
+- Some conventions were made precise while labelling and applied to every form. They are listed
+  in `eval/labelling/README.md` as added during labelling:
+  - label for the person filling the form, so other people's data is `other`;
+  - names asked in Hindi are `other`;
+  - date parts take the date's type;
+  - every signing space is `signature`;
+  - separator rules are `unknown`.
+
+**Class balance.** 295 of 567 fields (52 %) are `other`: these forms ask much about other people
+(nominees, the deceased, witnesses) and for office use. 11 are `unknown`. A model answering
+`other` everywhere would reach 52 %, so the eval also reports accuracy on the fields whose type
+is neither `other` nor `unknown` (261), and per type.
+
 ## In my own words
 

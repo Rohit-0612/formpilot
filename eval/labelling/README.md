@@ -123,6 +123,20 @@ before you start (commit `c7c7bd9`), and they are not changed while you label.
 - `unknown` only when you cannot tell what the box asks for.
 - A comb row is labelled like a text box: what goes into the whole row.
 
+Applied while writing the Claude reference labels (2026-10-26; decision P3-D6), in addition to the
+above:
+- Label for **the person filling the form**. On a claim form the claimant is the nominee, so
+  "Name of nominee" there is `full_name`. Data about anyone else (a deceased member, the nominee
+  on a nomination form, a witness, a parent signing their own undertaking, an official) is
+  `other`, except the person's own relatives' types (`father_name`, `mother_name`,
+  `guardian_name`, `spouse_name`).
+- A name asked **in Hindi** is `other`: a value from the profile in English cannot fill it.
+- Each part of a split date (`DD`, `MM`, `YYYY`, or "this __ day of __") gets the date's type.
+- A signing space is `signature` whoever signs (applicant, witness, official), including an
+  official's initials box. A seal or stamp space is `other`.
+- A ruled line with nothing to write on it (a separator under a section) is `unknown`.
+- A comb for the country code of a phone number gets the phone's type.
+
 ## Labelling order
 
 1. **#21 and #41 from scratch** — these tasks have no pre-filled boxes (anchoring check, below).
