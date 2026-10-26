@@ -15,6 +15,8 @@ dependencies = [
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "pyjwt>=2.15.1",
+    "pymupdf>=1.28.2",
+    "python-multipart>=0.0.32",
     "redis>=5.2,<6",
     "sqlalchemy[asyncio]>=2.1.1",
     "structlog>=26.1.0",
@@ -27,7 +29,6 @@ package = false
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
-    "pymupdf>=1.28.2",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.16.9",
@@ -51,12 +52,18 @@ select = [
     "RUF",
 ]
 
+[tool.ruff.lint.isort]
+# eval/ (the evaluation tooling at the repo root) is ours too.
+known-first-party = ["app", "eval", "tests"]
+
 [tool.ruff.lint.per-file-ignores]
-# Tests may assert, use fake secrets, and inspect the filesystem directly from async tests.
-"tests/**" = ["S101", "S105", "S106", "ASYNC240"]
+# Tests may assert, use fake secrets, inspect the filesystem directly from async tests, and use
+# seeded pseudo-random numbers to generate test data (S311 is about cryptographic use).
+"tests/**" = ["S101", "S105", "S106", "S311", "ASYNC240"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+# ".." makes the repo root importable, so tests can import the eval tooling (eval/).
+pythonpath = [".", ".."]
 testpaths = ["tests"]
 addopts = "--strict-markers"
 markers = [
@@ -72,6 +79,10 @@ filterwarnings = [
     # inside arq, which we cannot fix (see docs/decisions/phase-1.md, known issues). Scoped to
     # this message, DeprecationWarning, and warnings attributed to the arq.worker module only.
     'ignore:Call to deprecated close\. \(Use aclose\(\) instead\):DeprecationWarning:arq\.worker',
+    # PyMuPDF 1.28.2's SWIG-generated extension types have no __module__, and Python 3.12 warns
+    # when they are imported (see docs/decisions/phase-2.md, known issues). The warning is
+    # attributed to importlib, not pymupdf, so it is scoped to these three exact messages.
+    'ignore:builtin type (SwigPyPacked|SwigPyObject|swigvarlink) has no __module__ attribute:DeprecationWarning',
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

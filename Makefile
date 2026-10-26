@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples label-images eval-detect
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -11,16 +11,16 @@ BACKEND := cd backend &&
 	@sed -i.bak "s/^JWT_SECRET=$$/JWT_SECRET=$$(openssl rand -hex 32)/" .env && rm -f .env.bak
 	@echo "Created .env with a generated JWT_SECRET"
 
-## Build and start everything, wait until healthy, then apply migrations
+## Build and start everything and wait until healthy (the one-shot migrate service applies the
+## migrations before api and worker start)
 up: .env
 	$(COMPOSE) up -d --build --wait
-	$(MAKE) migrate
 
 ## Stop all containers (data volumes are kept)
 down:
 	$(COMPOSE) down
 
-## Apply Alembic migrations inside the api container
+## Apply Alembic migrations inside the api container (e.g. a new migration on a running stack)
 migrate:
 	$(COMPOSE) exec -T api alembic upgrade head
 
@@ -51,5 +51,31 @@ test-int: services
 
 ## Lint, format check and type check (backend and web)
 lint:
-	$(BACKEND) uv run ruff check . && uv run ruff format --check .
+	$(BACKEND) uv run ruff check . ../eval && uv run ruff format --check . ../eval
 	cd web && npm run --silent lint && npm run --silent typecheck
+
+# ---------- Labelling (eval/labelling/README.md) ----------
+# Run from the repo root: eval/ is importable from here, app/ through PYTHONPATH.
+EVAL_PY := PYTHONPATH=backend uv run --project backend python -m
+
+## Render the dev pages and write Label Studio tasks (with detector pre-annotations)
+label-tasks:
+	$(EVAL_PY) eval.labelling.tasks
+
+## Convert a Label Studio JSON export into eval/labels/<form>.json (run by the human labeller)
+label-convert:
+	@test -n "$(EXPORT)" || (echo "usage: make label-convert EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
+	$(EVAL_PY) eval.labelling.convert "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
+
+## Render the README example images from the synthetic fixtures (committed)
+label-images:
+	$(EVAL_PY) eval.labelling.examples --synthetic
+
+## Render the same examples on the dev forms (local only, never committed)
+label-examples:
+	$(EVAL_PY) eval.labelling.examples
+
+## Detection eval on the dev split: detector boxes vs eval/labels -> eval/reports/ (Phase 2)
+## Optional TAG=<name> names the run, e.g. make eval-detect TAG=pre-step11-tuning
+eval-detect:
+	$(EVAL_PY) eval.detection --split dev $(if $(TAG),--tag $(TAG),)

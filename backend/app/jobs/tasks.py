@@ -14,7 +14,9 @@ from typing import Any
 from app.config import Settings, get_settings
 from app.db.session import make_engine, make_sessionmaker
 from app.logging import configure_logging, get_logger
+from app.services.analysis import analyze_document
 from app.services.jobs import JobStore
+from app.storage import make_storage
 
 log = get_logger(__name__)
 
@@ -56,7 +58,21 @@ async def ping(ctx: dict[str, Any], job_id: str) -> str:
     return await run_tracked(ctx, job_id, _no_work)
 
 
-FUNCTIONS = [ping]
+async def analyze(ctx: dict[str, Any], job_id: str) -> str:
+    """Uploaded PDF -> Form IR version 1 and page images (app/services/analysis.py)."""
+
+    async def work() -> None:
+        await analyze_document(
+            uuid.UUID(job_id),
+            sessionmaker=ctx["sessionmaker"],
+            storage=ctx["storage"],
+            settings=ctx["settings"],
+        )
+
+    return await run_tracked(ctx, job_id, work)
+
+
+FUNCTIONS = [ping, analyze]
 
 
 async def startup(ctx: dict[str, Any]) -> None:
@@ -66,8 +82,24 @@ async def startup(ctx: dict[str, Any]) -> None:
     configure_logging(settings.log_level, settings.log_json)
     engine = make_engine(settings)
     ctx["engine"] = engine
-    ctx["job_store"] = JobStore(make_sessionmaker(engine))
+    ctx["sessionmaker"] = sessionmaker = make_sessionmaker(engine)
+    ctx["job_store"] = store = JobStore(sessionmaker)
+    ctx["storage"] = make_storage(settings)
+    await _fail_stale_jobs(store, settings.job_timeout_seconds)
     log.info("worker_started")
+
+
+async def _fail_stale_jobs(store: JobStore, timeout_seconds: int) -> None:
+    """Once per worker start (decision D6). A failure is logged at ERROR, not raised.
+
+    Compose runs the migrations before the worker starts, so a failure here means a real
+    problem (database down, schema behind). It is a safety net: the worker still starts, queued
+    jobs can run, and the check runs again on the next start.
+    """
+    try:
+        await store.fail_stale(timeout_seconds)
+    except Exception:
+        log.exception("stale_jobs_check_failed")  # structlog: level "error"
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:

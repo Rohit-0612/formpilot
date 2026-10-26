@@ -1,11 +1,15 @@
 import asyncio
 import io
+import json
 import uuid
 
 import pytest
 
-from app.jobs.tasks import FUNCTIONS, ping, run_tracked
+from app.config import Settings
+from app.jobs.tasks import FUNCTIONS, ping, run_tracked, shutdown, startup
 from app.logging import configure_logging
+from app.services.jobs import JobStore
+from app.storage.local import LocalStorage
 
 JOB_ID = str(uuid.UUID("00000000-0000-4000-8000-00000000000a"))
 LEAKY_EMAIL = "asha.verma@example.com"
@@ -104,3 +108,50 @@ async def test_cancellation_is_recorded_and_propagated() -> None:
 
 def test_ping_is_registered_with_the_worker() -> None:
     assert ping in FUNCTIONS
+
+
+# --- worker startup -------------------------------------------------------------------
+
+
+async def test_startup_fails_stale_jobs_with_the_job_timeout_and_provides_storage(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    timeouts: list[int] = []
+
+    async def fake_fail_stale(self: JobStore, timeout_seconds: int) -> list[uuid.UUID]:
+        timeouts.append(timeout_seconds)
+        return []
+
+    monkeypatch.setattr(JobStore, "fail_stale", fake_fail_stale)
+    ctx: dict = {"settings": settings.model_copy(update={"job_timeout_seconds": 123})}
+
+    await startup(ctx)
+    await shutdown(ctx)
+
+    assert timeouts == [123]
+    assert isinstance(ctx["job_store"], JobStore)
+    assert isinstance(ctx["storage"], LocalStorage)
+
+
+async def test_startup_survives_a_failing_stale_job_check(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A safety net: the check fails only on a real problem, which is logged as an error."""
+
+    message = f"could not reach the database for {LEAKY_EMAIL}"
+
+    async def failing_check(self: JobStore, timeout_seconds: int) -> list[uuid.UUID]:
+        raise RuntimeError(message)  # the log's stack shows this source line, not the message
+
+    monkeypatch.setattr(JobStore, "fail_stale", failing_check)
+    ctx: dict = {"settings": settings}
+
+    await startup(ctx)  # does not raise
+    await shutdown(ctx)
+
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    failure = next(e for e in events if e["event"] == "stale_jobs_check_failed")
+    assert failure["level"] == "error"
+    assert failure["exc_type"] == "RuntimeError"
+    assert LEAKY_EMAIL not in json.dumps(failure)  # exception messages are never logged
+    assert any(e["event"] == "worker_started" for e in events)

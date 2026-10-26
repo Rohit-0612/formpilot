@@ -2,7 +2,8 @@
 
 Blank forms downloaded for evaluation, classified by `scripts/classify_forms.py` (PyMuPDF
 1.28.2) on 2026-09-29. Sources and numbering: `eval/incoming/sources.md`. The PDFs themselves
-are in `eval/incoming/` locally and are never committed.
+are in `eval/dataset/dev/` and `eval/dataset/test/` locally (moved there from `eval/incoming/`
+on 2026-10-11, see Split) and are never committed.
 
 Type rules (from the script): **fillable** = at least one form widget; **flat** = no widgets and
 on average at least 50 extracted text characters per page; **scanned** = otherwise. Notes are the
@@ -17,7 +18,8 @@ where it is clean, and from rendered pages for every page of every form, includi
 Regenerate the measurements with:
 
 ```bash
-uv run --project backend python scripts/classify_forms.py
+uv run --project backend python scripts/classify_forms.py eval/dataset/dev
+uv run --project backend python scripts/classify_forms.py eval/dataset/test
 ```
 
 ## Forms
@@ -82,6 +84,9 @@ MVP form families: Bank / KYC, College / Education
 - Checks: every family appears in both dev and test; scanned forms in both (dev #38, #42; test
   #40); legacy Hindi font forms in both (dev #37; test #5); MVP tuning focus is Bank / KYC and
   College / Education, and all four families stay in the eval.
+- Moved on 2026-10-11 from `eval/incoming/` into `eval/dataset/dev/` and `eval/dataset/test/` as
+  listed above. Form #1 was copied in from the original download first. All 20 files match the
+  originals in the human's local download folder by SHA-256; the originals are kept unchanged.
 
 ## Observations
 
@@ -98,3 +103,9 @@ MVP form families: Bank / KYC, College / Education
   except for the institute's name in Hindi in the letterhead.
 - Forms that ask for a value *in Hindi* while the form itself is English: #25 (student's and
   parents' names in Hindi) and #32 (names in English and Hindi).
+- Known gaps in the test split (human decision 2026-10-11: keep the split as it is):
+  1. Test has no Hindi-only form (the only one, #42, is in dev).
+  2. Test has no bilingual form with a clean Unicode Hindi text layer (#5 uses a legacy font,
+     #40 is scanned).
+  Planned follow-up: add one Hindi-only form and one bilingual form with a clean text layer to
+  test later; dev stays unchanged. Every Phase 2 eval report must mention these two gaps.

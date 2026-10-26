@@ -29,19 +29,33 @@ services:
       timeout: 3s
       retries: 30
 
-  api:
+  # One-shot: applies the Alembic migrations, then exits. api and worker start only after it
+  # succeeded, so they never see an unmigrated database (decision record, Phase 2 Step 7).
+  migrate:
     build: ./backend
+    command: ["alembic", "upgrade", "head"]
     env_file: .env
     environment: &backend-environment
       # Inside compose, reach Postgres and Redis by service name (.env holds host-side URLs).
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-formpilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-formpilot}
       REDIS_URL: redis://redis:6379/0
       STORAGE_ROOT: /data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ./backend
+    env_file: .env
+    environment: *backend-environment
     ports:
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     volumes:
       - storage:/data/storage
     depends_on: &backend-depends-on
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -81,6 +95,8 @@ services:
       args:
         # Inlined into the browser bundle at build time; the browser calls the API directly.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        # Same value as the API's MAX_UPLOAD_MB (a readable size message before uploading).
+        NEXT_PUBLIC_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-20}
     ports:
       - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
     depends_on:

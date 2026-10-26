@@ -11,7 +11,7 @@ It also flags files that fail to open or are encrypted, pages with no text layer
 looks garbled (possibly a legacy non-Unicode Hindi font such as Kruti Dev). The garbled-text
 check is a heuristic for a human to verify, not a verdict.
 
-Usage (PyMuPDF is a dev dependency of the backend project):
+Usage (PyMuPDF is a dependency of the backend project):
 
     uv run --project backend python scripts/classify_forms.py [FOLDER] [--json]
 """

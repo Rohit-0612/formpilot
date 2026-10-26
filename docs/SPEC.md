@@ -27,10 +27,24 @@ harness gated in CI.*
 
 ## 2. Scope
 
-**v1 (Phases 1–5):** flat (text-layer) PDFs end to end. The fillable (AcroForm) path is kept as a
-small secondary path, tested on synthetic fixtures.
-**v2 (Phases 6–7):** scanned PDFs and pages with unusable text layers, via OCR; provider
-comparison, CI eval gate, deploy.
+**v1 (Phases 1–5 and 5b; human decision, 2026-10-26):** flat (text-layer) PDFs end to end:
+detection, understanding, vault and matching, validation, questions and answers (free-text
+answers parsed by the LLM, §6.5), review and confirm, overlay rendering and download.
+
+v1 also includes:
+- a live demo (synthetic forms only, §11);
+- the CI eval gate;
+- a detection release measurement on the test split.
+
+The fillable (AcroForm) path is **detection only** in v1, tested on synthetic fixtures.
+
+**After v1:**
+- AcroForm filling;
+- drag/resize of boxes in review;
+- signature areas above a caption with nothing drawn;
+- scanned PDFs and pages with unusable text layers, via OCR (Phase 6);
+- provider comparison (Phase 7).
+
 **Stretch (Phase 8):** photo of a paper form (perspective correction + numbered guide), MCP server.
 
 Scope set after the Phase 0 reality check: 0 of 20 collected real forms were fillable (17 flat,
@@ -93,13 +107,23 @@ class SourceKind(str, Enum):
     SCANNED = "scanned"          # image-only pages
     PHOTO = "photo"              # camera image (stretch)
 
+class TextLayer(str, Enum):      # per page (decision D1, docs/decisions/phase-2.md)
+    OK = "ok"                    # usable text layer
+    GARBLED = "garbled"          # text present but extracts as garbage -> OCR (Phase 6)
+    NONE = "none"                # < 50 non-space chars AND mostly image -> OCR (Phase 6)
+
 class FieldKind(str, Enum):
     TEXT = "text"; CHECKBOX = "checkbox"; RADIO = "radio"
     CHOICE = "choice"; DATE = "date"; SIGNATURE = "signature"; UNKNOWN = "unknown"
 
 class BBox(BaseModel):
     page: int                     # 0-based
-    x0: float; y0: float; x1: float; y1: float   # PDF points, origin TOP-LEFT
+    x0: float; y0: float; x1: float; y1: float   # PDF points, origin TOP-LEFT of the displayed page
+                                  # validated: page >= 0, x0 < x1, y0 < y1, finite
+
+class PageInfo(BaseModel):
+    width: float; height: float   # points, displayed page (after /Rotate)
+    text_layer: TextLayer
 
 class Option(BaseModel):          # for checkbox / radio / choice
     value: str                    # value to write into the PDF (e.g. "/On", export value)
@@ -143,19 +167,27 @@ class FormIR(BaseModel):
     schema_version: int = 1
     document_id: UUID
     source_kind: SourceKind
-    page_sizes: list[tuple[float, float]]   # (width, height) in points
+    pages: list[PageInfo]         # index in this list == BBox.page
     fields: list[Field]
     trace: list[TraceEvent] = []
 ```
 
 Rules: field ids are never reused within a document; passes never delete fields (they may mark
-them `SKIPPED`); every change is appended to `trace`.
+them `SKIPPED`); every change is appended to `trace`. A `FormIR` validates that field ids are
+unique and that every box refers to an existing page; IR models reject unknown keys.
+
+`pages` replaced the original `page_sizes: list[tuple[float, float]]` (decision D1 in
+`docs/decisions/phase-2.md`) so that text-layer quality can be recorded per page.
 
 ## 5. Semantic types
 
 Defined in `backend/app/ir/semantic_types.py` as `SemanticType(str, Enum)`, each entry with:
 a description (used in the LLM prompt), keyword patterns (English and common Hindi transliterations
 such as "pita ka naam"), the profile key it maps to, a `sensitive` flag, and default validators.
+
+Sensitive types (masked in API responses, saved to the vault only on opt-in; CLAUDE.md §3 plus
+`voter_id`, decision D2 in `docs/decisions/phase-2.md`): `aadhaar`, `pan`, `bank_account_number`,
+`passport_number`, `voter_id`.
 
 Initial list (extend only via a decision record):
 
@@ -165,8 +197,8 @@ Initial list (extend only via a decision record):
 - Contact: `email`, `phone_mobile`, `phone_alternate`
 - Address (current and permanent variants): `address_line1`, `address_line2`, `city`,
   `district`, `state`, `pincode`, `country` — as `current_*` and `permanent_*`
-- IDs (sensitive): `pan`, `aadhaar`, `passport_number`, `voter_id`
-- Bank (sensitive): `bank_name`, `bank_account_number`, `ifsc`, `bank_branch`
+- IDs: `pan`, `aadhaar`, `passport_number`, `voter_id`
+- Bank: `bank_name`, `bank_account_number`, `ifsc`, `bank_branch`
 - Education: `institution_name`, `course`, `enrollment_number`, `year_of_study`,
   `percentage_or_cgpa`, `passing_year`
 - Form-local: `date_of_filling`, `place`, `signature`, `declaration_checkbox`
@@ -178,12 +210,14 @@ Initial list (extend only via a decision record):
 
 `frontends/detect.py` decides `SourceKind`:
 widgets present → `FILLABLE`; else meaningful text layer on most pages → `FLAT_TEXT`;
-else → `SCANNED`.
+else → `SCANNED`. "Most pages" means more than half of the pages have `text_layer = ok`.
 
-**Text-layer quality check.** A page's text layer is used only if it looks like real text. If it
-looks garbled (e.g. legacy non-Unicode Hindi fonts, whose glyphs extract as Latin-extended letters
-or as ASCII letters mixed with punctuation), that page is treated like a scanned page and routed
-to OCR.
+**Text-layer quality check.** Each page gets a `TextLayer` (SPEC §4). A page's text layer is used
+only if it looks like real text. If it looks garbled (e.g. legacy non-Unicode Hindi fonts, whose
+glyphs extract as Latin-extended letters or as ASCII letters mixed with punctuation), the page is
+`garbled`. A page is `none` only if it has fewer than 50 non-space characters **and** images cover
+most of its area; a sparse page without significant images (e.g. a signature page) stays `ok`.
+`garbled` and `none` pages are treated like scanned pages and routed to OCR.
 
 **acroform.py (v1, secondary path; tested on synthetic fixtures).** Read widgets with PyMuPDF.
 Map widget types to `FieldKind`; for checkboxes record on/off export values; for radio groups and
@@ -197,7 +231,7 @@ using PyMuPDF drawings, with an OpenCV fallback on a rasterized page. Associate 
 with the nearest label (same row to the left, else directly above). Sanity checks: entry boxes
 must not overlap each other; boxes smaller than the minimum font height are flagged.
 
-**scanned.py (v2).** Rasterize at 300 DPI, OCR with Tesseract (`eng` + `hin`) to get
+**scanned.py (after v1).** Rasterize at 300 DPI, OCR with Tesseract (`eng` + `hin`) to get
 words with boxes, detect lines/boxes with OpenCV, then reuse the flat.py association logic.
 Also used for pages whose text layer fails the quality check.
 
@@ -261,16 +295,16 @@ to the minimum (default 6 pt); if it still does not fit, flag `fits_box=false` f
 ### 6.8 Review (UI)
 
 PDF rendered page by page with field boxes overlaid (colour by status). Side panel per field:
-label, value, source badge, confidence, validation messages, edit box, confirm button. For flat
-and scanned forms the user can drag/resize a box (`USER_EDIT` recorded in trace). Bulk action:
-"confirm all fields with no warnings".
+label, value, source badge, confidence, validation messages, edit box, confirm button. After v1:
+for flat and scanned forms the user can drag/resize a box (`USER_EDIT` recorded in trace); in v1
+the user edits values, not boxes. Bulk action: "confirm all fields with no warnings".
 
 ### 6.9 Rendering (backends)
 
 - `overlay.py` (primary renderer in v1): draw text inside the bbox with the fit-pass font size;
   checkboxes get an "X".
-- `acroform_fill.py` (secondary): write values into widgets (checkbox → its on-value), regenerate
-  appearances, optional flatten.
+- `acroform_fill.py` (secondary, after v1): write values into widgets (checkbox → its on-value),
+  regenerate appearances, optional flatten.
 - `guide.py` (stretch): numbered markers on the page image plus a list "Box 3: write ...".
 Only `CONFIRMED` fields are rendered.
 
@@ -280,7 +314,9 @@ Only `CONFIRMED` fields are rendered.
 - `documents(id, owner_id, original_filename, sha256, source_kind, status, page_count,
   created_at, expires_at)` — status: `uploaded | analyzing | ready | rendering | done | failed`
 - `form_ir_versions(id, document_id, version, ir_json JSONB, created_at)` — append-only
-- `jobs(id, document_id, type, status, error, created_at, finished_at)` — types: `analyze`, `render`
+- `jobs(id, document_id, type, status, error, created_at, started_at, finished_at)` — types:
+  `analyze`, `render`; `started_at` is used to fail jobs left running by a crashed worker
+  (decision D6 in `docs/decisions/phase-2.md`)
 - `profiles(user_id, encrypted_blob, updated_at)` — encrypted with Fernet; key from env
 - `audit_events(id, document_id, field_id, event, actor, created_at)` — no values stored
 
@@ -308,6 +344,26 @@ Files (uploads, rendered outputs) live in a `Storage` interface; v1 uses a local
 
 Upload limits (config): 20 MB, 50 pages, PDF magic-bytes check (images in stretch phase).
 
+**Upload step** (decision D3, `docs/decisions/phase-2.md`). The API never opens a PDF (§11). It
+checks the size while reading the body (`MAX_UPLOAD_MB`; a declared `Content-Length` over the
+cap is refused before reading, and reading stops once the body passes the cap) → `413`, and the
+magic bytes (`%PDF-` within the first 1024 bytes) → `415`; then it stores the original, inserts
+the document and enqueues the `analyze` job → `202`. The worker enforces the page limit
+(`MAX_PAGES`; document `failed`, job error `TooManyPages`), runs detection and the frontend,
+renders the page images (`PAGE_IMAGE_DPI`) and stores IR version 1. Job errors are shown by
+`GET /documents/{id}` as readable messages. Another user's document or job answers `404`.
+Page images are sent with `Cache-Control: private, no-store`.
+
+**Masking rule.** Every Form IR returned to the client is masked, in any endpoint and at any
+nesting depth; the stored IR keeps the real values. A field value is masked when its semantic
+type is sensitive (§5) or, as defence in depth, when the value itself looks like one of those
+identifiers (Aadhaar, PAN, passport, voter ID, bank account number), whatever the field's type.
+Exception: in a field understood as a phone number, a value in Indian mobile format (10 digits
+starting 6–9, optional `+91` or leading `0`) is not masked.
+Mask: `XXXX` + the last 4 characters for values of 8 or more characters, else `XXXX`. Enforced by
+the response type `MaskedFormIR` (masks on construction) and a test over the OpenAPI document
+that no response contains a plain `FormIR`.
+
 ## 9. Tech stack
 
 | Layer | Choice | Note |
@@ -315,13 +371,13 @@ Upload limits (config): 20 MB, 50 pages, PDF magic-bytes check (images in stretc
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0, Alembic | |
 | Jobs | Redis + arq | async, lighter than Celery |
 | PDF | PyMuPDF | read widgets, words with coordinates, drawings, rendering. **AGPL-3.0**: the repo is public and licensed AGPL-3.0 |
-| OCR (v2) | Tesseract via pytesseract | `eng` + `hin` language packs, both required |
-| Vision (v2) | OpenCV | lines, boxes, perspective |
-| LLM | `LLMProvider` interface: `OllamaProvider` (default, local), `GroqProvider` (optional API), `FakeProvider` (tests) | model name from config; start with a 7–8B instruct model, fall back to 3B on low-RAM machines |
+| OCR (after v1) | Tesseract via pytesseract | `eng` + `hin` language packs, both required |
+| Vision (after v1) | OpenCV | lines, boxes, perspective |
+| LLM | `LLMProvider` interface: `OllamaProvider` (default, local), `GroqProvider` (optional API, only if its free tier needs no card or payment), `FakeProvider` (tests); sensitive and phone values never reach a remote provider (§11) | model name from config; start with a 7–8B instruct model, fall back to 3B on low-RAM machines |
 | LLM cache | recorded responses keyed by hash(provider, model, prompt, schema) | makes CI eval deterministic and free |
 | Frontend | Next.js (App Router), TypeScript, Tailwind, TanStack Query, pdf page images from API | types generated with `openapi-typescript` |
 | Tests | pytest, Playwright (one happy-path e2e) | |
-| Infra | Docker Compose, GitHub Actions, Makefile | deploy on a free tier in Phase 7 |
+| Infra | Docker Compose, GitHub Actions, Makefile | deploy on a free tier in Phase 5b (v1) |
 
 ## 10. Evaluation
 
@@ -343,7 +399,7 @@ Metrics:
 
 | Metric | Definition |
 |---|---|
-| Detection precision / recall | predicted vs labelled fields, match if IoU ≥ 0.5 on the same page |
+| Detection precision / recall | predicted vs labelled fields, match if IoU ≥ 0.5 on the same page; Phase 2 adds a primary **writing-spot match** (same horizontal extent and same writing row, box height not scored; `docs/decisions/phase-2.md`) |
 | Semantic accuracy | share of matched fields with the correct semantic type |
 | Fill correctness | render with a persona, read back values, compare to expected |
 | Placement IoU (v1) | mean IoU of rendered text box vs labelled entry box |
@@ -361,6 +417,13 @@ each label file records `"verified_by_human": true`.
 - Vault encrypted at rest (Fernet, key from env). This protects the database dump; it is not
   end-to-end encryption and the README says so.
 - Sensitive types masked in responses, never logged, saved to the vault only on explicit opt-in.
+- **Remote LLM providers never receive sensitive values** (human decision, 2026-10-26). Values
+  of the sensitive types (`aadhaar`, `pan`, `bank_account_number`, `passport_number`,
+  `voter_id`) and of the phone types (`phone_mobile`, `phone_alternate`) are never sent to a
+  remote provider. Free-text answer parsing (§6.5) may send non-sensitive free text, such as an
+  address; the README's privacy section says so. Enforced at the provider layer and tested.
+- **Public demo:** synthetic forms only, with a visible banner saying so; the 24 h expiry
+  applies to everything in the demo; no real documents are seeded.
 - Uploads and outputs expire after 24 h (arq cron). `DELETE` removes files immediately.
 - PDFs are opened only in the worker, never in the API process.
 

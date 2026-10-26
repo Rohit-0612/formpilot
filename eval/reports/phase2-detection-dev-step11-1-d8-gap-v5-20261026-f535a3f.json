@@ -1,0 +1,1069 @@
+{
+  "eval": "phase2-detection",
+  "tag": "step11-1-d8-gap-v5",
+  "split": "dev",
+  "detector": "flat@f535a3f",
+  "created_at": "2026-10-26T07:12:11+00:00",
+  "primary_metric": "writing_spot",
+  "match_rules": {
+    "writing_spot": "same page, x-interval IoU >= 0.5, vertical centres at most 0.5 x the taller box's height apart; one-to-one, greedy",
+    "iou_0.5": "IoU >= 0.5 on the same page; one-to-one, greedy",
+    "iou_0.3": "IoU >= 0.3 (diagnostic)"
+  },
+  "subset_pages_1based": {
+    "01_sbi_account_opening_form": [
+      1,
+      4,
+      5,
+      8,
+      9
+    ],
+    "02_sbi_kyc_annexure_a": "all",
+    "03_sbi_kyc_annexure_b": [
+      2
+    ],
+    "06_union_bank_nomination_form": "all",
+    "21_india_post_pmjjby_claim_form": "all",
+    "23_lic_claim_form_a_3783": "all",
+    "25_cdlsiet_btech_admission_form": "all",
+    "30_allahabad_univ_enrollment_form": "all",
+    "32_niftem_student_declaration_form": "all",
+    "39_cebs_joining_report": "all",
+    "41_india_post_pli_name_change_form": "all"
+  },
+  "overall": {
+    "writing_spot": {
+      "tp": 541,
+      "fp": 90,
+      "fn": 157,
+      "precision": 0.8573692551505546,
+      "recall": 0.7750716332378224
+    },
+    "iou_0.5": {
+      "tp": 522,
+      "fp": 109,
+      "fn": 176,
+      "precision": 0.8272583201267829,
+      "recall": 0.7478510028653295
+    },
+    "iou_0.3": {
+      "tp": 548,
+      "fp": 83,
+      "fn": 150,
+      "precision": 0.8684627575277337,
+      "recall": 0.7851002865329513
+    },
+    "macro": {
+      "writing_spot": {
+        "precision": 0.878694321252652,
+        "recall": 0.7692638000370998,
+        "forms_precision": 11,
+        "forms_recall": 11
+      },
+      "iou_0.5": {
+        "precision": 0.819489880919627,
+        "recall": 0.7299342178070322,
+        "forms_precision": 11,
+        "forms_recall": 11
+      }
+    },
+    "kinds": {
+      "recall_by_labelled_kind": {
+        "text": {
+          "matched": 329,
+          "total": 424,
+          "share": 0.7759433962264151
+        },
+        "comb": {
+          "matched": 91,
+          "total": 143,
+          "share": 0.6363636363636364
+        },
+        "checkbox": {
+          "matched": 121,
+          "total": 131,
+          "share": 0.9236641221374046
+        }
+      },
+      "precision_by_predicted_kind": {
+        "text": {
+          "matched": 329,
+          "total": 396,
+          "share": 0.8308080808080808
+        },
+        "comb": {
+          "matched": 91,
+          "total": 106,
+          "share": 0.8584905660377359
+        },
+        "checkbox": {
+          "matched": 121,
+          "total": 129,
+          "share": 0.937984496124031
+        }
+      },
+      "matched_pairs_predicted_to_labelled_kind": {
+        "checkbox->checkbox": 121,
+        "comb->comb": 91,
+        "text->text": 329
+      }
+    }
+  },
+  "anchoring_check": {
+    "from_scratch": {
+      "writing_spot": {
+        "tp": 37,
+        "fp": 11,
+        "fn": 31,
+        "precision": 0.7708333333333334,
+        "recall": 0.5441176470588235
+      },
+      "iou_0.5": {
+        "tp": 21,
+        "fp": 27,
+        "fn": 47,
+        "precision": 0.4375,
+        "recall": 0.3088235294117647
+      },
+      "iou_0.3": {
+        "tp": 36,
+        "fp": 12,
+        "fn": 32,
+        "precision": 0.75,
+        "recall": 0.5294117647058824
+      },
+      "macro": {
+        "writing_spot": {
+          "precision": 0.7464285714285714,
+          "recall": 0.5604166666666667,
+          "forms_precision": 2,
+          "forms_recall": 2
+        },
+        "iou_0.5": {
+          "precision": 0.4464285714285714,
+          "recall": 0.3645833333333333,
+          "forms_precision": 2,
+          "forms_recall": 2
+        }
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 37,
+            "total": 64,
+            "share": 0.578125
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 4,
+            "share": 0.0
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 37,
+            "total": 48,
+            "share": 0.7708333333333334
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 37
+        }
+      }
+    },
+    "prefilled": {
+      "writing_spot": {
+        "tp": 504,
+        "fp": 79,
+        "fn": 126,
+        "precision": 0.8644939965694682,
+        "recall": 0.8
+      },
+      "iou_0.5": {
+        "tp": 501,
+        "fp": 82,
+        "fn": 129,
+        "precision": 0.8593481989708405,
+        "recall": 0.7952380952380952
+      },
+      "iou_0.3": {
+        "tp": 512,
+        "fp": 71,
+        "fn": 118,
+        "precision": 0.8782161234991424,
+        "recall": 0.8126984126984127
+      },
+      "macro": {
+        "writing_spot": {
+          "precision": 0.9080867101024478,
+          "recall": 0.8156742741194184,
+          "forms_precision": 9,
+          "forms_recall": 9
+        },
+        "iou_0.5": {
+          "precision": 0.9023923941398616,
+          "recall": 0.811123303245632,
+          "forms_precision": 9,
+          "forms_recall": 9
+        }
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 292,
+            "total": 360,
+            "share": 0.8111111111111111
+          },
+          "comb": {
+            "matched": 91,
+            "total": 143,
+            "share": 0.6363636363636364
+          },
+          "checkbox": {
+            "matched": 121,
+            "total": 127,
+            "share": 0.952755905511811
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 292,
+            "total": 348,
+            "share": 0.8390804597701149
+          },
+          "comb": {
+            "matched": 91,
+            "total": 106,
+            "share": 0.8584905660377359
+          },
+          "checkbox": {
+            "matched": 121,
+            "total": 129,
+            "share": 0.937984496124031
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "checkbox->checkbox": 121,
+          "comb->comb": 91,
+          "text->text": 292
+        }
+      }
+    }
+  },
+  "forms": [
+    {
+      "form": "01_sbi_account_opening_form",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1,
+        4,
+        5,
+        8,
+        9
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [
+        2,
+        3,
+        6,
+        7
+      ],
+      "writing_spot": {
+        "tp": 212,
+        "fp": 31,
+        "fn": 61,
+        "precision": 0.8724279835390947,
+        "recall": 0.7765567765567766
+      },
+      "iou_0.5": {
+        "tp": 212,
+        "fp": 31,
+        "fn": 61,
+        "precision": 0.8724279835390947,
+        "recall": 0.7765567765567766
+      },
+      "iou_0.3": {
+        "tp": 220,
+        "fp": 23,
+        "fn": 53,
+        "precision": 0.9053497942386831,
+        "recall": 0.8058608058608059
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 49,
+            "total": 68,
+            "share": 0.7205882352941176
+          },
+          "comb": {
+            "matched": 66,
+            "total": 108,
+            "share": 0.6111111111111112
+          },
+          "checkbox": {
+            "matched": 97,
+            "total": 97,
+            "share": 1.0
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 49,
+            "total": 57,
+            "share": 0.8596491228070176
+          },
+          "comb": {
+            "matched": 66,
+            "total": 81,
+            "share": 0.8148148148148148
+          },
+          "checkbox": {
+            "matched": 97,
+            "total": 105,
+            "share": 0.9238095238095239
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "checkbox->checkbox": 97,
+          "comb->comb": 66,
+          "text->text": 49
+        }
+      }
+    },
+    {
+      "form": "02_sbi_kyc_annexure_a",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 31,
+        "fp": 11,
+        "fn": 10,
+        "precision": 0.7380952380952381,
+        "recall": 0.7560975609756098
+      },
+      "iou_0.5": {
+        "tp": 31,
+        "fp": 11,
+        "fn": 10,
+        "precision": 0.7380952380952381,
+        "recall": 0.7560975609756098
+      },
+      "iou_0.3": {
+        "tp": 31,
+        "fp": 11,
+        "fn": 10,
+        "precision": 0.7380952380952381,
+        "recall": 0.7560975609756098
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 31,
+            "total": 34,
+            "share": 0.9117647058823529
+          },
+          "comb": {
+            "matched": 0,
+            "total": 1,
+            "share": 0.0
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 6,
+            "share": 0.0
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 31,
+            "total": 42,
+            "share": 0.7380952380952381
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 31
+        }
+      }
+    },
+    {
+      "form": "03_sbi_kyc_annexure_b",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        2
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [
+        1
+      ],
+      "writing_spot": {
+        "tp": 56,
+        "fp": 14,
+        "fn": 9,
+        "precision": 0.8,
+        "recall": 0.8615384615384616
+      },
+      "iou_0.5": {
+        "tp": 56,
+        "fp": 14,
+        "fn": 9,
+        "precision": 0.8,
+        "recall": 0.8615384615384616
+      },
+      "iou_0.3": {
+        "tp": 56,
+        "fp": 14,
+        "fn": 9,
+        "precision": 0.8,
+        "recall": 0.8615384615384616
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 7,
+            "total": 9,
+            "share": 0.7777777777777778
+          },
+          "comb": {
+            "matched": 25,
+            "total": 32,
+            "share": 0.78125
+          },
+          "checkbox": {
+            "matched": 24,
+            "total": 24,
+            "share": 1.0
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 7,
+            "total": 21,
+            "share": 0.3333333333333333
+          },
+          "comb": {
+            "matched": 25,
+            "total": 25,
+            "share": 1.0
+          },
+          "checkbox": {
+            "matched": 24,
+            "total": 24,
+            "share": 1.0
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "checkbox->checkbox": 24,
+          "comb->comb": 25,
+          "text->text": 7
+        }
+      }
+    },
+    {
+      "form": "06_union_bank_nomination_form",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1,
+        2
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 27,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.9642857142857143
+      },
+      "iou_0.5": {
+        "tp": 27,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.9642857142857143
+      },
+      "iou_0.3": {
+        "tp": 27,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.9642857142857143
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 27,
+            "total": 28,
+            "share": 0.9642857142857143
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 27,
+            "total": 27,
+            "share": 1.0
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 27
+        }
+      }
+    },
+    {
+      "form": "21_india_post_pmjjby_claim_form",
+      "prefilled_from": null,
+      "scored_pages": [
+        1,
+        2
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 25,
+        "fp": 3,
+        "fn": 23,
+        "precision": 0.8928571428571429,
+        "recall": 0.5208333333333334
+      },
+      "iou_0.5": {
+        "tp": 11,
+        "fp": 17,
+        "fn": 37,
+        "precision": 0.39285714285714285,
+        "recall": 0.22916666666666666
+      },
+      "iou_0.3": {
+        "tp": 24,
+        "fp": 4,
+        "fn": 24,
+        "precision": 0.8571428571428571,
+        "recall": 0.5
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 25,
+            "total": 48,
+            "share": 0.5208333333333334
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 25,
+            "total": 28,
+            "share": 0.8928571428571429
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 25
+        }
+      }
+    },
+    {
+      "form": "23_lic_claim_form_a_3783",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1,
+        2,
+        3
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 44,
+        "fp": 3,
+        "fn": 20,
+        "precision": 0.9361702127659575,
+        "recall": 0.6875
+      },
+      "iou_0.5": {
+        "tp": 42,
+        "fp": 5,
+        "fn": 22,
+        "precision": 0.8936170212765957,
+        "recall": 0.65625
+      },
+      "iou_0.3": {
+        "tp": 44,
+        "fp": 3,
+        "fn": 20,
+        "precision": 0.9361702127659575,
+        "recall": 0.6875
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 44,
+            "total": 64,
+            "share": 0.6875
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 44,
+            "total": 47,
+            "share": 0.9361702127659575
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 44
+        }
+      }
+    },
+    {
+      "form": "25_cdlsiet_btech_admission_form",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 95,
+        "fp": 20,
+        "fn": 8,
+        "precision": 0.8260869565217391,
+        "recall": 0.9223300970873787
+      },
+      "iou_0.5": {
+        "tp": 94,
+        "fp": 21,
+        "fn": 9,
+        "precision": 0.8173913043478261,
+        "recall": 0.912621359223301
+      },
+      "iou_0.3": {
+        "tp": 95,
+        "fp": 20,
+        "fn": 8,
+        "precision": 0.8260869565217391,
+        "recall": 0.9223300970873787
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 95,
+            "total": 101,
+            "share": 0.9405940594059405
+          },
+          "comb": {
+            "matched": 0,
+            "total": 2,
+            "share": 0.0
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 95,
+            "total": 115,
+            "share": 0.8260869565217391
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 95
+        }
+      }
+    },
+    {
+      "form": "30_allahabad_univ_enrollment_form",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 15,
+        "fp": 0,
+        "fn": 16,
+        "precision": 1.0,
+        "recall": 0.4838709677419355
+      },
+      "iou_0.5": {
+        "tp": 15,
+        "fp": 0,
+        "fn": 16,
+        "precision": 1.0,
+        "recall": 0.4838709677419355
+      },
+      "iou_0.3": {
+        "tp": 15,
+        "fp": 0,
+        "fn": 16,
+        "precision": 1.0,
+        "recall": 0.4838709677419355
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 15,
+            "total": 31,
+            "share": 0.4838709677419355
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 15,
+            "total": 15,
+            "share": 1.0
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 15
+        }
+      }
+    },
+    {
+      "form": "32_niftem_student_declaration_form",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 16,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "iou_0.5": {
+        "tp": 16,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "iou_0.3": {
+        "tp": 16,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 16,
+            "total": 16,
+            "share": 1.0
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 16,
+            "total": 16,
+            "share": 1.0
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 16
+        }
+      }
+    },
+    {
+      "form": "39_cebs_joining_report",
+      "prefilled_from": "flat@5fe80d0",
+      "scored_pages": [
+        1
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 8,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.8888888888888888
+      },
+      "iou_0.5": {
+        "tp": 8,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.8888888888888888
+      },
+      "iou_0.3": {
+        "tp": 8,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.8888888888888888
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 8,
+            "total": 9,
+            "share": 0.8888888888888888
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 8,
+            "total": 8,
+            "share": 1.0
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 8
+        }
+      }
+    },
+    {
+      "form": "41_india_post_pli_name_change_form",
+      "prefilled_from": null,
+      "scored_pages": [
+        1
+      ],
+      "ocr_pages_not_scored": [],
+      "unlabelled_pages": [],
+      "labelled_outside_subset_not_scored": [],
+      "writing_spot": {
+        "tp": 12,
+        "fp": 8,
+        "fn": 8,
+        "precision": 0.6,
+        "recall": 0.6
+      },
+      "iou_0.5": {
+        "tp": 10,
+        "fp": 10,
+        "fn": 10,
+        "precision": 0.5,
+        "recall": 0.5
+      },
+      "iou_0.3": {
+        "tp": 12,
+        "fp": 8,
+        "fn": 8,
+        "precision": 0.6,
+        "recall": 0.6
+      },
+      "kinds": {
+        "recall_by_labelled_kind": {
+          "text": {
+            "matched": 12,
+            "total": 16,
+            "share": 0.75
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 4,
+            "share": 0.0
+          }
+        },
+        "precision_by_predicted_kind": {
+          "text": {
+            "matched": 12,
+            "total": 20,
+            "share": 0.6
+          },
+          "comb": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          },
+          "checkbox": {
+            "matched": 0,
+            "total": 0,
+            "share": null
+          }
+        },
+        "matched_pairs_predicted_to_labelled_kind": {
+          "text->text": 12
+        }
+      }
+    }
+  ],
+  "forms_without_labels": [],
+  "forms_without_ok_pages": [
+    "37_aees_joining_report",
+    "38_vnsgu_joining_report",
+    "42_allahabad_univ_diploma_admission_form"
+  ],
+  "dataset_notes": "Known gaps in the test split (docs/reality_check.md, human decision 2026-10-11): the test split has no Hindi-only form, and no bilingual form with a clean Unicode Hindi text layer. Planned follow-up: add one Hindi-only form and one bilingual form with a clean text layer to test later; dev stays unchanged. This report uses the dev split only."
+}
