@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-examples label-images eval-detect
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -75,6 +75,11 @@ label-semantic:
 label-semantic-merge:
 	@test -n "$(EXPORT)" || (echo "usage: make label-semantic-merge EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
 	$(EVAL_PY) eval.labelling.semantic merge "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
+
+## Write semantic reference labels (Claude-written, decision P3-D6) into eval/labels_semantic/
+label-semantic-reference:
+	@test -n "$(EXPORT)" || (echo "usage: make label-semantic-reference EXPORT=path/to/export.json BY='who labelled'" && exit 2)
+	$(EVAL_PY) eval.labelling.semantic reference "$(EXPORT)" --by "$(BY)" $(if $(OVERWRITE),--overwrite,)
 
 ## Render the README example images from the synthetic fixtures (committed)
 label-images:

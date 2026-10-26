@@ -13,6 +13,7 @@ or asks for it, after labelling; label files stay human ground truth (CLAUDE.md 
 """
 
 import argparse
+import hashlib
 import html
 import json
 import sys
@@ -27,10 +28,13 @@ from app.ir.semantic_types import SEMANTIC_TYPES, SemanticType
 from eval.labelling.schema import (
     DATASET_DIR,
     LABELS_DIR,
+    REFERENCE_DIR,
     LabelField,
     LabelFile,
     LabelKind,
+    SemanticReference,
     dump_label_file,
+    dump_reference,
     load_label_file,
 )
 from eval.labelling.subset import DEV_SUBSET, PageSelection, subset_pages
@@ -129,26 +133,23 @@ class MergeError(ValueError):
     pass
 
 
-def merge(
-    export: dict[str, Any], labels_dir: Path, *, overwrite: bool
-) -> dict[str, tuple[int, int]]:
-    """Write the exported semantic types into the label files. Returns form -> (set, changed)."""
+def _checked(
+    export: dict[str, Any], labels_dir: Path
+) -> dict[str, tuple[LabelFile, dict[str, SemanticType]]]:
+    """The export's semantic types per form, checked against the label files' boxes."""
     if export.get("schema") != EXPORT_SCHEMA:
         raise MergeError(f"not a semantic-label export (expected schema {EXPORT_SCHEMA})")
     wanted: dict[str, dict[str, dict[str, Any]]] = {}
     for entry in export.get("labels", []):
         wanted.setdefault(entry["form"], {})[entry["id"]] = entry
-
-    updated: dict[str, LabelFile] = {}
-    summary: dict[str, tuple[int, int]] = {}
+    checked: dict[str, tuple[LabelFile, dict[str, SemanticType]]] = {}
     for form, entries in sorted(wanted.items()):
         path = labels_dir / f"{form}.json"
         if not path.exists():
             raise MergeError(f"{form}: no label file")
         label_file = load_label_file(path)
         fields = {f.id: f for f in label_file.fields}
-        changed = 0
-        new_fields = list(label_file.fields)
+        types: dict[str, SemanticType] = {}
         for field_id, entry in entries.items():
             field = fields.get(field_id)
             if field is None:
@@ -159,22 +160,64 @@ def merge(
             if field.page != entry["page"] or not same_box or field.kind is not LabelKind.TEXT:
                 raise MergeError(f"{form} {field_id}: the label file changed since the sheet")
             try:
-                semantic_type = SemanticType(entry["semantic_type"])
+                types[field_id] = SemanticType(entry["semantic_type"])
             except ValueError:
                 raise MergeError(f"{form} {field_id}: unknown semantic type") from None
+        checked[form] = (label_file, types)
+    return checked
+
+
+def merge(
+    export: dict[str, Any], labels_dir: Path, *, overwrite: bool
+) -> dict[str, tuple[int, int]]:
+    """Write the exported semantic types into the label files. Returns form -> (set, changed)."""
+    updated: dict[str, LabelFile] = {}
+    summary: dict[str, tuple[int, int]] = {}
+    for form, (label_file, types) in _checked(export, labels_dir).items():
+        changed = 0
+        new_fields = []
+        for field in label_file.fields:
+            semantic_type = types.get(field.id)
+            if semantic_type is None:
+                new_fields.append(field)
+                continue
             if field.semantic_type not in (None, semantic_type) and not overwrite:
-                raise MergeError(f"{form} {field_id}: already set; use --overwrite to replace it")
-            if field.semantic_type is not semantic_type:
-                changed += 1
-            index = new_fields.index(field)
-            new_fields[index] = field.model_copy(update={"semantic_type": semantic_type})
+                raise MergeError(f"{form} {field.id}: already set; use --overwrite to replace it")
+            changed += field.semantic_type is not semantic_type
+            new_fields.append(field.model_copy(update={"semantic_type": semantic_type}))
         updated[form] = label_file.model_copy(update={"fields": new_fields})
-        summary[form] = (len(entries), changed)
+        summary[form] = (len(types), changed)
 
     for form, label_file in updated.items():  # write only once every form has passed the checks
         LabelFile.model_validate(label_file.model_dump())
         (labels_dir / f"{form}.json").write_text(dump_label_file(label_file), encoding="utf-8")
     return summary
+
+
+def write_reference(
+    export: dict[str, Any],
+    labels_dir: Path,
+    out_dir: Path,
+    *,
+    labelled_by: str,
+    overwrite: bool = False,
+) -> dict[str, int]:
+    """Write the export as semantic reference files (decision P3-D6); label files untouched.
+
+    Reference files are frozen once written: an existing one is replaced only with `overwrite`.
+    """
+    references: dict[str, SemanticReference] = {}
+    for form, (_, types) in _checked(export, labels_dir).items():
+        if (out_dir / f"{form}.json").exists() and not overwrite:
+            raise MergeError(f"{form}: reference labels exist and are frozen")
+        sha = hashlib.sha256((labels_dir / f"{form}.json").read_bytes()).hexdigest()
+        references[form] = SemanticReference(
+            form=form, label_file_sha256=sha, labelled_by=labelled_by, labels=types
+        )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for form, reference in references.items():
+        (out_dir / f"{form}.json").write_text(dump_reference(reference), encoding="utf-8")
+    return {form: len(r.labels) for form, r in references.items()}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -184,6 +227,10 @@ def main(argv: list[str] | None = None) -> int:
     merge_cmd = commands.add_parser("merge", help="merge an export into eval/labels/")
     merge_cmd.add_argument("export", type=Path)
     merge_cmd.add_argument("--overwrite", action="store_true")
+    ref_cmd = commands.add_parser("reference", help="write reference labels (P3-D6)")
+    ref_cmd.add_argument("export", type=Path)
+    ref_cmd.add_argument("--by", required=True, help="who labelled, e.g. the model and how")
+    ref_cmd.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
 
     if args.command == "sheet":
@@ -193,9 +240,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         export = json.loads(args.export.expanduser().read_text(encoding="utf-8"))
+        if args.command == "reference":
+            counts = write_reference(
+                export, LABELS_DIR, REFERENCE_DIR, labelled_by=args.by, overwrite=args.overwrite
+            )
+            for form, count in counts.items():
+                print(f"{form}: {count} reference labels")  # noqa: T201 - CLI output
+            return 0
         summary = merge(export, LABELS_DIR, overwrite=args.overwrite)
     except (MergeError, OSError, ValueError, KeyError) as exc:
-        print(f"merge refused: {exc}", file=sys.stderr)  # noqa: T201 - CLI output
+        print(f"{args.command} refused: {exc}", file=sys.stderr)  # noqa: T201 - CLI output
         return 1
     for form, (count, changed) in summary.items():
         print(f"{form}: {count} semantic types, {changed} changed")  # noqa: T201 - CLI output

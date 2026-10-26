@@ -3,6 +3,7 @@
 No real form and no real label file is read or written.
 """
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ from eval.labelling.schema import (
     LabelPage,
     dump_label_file,
     load_label_file,
+    load_reference,
 )
 from tests.fixtures import pdfs
 
@@ -168,3 +170,49 @@ def test_merge_does_not_replace_a_type_without_overwrite(folders: tuple[Path, Pa
 def test_merge_refuses_other_exports(folders: tuple[Path, Path]) -> None:
     with pytest.raises(semantic.MergeError, match="not a semantic-label export"):
         semantic.merge({"labels": []}, folders[1], overwrite=False)
+
+
+# --- reference labels (P3-D6) -------------------------------------------------------------------
+
+
+def test_reference_labels_go_to_their_own_files_and_pin_the_label_file(
+    folders: tuple[Path, Path], tmp_path: Path
+) -> None:
+    _, labels = folders
+    before = (labels / f"{FORM}.json").read_bytes()
+    out = tmp_path / "labels_semantic"
+
+    counts = semantic.write_reference(
+        _export(_entry("p0_l000", 100, "full_name"), _entry("p0_l003", 400, "pan")),
+        labels,
+        out,
+        labelled_by="test labeller",
+    )
+
+    assert counts == {FORM: 2}
+    assert (labels / f"{FORM}.json").read_bytes() == before  # the human's file is untouched
+    reference = load_reference(out / f"{FORM}.json")
+    assert reference.labels == {"p0_l000": SemanticType.FULL_NAME, "p0_l003": SemanticType.PAN}
+    assert reference.labelled_by == "test labeller"
+    assert reference.label_file_sha256 == hashlib.sha256(before).hexdigest()
+
+
+def test_reference_labels_are_frozen(folders: tuple[Path, Path], tmp_path: Path) -> None:
+    _, labels = folders
+    out = tmp_path / "labels_semantic"
+    export = _export(_entry("p0_l000", 100, "full_name"))
+    semantic.write_reference(export, labels, out, labelled_by="test")
+
+    with pytest.raises(semantic.MergeError, match="frozen"):
+        semantic.write_reference(export, labels, out, labelled_by="test")
+    semantic.write_reference(export, labels, out, labelled_by="test", overwrite=True)
+
+
+def test_reference_labels_check_the_boxes_like_the_merge(
+    folders: tuple[Path, Path], tmp_path: Path
+) -> None:
+    with pytest.raises(semantic.MergeError, match="changed since the sheet"):
+        semantic.write_reference(
+            _export(_entry("p0_l000", 101, "full_name")), folders[1], tmp_path, labelled_by="test"
+        )
+    assert list(tmp_path.glob("*.json")) == []
