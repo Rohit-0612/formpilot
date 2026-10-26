@@ -95,6 +95,8 @@ eval-detect:
 	$(EVAL_PY) eval.detection --split dev $(if $(TAG),--tag $(TAG),)
 
 ## Understanding eval on the dev split (Phase 3): MODE=hybrid|llm|rules; replays the recorded model
-## answers by default, RECORD=1 asks the model (Ollama) and records them, LIVE=1 skips the cache
+## answers by default, RECORD=1 asks the model and records them, LIVE=1 skips the cache.
+## PROVIDER=ollama|groq and MODEL=<name> pick the model (default Ollama qwen3:8b); Groq reads
+## GROQ_API_KEY from .env
 eval:
-	$(EVAL_PY) eval.run_eval --split dev --mode $(or $(MODE),hybrid) --cache $(if $(RECORD),record,$(if $(LIVE),off,replay)) $(if $(TAG),--tag $(TAG),) $(if $(BASELINE),--write-baseline,)
+	$(EVAL_PY) eval.run_eval --split dev --mode $(or $(MODE),hybrid) $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),) --cache $(if $(RECORD),record,$(if $(LIVE),off,replay)) $(if $(TAG),--tag $(TAG),) $(if $(BASELINE),--write-baseline,)

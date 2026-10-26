@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from app.config import GroqSettings
 from app.llm.cache import CachedProvider
 from app.llm.fake import FakeProvider
 from app.llm.provider import LLMRequest
@@ -99,6 +100,8 @@ def test_hybrid_scores_matched_fields_against_the_reference(
 
     assert m["overall"]["all"] == {"correct": 4, "total": 5, "accuracy": 0.8}  # type: ignore[index]
     assert m["overall"]["fillable"] == {"correct": 3, "total": 4, "accuracy": 0.75}  # type: ignore[index]
+    # 4 fields got a fillable type (Remarks is `other`), 3 of them the right one
+    assert m["overall"]["fillable_precision"] == {"correct": 3, "total": 4, "accuracy": 0.75}  # type: ignore[index]
     assert m["not_detected"] == 1
     assert m["by_method"]["llm"] == {"correct": 1, "total": 1, "accuracy": 1.0}  # type: ignore[index]
     assert m["confusions"] == [
@@ -159,6 +162,7 @@ def test_reports_say_the_reference_labels_are_claude_written(
     assert json.loads(json_path.read_text())["reference_labels"] == run_eval.DISCLOSURE
     assert run_eval.DISCLOSURE in md_path.read_text()
     assert "| All forms | 80.0 % (4/5) | 75.0 % (3/4) |" in md_path.read_text()
+    assert "Precision of predicted fillable types: 75.0 % (3/4)." in md_path.read_text()
 
 
 def test_command_line_runs_rules_mode_and_writes_reports(
@@ -175,3 +179,16 @@ def test_command_line_runs_rules_mode_and_writes_reports(
 
     assert run_eval.main(["--mode", "rules", "--tag", "cli"]) == 0
     assert len(list((tmp_path / "reports").glob("phase3-understanding-dev-rules-cli-*.json"))) == 1
+
+
+def test_groq_replay_needs_no_key_and_never_calls_groq(
+    folders: tuple[Path, Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setattr(run_eval, "GroqSettings", lambda: GroqSettings(_env_file=None))
+    monkeypatch.setattr(run_eval, "CACHE_DIR", tmp_path / "cache")
+    provider = run_eval._provider("groq", "openai/gpt-oss-120b", "replay", "unused")
+
+    assert isinstance(provider, CachedProvider) and provider.is_remote
+    with pytest.raises(run_eval.EvalError, match="not in the cache"):
+        _run(folders, "hybrid", provider)  # a miss is refused; no HTTP call is possible

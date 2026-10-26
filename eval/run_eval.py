@@ -2,6 +2,7 @@
 
     make eval MODE=hybrid            # replay the recorded model answers (default)
     make eval MODE=hybrid RECORD=1   # ask the model (Ollama) and record its answers
+    make eval PROVIDER=groq MODEL=openai/gpt-oss-120b RECORD=1   # Groq; needs GROQ_API_KEY
 
 For every PDF in eval/dataset/<split>/ with a label file in eval/labels/ and semantic reference
 labels in eval/labels_semantic/:
@@ -39,11 +40,13 @@ from typing import Literal
 
 import pymupdf
 
+from app.config import GroqSettings
 from app.frontends import flat
 from app.frontends.detect import detect
 from app.ir.models import BBox, FormIR, TextLayer
 from app.ir.semantic_types import SemanticType
 from app.llm.cache import CachedProvider
+from app.llm.groq import GroqProvider
 from app.llm.ollama import OllamaProvider
 from app.llm.provider import LLMError, LLMProvider, LLMRequest
 from app.logging import configure_logging
@@ -251,7 +254,14 @@ def _accuracy(items: list[Compared]) -> dict[str, float | int | None]:
 def metrics(result: EvalResult) -> dict[str, object]:
     def block(items: list[Compared]) -> dict[str, object]:
         fillable = [c for c in items if c.reference not in NOT_FILLABLE]
-        return {"all": _accuracy(items), "fillable": _accuracy(fillable)}
+        # Of the fields given a fillable type, how many got the right one: a wrong fillable type
+        # puts a profile value in the wrong place (M2 fills only these).
+        predicted_fillable = [c for c in items if c.predicted not in NOT_FILLABLE]
+        return {
+            "all": _accuracy(items),
+            "fillable": _accuracy(fillable),
+            "fillable_precision": _accuracy(predicted_fillable),
+        }
 
     every = result.compared()
     per_form = {f.form: block(f.compared) for f in result.forms}
@@ -334,6 +344,8 @@ def report_markdown(result: EvalResult) -> str:
         lines.append(f"| {name} | {_acc(block['all'])} | {_acc(block['fillable'])} |")  # type: ignore[index]
     lines += [
         "",
+        f"Precision of predicted fillable types: {_acc(overall['fillable_precision'])}.",  # type: ignore[index]
+        "",
         f"Macro over forms (fillable): {_pct(m['macro_fillable'])}. Predicted `unknown`: "
         f"{m['predicted_unknown']}. Reference fields not found by the detector: "
         f"{m['not_detected']}.",
@@ -412,7 +424,12 @@ def write_baseline(result: EvalResult, report: Path, path: Path) -> None:
 def _provider(name: str, model: str, cache: CacheMode, base_url: str) -> LLMProvider | None:
     if name == "none":
         return None
-    inner = OllamaProvider(base_url, model, timeout_seconds=600)
+    inner: LLMProvider
+    if name == "groq":
+        # GROQ_API_KEY from the environment or .env; a replay sends nothing and needs no key.
+        inner = GroqProvider(GroqSettings().groq_api_key, model)
+    else:
+        inner = OllamaProvider(base_url, model, timeout_seconds=600)
     return inner if cache == "off" else CachedProvider(inner, CACHE_DIR, cache)
 
 
@@ -420,7 +437,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Understanding eval (Phase 3).")
     parser.add_argument("--split", choices=["dev"], default="dev")
     parser.add_argument("--mode", choices=["rules", "llm", "hybrid"], default="hybrid")
-    parser.add_argument("--provider", choices=["ollama", "none"], default="ollama")
+    parser.add_argument("--provider", choices=["ollama", "groq", "none"], default="ollama")
     parser.add_argument("--model", default="qwen3:8b")
     parser.add_argument("--ollama-url", default="http://localhost:11434")
     parser.add_argument("--cache", choices=["record", "replay", "off"], default="replay")
