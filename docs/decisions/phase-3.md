@@ -156,5 +156,32 @@ different, much larger model. It is not accuracy against human ground truth.
 `other` everywhere would reach 52 %, so the eval also reports accuracy on the fields whose type
 is neither `other` nor `unknown` (261), and per type.
 
+## Pre-tuning eval (2026-10-26; kept unchanged as history)
+
+`make eval` on the dev split at `ee3c22e`: the rules and prompt as frozen in `c7c7bd9`, the
+reference labels of P3-D6, and the model `qwen3:8b` through local Ollama. **Reference labels are
+Claude-written, not human** (P3-D6); accuracy is agreement with them.
+- **Compared:** 524 fields, the reference fields that the detector found (43 of the 567 were not
+  detected).
+- **Fillable:** reference type neither `other` nor `unknown` (241 fields).
+
+| Mode | Report | All | Fillable | Fillable, from scratch | Fillable, pre-filled | Macro (fillable) | Predicted `unknown` |
+|---|---|---|---|---|---|---|---|
+| Rules only | `…-rules-pre-tuning-20261026-ee3c22e` | 17.4 % (91/524) | 33.6 % (81/241) | 50.0 % (15/30) | 31.3 % (66/211) | 35.1 % | 390 |
+| Hybrid (product) | `…-hybrid-pre-tuning-20261026-ee3c22e` | 57.4 % (301/524) | 57.3 % (138/241) | 56.7 % (17/30) | 57.3 % (121/211) | 53.7 % | 21 |
+| LLM only | `…-llm-pre-tuning-20261026-ee3c22e` | 57.6 % (302/524) | 55.2 % (133/241) | 60.0 % (18/30) | 54.5 % (115/211) | 64.3 % | 43 |
+
+**Hybrid by method:** rules typed 134 fields (60.4 % correct), the LLM 390 (56.4 %). One LLM
+batch was retried (#1 page 4); none failed.
+
+**Replay check:** both model modes replayed from `eval/llm_cache/understand/` (83 recorded
+answers) with the provider pointed at a dead address. The metrics were identical to the
+recorded runs.
+
+`eval/baseline.json` holds the hybrid run.
+
+**Latency:** the hybrid recording took 66 minutes and the llm one 81, on the development laptop
+under memory pressure. Not a product latency measurement: not measured yet.
+
 ## In my own words
 
