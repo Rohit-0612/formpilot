@@ -56,3 +56,7 @@ class LLMProvider(ABC):
 
     @abstractmethod
     def _complete(self, request: LLMRequest) -> str: ...
+
+    def close(self) -> None:
+        """Release connections, if any."""
+        return None

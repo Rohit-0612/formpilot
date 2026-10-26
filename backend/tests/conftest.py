@@ -39,4 +39,5 @@ def settings(tmp_path: Path) -> Settings:
         storage_root=tmp_path / "storage",
         cors_origins=["http://localhost:3000"],
         log_json=True,
+        llm_provider="none",  # tests never call a real model (invariant 5)
     )

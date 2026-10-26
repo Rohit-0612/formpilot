@@ -9,7 +9,8 @@
 3. Never filled (decision P3-D1): signature fields and fields under an office-use heading get a
    `no_fill_reason` and status SKIPPED; fields below the review threshold get NEEDS_REVIEW.
 
-Fields whose semantic method is already set (an AcroForm signature widget) are left alone.
+Fields whose semantic method is already set (an AcroForm signature widget) are left alone. With
+a deadline in the context, batches due after it are skipped (their fields stay unknown).
 Trace events name types and methods, never values.
 """
 
@@ -291,6 +292,9 @@ def run(ir: FormIR, ctx: PassContext) -> FormIR:
         for page, page_fields in sorted(by_page.items()):
             for start in range(0, len(page_fields), LLM_BATCH):
                 batch = page_fields[start : start + LLM_BATCH]
+                if ctx.deadline is not None and ctx.clock() >= ctx.deadline:
+                    trace.append(_event(None, f"page {page}: LLM time budget used up", ctx))
+                    continue
                 found, outcome = _classify_batch(batch, ctx.provider)
                 if outcome != "ok":
                     trace.append(_event(None, f"page {page}: LLM batch {outcome}", ctx))

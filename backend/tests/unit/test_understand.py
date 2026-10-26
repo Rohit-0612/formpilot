@@ -322,3 +322,15 @@ def test_prompt_lists_every_type_and_the_schema_allows_only_them() -> None:
     assert "{types}" not in prompt
     assert all(f"- {t.value}:" in prompt for t in SemanticType)
     assert set(enum) == {t.value for t in SemanticType}
+
+
+def test_batches_after_the_deadline_are_skipped_and_traced() -> None:
+    """The analyze job's time budget: no LLM call once the deadline has passed."""
+    provider = FakeProvider([])
+    ctx = _ctx(provider, deadline=AT)  # the clock already reads the deadline
+
+    out = understand.run(_ir(_field("p0_f000", "Mobile No."), _field("p0_f001", "Policy No.")), ctx)
+
+    assert provider.requests == []
+    assert [f.semantic_type for f in out.fields] == [T.PHONE_MOBILE, T.UNKNOWN]
+    assert "page 0: LLM time budget used up" in [e.change for e in out.trace]

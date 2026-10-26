@@ -62,3 +62,6 @@ class OllamaProvider(LLMProvider):
         if not isinstance(content, str) or not content.strip():
             raise LLMError("ollama: empty response")
         return content
+
+    def close(self) -> None:
+        self._client.close()
