@@ -159,6 +159,7 @@ class Field(BaseModel):
     value_source: ValueSource = ValueSource.NONE
     validations: list[ValidationResult] = []
     status: FieldStatus = FieldStatus.DETECTED
+    no_fill_reason: Literal["office_use", "signature"] | None = None  # never filled (P3-D1)
 
 class TraceEvent(BaseModel):
     pass_name: str; field_id: str | None; change: str; at: datetime

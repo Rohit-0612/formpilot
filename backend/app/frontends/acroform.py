@@ -7,7 +7,9 @@ on synthetic fixtures only (docs/decisions/phase-2.md, Step 9):
 - a radio group -> one RADIO field per page: options are the buttons' on-states with their boxes
   and the text to their right; the field box is the union of the buttons;
 - combo and list boxes -> CHOICE, options from /Opt (export value, display text);
-- push buttons, signature fields and unknown widget types are skipped with a trace event.
+- signature widgets -> TEXT, like flat signature boxes, with `semantic_type` signature (known from
+  the widget type) and `no_fill_reason` "signature": detected, never filled (decision P3-D1);
+- push buttons and unknown widget types are skipped with a trace event.
 
 Labels: the tooltip (/TU); without one, the text the flat frontend would take (left, else
 above; tick boxes right first), only on pages whose text layer is OK. Context: the nearest
@@ -26,8 +28,17 @@ import pymupdf
 from app.frontends import flat
 from app.frontends.detect import Detection
 from app.ir.models import BBox, Field, FieldKind, FormIR, Option, TextLayer, TraceEvent
+from app.ir.semantic_types import SemanticType
 
 STAGE = "frontend.acroform"
+
+# A signature widget's type says what it is: no rule or LLM is needed (decision P3-D1).
+_SIGNATURE = {
+    "semantic_type": SemanticType.SIGNATURE,
+    "semantic_confidence": 1.0,
+    "semantic_method": "rule",
+    "no_fill_reason": "signature",
+}
 
 _KINDS = {
     pymupdf.PDF_WIDGET_TYPE_TEXT: FieldKind.TEXT,
@@ -50,6 +61,7 @@ class _Spec:
     max_chars: int | None = None
     options: list[Option] = field(default_factory=list)
     widget_type: str = ""
+    signature: bool = False
 
 
 def _union(boxes: list[BBox]) -> BBox:
@@ -99,7 +111,8 @@ def _page_specs(page: pymupdf.Page, page_no: int, text_ok: bool) -> tuple[list[_
     # Radio buttons of one group share the group's field name (inherited from the parent).
     radio_groups: dict[str | int, list[pymupdf.Widget]] = defaultdict(list)
     for widget, rect in zip(widgets, rects, strict=True):
-        kind = _KINDS.get(widget.field_type)
+        signature = widget.field_type == pymupdf.PDF_WIDGET_TYPE_SIGNATURE
+        kind = FieldKind.TEXT if signature else _KINDS.get(widget.field_type)
         if kind is None:
             skipped.append(f"page {page_no}: skipped a {widget.field_type_string} widget")
             continue
@@ -119,9 +132,12 @@ def _page_specs(page: pymupdf.Page, page_no: int, text_ok: bool) -> tuple[list[_
                 bbox=bbox,
                 label=label(widget, rect, kind),
                 context=context(rect),
-                max_chars=(widget.text_maxlen or None) if kind is FieldKind.TEXT else None,
+                max_chars=(widget.text_maxlen or None)
+                if kind is FieldKind.TEXT and not signature
+                else None,
                 options=options,
                 widget_type=widget.field_type_string,
+                signature=signature,
             )
         )
 
@@ -182,6 +198,7 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     bbox=bbox,
                     max_chars=spec.max_chars,
                     options=spec.options,
+                    **_SIGNATURE if spec.signature else {},
                 )
             )
             trace.append(

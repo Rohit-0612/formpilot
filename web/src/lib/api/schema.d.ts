@@ -258,6 +258,8 @@ export interface components {
             validations?: components["schemas"]["ValidationResult"][];
             /** @default detected */
             status: components["schemas"]["FieldStatus"];
+            /** No Fill Reason */
+            no_fill_reason?: ("office_use" | "signature") | null;
         };
         /**
          * FieldKind

@@ -115,6 +115,7 @@ def test_field_defaults() -> None:
     assert field.value_source is ValueSource.NONE
     assert field.options == []
     assert field.validations == []
+    assert field.no_fill_reason is None
 
 
 def test_native_label_and_context_are_required_but_nullable() -> None:
@@ -174,12 +175,32 @@ def test_text_layer_values() -> None:
         {"max_chars": 0},
         {"semantic_method": "guess"},
         {"semantic_type": "shoe_size"},
+        {"no_fill_reason": "too_hard"},
         {"id": ""},
     ],
 )
 def test_field_rejects_invalid_values(overrides: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         _field(**overrides)
+
+
+@pytest.mark.parametrize("reason", ["office_use", "signature"])
+def test_no_fill_reason_round_trips(reason: str) -> None:
+    ir = _ir(fields=[_field(no_fill_reason=reason)])
+
+    assert FormIR.model_validate_json(ir.model_dump_json()).fields[0].no_fill_reason == reason
+
+
+def test_ir_stored_before_no_fill_reason_still_loads() -> None:
+    """P3-D1 keeps schema_version 1: a stored IR without the attribute loads with None."""
+    data = _full_ir().model_dump(mode="json")
+    for field in data["fields"]:
+        del field["no_fill_reason"]
+
+    restored = FormIR.model_validate(data)
+
+    assert restored.schema_version == 1
+    assert all(field.no_fill_reason is None for field in restored.fields)
 
 
 def test_trace_event_requires_timezone() -> None:

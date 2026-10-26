@@ -122,6 +122,9 @@ class Field(_IRModel):
     value_source: ValueSource = ValueSource.NONE
     validations: list[ValidationResult] = pydantic.Field(default_factory=list)
     status: FieldStatus = FieldStatus.DETECTED
+    # Set for fields FormPilot never fills: not asked, not matched, not rendered (decision P3-D1,
+    # docs/decisions/phase-3.md). None for every other field, and in IRs stored before Phase 3.
+    no_fill_reason: Literal["office_use", "signature"] | None = None
 
 
 class TraceEvent(_IRModel):
