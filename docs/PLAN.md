@@ -229,7 +229,7 @@ Teach-back
 1. Why rules first and the LLM second? What does the eval say about it?
 2. Why can't we trust the LLM's self-reported confidence as a probability?
 
-**Gate 3:** — [ ] passed
+**Gate 3:** — [x] passed (the human's decision, 2026-10-27)
 
 ---
 
