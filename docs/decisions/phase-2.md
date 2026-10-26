@@ -1719,11 +1719,13 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 
 ### Acceptance checks not ticked by Claude
 - **"Boxes drawn in the viewer line up with the form's fields (human visual check on 5 forms)."**
-  This is a human check; it has not been done yet. The Gate 2 checklist (which 5 forms to open)
-  is given to the human with this close-out. The PR to `main` waits for it.
+  Passed by the human on 2026-10-26 on #1 (pages 1, 4), #21 (pages 1, 2), #25 (page 1), #30 and
+  #41. The boxes sit on their lines, cells and combs, with no shift, scale or rotation problem.
+  The known extra boxes (#21's "OR" column, #41's "Documents Enclosed:") were seen as expected.
+  Ticked in PLAN on the human's behalf.
 
 ### For the human
-- **Gate 2:** the visual check above; then the human ticks the gate.
+- **Gate 2:** all acceptance checks pass; only the human ticks the gate line in PLAN.md.
 - **Teach-back answers and "In my own words":** pending for Phase 1 and Phase 2. From v1 on, a
   short checkpoint at the end of each milestone (PLAN.md).
 

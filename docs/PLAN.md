@@ -163,7 +163,8 @@ Acceptance
 - [x] Detection precision/recall on the dev flat forms reported (eval report in `eval/reports/`).
       (`…step11-7-hyphen-leaders-v5-20261026-714c3d3`: writing spot 95.1 / 92.4, IoU ≥ 0.5 88.1 /
       85.5; eval tests pass in `make test`, 2026-10-26.)
-- [ ] Boxes drawn in the viewer line up with the form's fields (human visual check on 5 forms).
+- [x] Boxes drawn in the viewer line up with the form's fields (human visual check on 5 forms).
+      (Passed by the human on 2026-10-26 on #1, #21, #25, #30, #41; ticked on the human's behalf.)
 - [x] Coordinate conversion has unit tests (bottom-left ↔ top-left).
       (`backend/tests/unit/test_coords.py`, 43 passed, 2026-10-26.)
 - [x] Uploading a non-PDF or an oversized file is rejected with a clear error.
