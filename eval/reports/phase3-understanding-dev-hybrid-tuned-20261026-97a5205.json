@@ -1,0 +1,537 @@
+{
+  "kind": "understanding",
+  "split": "dev",
+  "mode": "hybrid",
+  "detector": "flat@97a5205",
+  "provider": "ollama:qwen3:8b",
+  "prompt": "understand_v2.md",
+  "created_at": "2026-10-26T18:53:19+00:00",
+  "tag": "tuned",
+  "reference_labels": "Reference labels: written by Claude Code (claude-opus-5-5), blind to the model's output, not by a human (decision P3-D6). Accuracy is agreement with them.",
+  "metrics": {
+    "overall": {
+      "all": {
+        "correct": 337,
+        "total": 524,
+        "accuracy": 0.6431297709923665
+      },
+      "fillable": {
+        "correct": 140,
+        "total": 241,
+        "accuracy": 0.5809128630705395
+      }
+    },
+    "from_scratch": {
+      "all": {
+        "correct": 47,
+        "total": 63,
+        "accuracy": 0.746031746031746
+      },
+      "fillable": {
+        "correct": 20,
+        "total": 30,
+        "accuracy": 0.6666666666666666
+      }
+    },
+    "prefilled": {
+      "all": {
+        "correct": 290,
+        "total": 461,
+        "accuracy": 0.6290672451193059
+      },
+      "fillable": {
+        "correct": 120,
+        "total": 211,
+        "accuracy": 0.5687203791469194
+      }
+    },
+    "macro_fillable": 0.5453702508828234,
+    "by_method": {
+      "rule": {
+        "correct": 65,
+        "total": 85,
+        "accuracy": 0.7647058823529411
+      },
+      "llm": {
+        "correct": 272,
+        "total": 439,
+        "accuracy": 0.6195899772209568
+      },
+      "none": {
+        "correct": 0,
+        "total": 0,
+        "accuracy": null
+      }
+    },
+    "by_type": {
+      "aadhaar": {
+        "support": 5,
+        "recall": 1.0,
+        "predicted": 6,
+        "precision": 0.8333333333333334
+      },
+      "age": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 4,
+        "precision": 0.25
+      },
+      "bank_account_number": {
+        "support": 11,
+        "recall": 0.6363636363636364,
+        "predicted": 8,
+        "precision": 0.875
+      },
+      "bank_branch": {
+        "support": 3,
+        "recall": 0.6666666666666666,
+        "predicted": 2,
+        "precision": 1.0
+      },
+      "bank_name": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 4,
+        "precision": 0.5
+      },
+      "category": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 8,
+        "precision": 0.25
+      },
+      "course": {
+        "support": 1,
+        "recall": 0.0,
+        "predicted": 1,
+        "precision": 0.0
+      },
+      "current_address_line1": {
+        "support": 9,
+        "recall": 0.6666666666666666,
+        "predicted": 11,
+        "precision": 0.5454545454545454
+      },
+      "current_address_line2": {
+        "support": 5,
+        "recall": 0.4,
+        "predicted": 3,
+        "precision": 0.6666666666666666
+      },
+      "current_city": {
+        "support": 4,
+        "recall": 1.0,
+        "predicted": 6,
+        "precision": 0.6666666666666666
+      },
+      "current_country": {
+        "support": 3,
+        "recall": 1.0,
+        "predicted": 3,
+        "precision": 1.0
+      },
+      "current_district": {
+        "support": 5,
+        "recall": 0.8,
+        "predicted": 5,
+        "precision": 0.8
+      },
+      "current_pincode": {
+        "support": 5,
+        "recall": 1.0,
+        "predicted": 5,
+        "precision": 1.0
+      },
+      "current_state": {
+        "support": 5,
+        "recall": 1.0,
+        "predicted": 6,
+        "precision": 0.8333333333333334
+      },
+      "date_of_birth": {
+        "support": 7,
+        "recall": 0.7142857142857143,
+        "predicted": 8,
+        "precision": 0.625
+      },
+      "date_of_filling": {
+        "support": 38,
+        "recall": 0.47368421052631576,
+        "predicted": 30,
+        "precision": 0.6
+      },
+      "email": {
+        "support": 5,
+        "recall": 1.0,
+        "predicted": 5,
+        "precision": 1.0
+      },
+      "enrollment_number": {
+        "support": 5,
+        "recall": 0.8,
+        "predicted": 12,
+        "precision": 0.3333333333333333
+      },
+      "father_name": {
+        "support": 5,
+        "recall": 0.6,
+        "predicted": 5,
+        "precision": 0.6
+      },
+      "first_name": {
+        "support": 2,
+        "recall": 0.0,
+        "predicted": 0,
+        "precision": null
+      },
+      "full_name": {
+        "support": 21,
+        "recall": 0.5238095238095238,
+        "predicted": 27,
+        "precision": 0.4074074074074074
+      },
+      "gender": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 1,
+        "precision": 1.0
+      },
+      "guardian_name": {
+        "support": 3,
+        "recall": 0.3333333333333333,
+        "predicted": 4,
+        "precision": 0.25
+      },
+      "ifsc": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 2,
+        "precision": 1.0
+      },
+      "institution_name": {
+        "support": 3,
+        "recall": 0.3333333333333333,
+        "predicted": 1,
+        "precision": 1.0
+      },
+      "last_name": {
+        "support": 2,
+        "recall": 0.0,
+        "predicted": 0,
+        "precision": null
+      },
+      "marital_status": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 2,
+        "precision": 0.5
+      },
+      "middle_name": {
+        "support": 2,
+        "recall": 0.0,
+        "predicted": 0,
+        "precision": null
+      },
+      "mother_name": {
+        "support": 4,
+        "recall": 0.5,
+        "predicted": 3,
+        "precision": 0.6666666666666666
+      },
+      "nationality": {
+        "support": 4,
+        "recall": 0.5,
+        "predicted": 3,
+        "precision": 0.6666666666666666
+      },
+      "other": {
+        "support": 272,
+        "recall": 0.7132352941176471,
+        "predicted": 276,
+        "precision": 0.7028985507246377
+      },
+      "pan": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 2,
+        "precision": 1.0
+      },
+      "passing_year": {
+        "support": 8,
+        "recall": 0.0,
+        "predicted": 1,
+        "precision": 0.0
+      },
+      "percentage_or_cgpa": {
+        "support": 5,
+        "recall": 0.6,
+        "predicted": 9,
+        "precision": 0.3333333333333333
+      },
+      "permanent_address_line1": {
+        "support": 1,
+        "recall": 0.0,
+        "predicted": 0,
+        "precision": null
+      },
+      "phone_alternate": {
+        "support": 3,
+        "recall": 0.3333333333333333,
+        "predicted": 3,
+        "precision": 0.3333333333333333
+      },
+      "phone_mobile": {
+        "support": 8,
+        "recall": 0.875,
+        "predicted": 11,
+        "precision": 0.6363636363636364
+      },
+      "place": {
+        "support": 7,
+        "recall": 0.7142857142857143,
+        "predicted": 5,
+        "precision": 1.0
+      },
+      "signature": {
+        "support": 40,
+        "recall": 0.425,
+        "predicted": 19,
+        "precision": 0.8947368421052632
+      },
+      "spouse_name": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 1,
+        "precision": 1.0
+      },
+      "unknown": {
+        "support": 11,
+        "recall": 0.2727272727272727,
+        "predicted": 17,
+        "precision": 0.17647058823529413
+      }
+    },
+    "per_form": {
+      "01_sbi_account_opening_form": {
+        "all": {
+          "correct": 112,
+          "total": 168,
+          "accuracy": 0.6666666666666666
+        },
+        "fillable": {
+          "correct": 35,
+          "total": 74,
+          "accuracy": 0.47297297297297297
+        }
+      },
+      "02_sbi_kyc_annexure_a": {
+        "all": {
+          "correct": 30,
+          "total": 33,
+          "accuracy": 0.9090909090909091
+        },
+        "fillable": {
+          "correct": 22,
+          "total": 24,
+          "accuracy": 0.9166666666666666
+        }
+      },
+      "03_sbi_kyc_annexure_b": {
+        "all": {
+          "correct": 26,
+          "total": 39,
+          "accuracy": 0.6666666666666666
+        },
+        "fillable": {
+          "correct": 14,
+          "total": 21,
+          "accuracy": 0.6666666666666666
+        }
+      },
+      "06_union_bank_nomination_form": {
+        "all": {
+          "correct": 13,
+          "total": 27,
+          "accuracy": 0.48148148148148145
+        },
+        "fillable": {
+          "correct": 1,
+          "total": 4,
+          "accuracy": 0.25
+        }
+      },
+      "21_india_post_pmjjby_claim_form": {
+        "all": {
+          "correct": 33,
+          "total": 47,
+          "accuracy": 0.7021276595744681
+        },
+        "fillable": {
+          "correct": 19,
+          "total": 28,
+          "accuracy": 0.6785714285714286
+        }
+      },
+      "23_lic_claim_form_a_3783": {
+        "all": {
+          "correct": 27,
+          "total": 44,
+          "accuracy": 0.6136363636363636
+        },
+        "fillable": {
+          "correct": 4,
+          "total": 13,
+          "accuracy": 0.3076923076923077
+        }
+      },
+      "25_cdlsiet_btech_admission_form": {
+        "all": {
+          "correct": 55,
+          "total": 97,
+          "accuracy": 0.5670103092783505
+        },
+        "fillable": {
+          "correct": 27,
+          "total": 47,
+          "accuracy": 0.574468085106383
+        }
+      },
+      "30_allahabad_univ_enrollment_form": {
+        "all": {
+          "correct": 12,
+          "total": 29,
+          "accuracy": 0.41379310344827586
+        },
+        "fillable": {
+          "correct": 8,
+          "total": 14,
+          "accuracy": 0.5714285714285714
+        }
+      },
+      "32_niftem_student_declaration_form": {
+        "all": {
+          "correct": 9,
+          "total": 16,
+          "accuracy": 0.5625
+        },
+        "fillable": {
+          "correct": 8,
+          "total": 11,
+          "accuracy": 0.7272727272727273
+        }
+      },
+      "39_cebs_joining_report": {
+        "all": {
+          "correct": 6,
+          "total": 8,
+          "accuracy": 0.75
+        },
+        "fillable": {
+          "correct": 1,
+          "total": 3,
+          "accuracy": 0.3333333333333333
+        }
+      },
+      "41_india_post_pli_name_change_form": {
+        "all": {
+          "correct": 14,
+          "total": 16,
+          "accuracy": 0.875
+        },
+        "fillable": {
+          "correct": 1,
+          "total": 2,
+          "accuracy": 0.5
+        }
+      }
+    },
+    "confusions": [
+      {
+        "reference": "signature",
+        "predicted": "other",
+        "count": 20
+      },
+      {
+        "reference": "date_of_filling",
+        "predicted": "other",
+        "count": 17
+      },
+      {
+        "reference": "other",
+        "predicted": "full_name",
+        "count": 13
+      },
+      {
+        "reference": "other",
+        "predicted": "date_of_filling",
+        "count": 10
+      },
+      {
+        "reference": "other",
+        "predicted": "enrollment_number",
+        "count": 8
+      },
+      {
+        "reference": "full_name",
+        "predicted": "other",
+        "count": 7
+      },
+      {
+        "reference": "unknown",
+        "predicted": "other",
+        "count": 7
+      },
+      {
+        "reference": "other",
+        "predicted": "unknown",
+        "count": 7
+      },
+      {
+        "reference": "passing_year",
+        "predicted": "other",
+        "count": 6
+      },
+      {
+        "reference": "other",
+        "predicted": "category",
+        "count": 6
+      },
+      {
+        "reference": "bank_account_number",
+        "predicted": "other",
+        "count": 4
+      },
+      {
+        "reference": "other",
+        "predicted": "percentage_or_cgpa",
+        "count": 4
+      },
+      {
+        "reference": "other",
+        "predicted": "age",
+        "count": 3
+      },
+      {
+        "reference": "other",
+        "predicted": "date_of_birth",
+        "count": 3
+      },
+      {
+        "reference": "other",
+        "predicted": "current_address_line1",
+        "count": 3
+      }
+    ],
+    "predicted_unknown": 17,
+    "never_fill": {
+      "signature": 19,
+      "office_use": 40
+    },
+    "not_detected": 43,
+    "llm_trouble": {
+      "01_sbi_account_opening_form": [
+        "page 3: LLM batch retried"
+      ]
+    }
+  }
+}

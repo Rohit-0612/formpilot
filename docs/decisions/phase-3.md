@@ -183,5 +183,53 @@ recorded runs.
 **Latency:** the hybrid recording took 66 minutes and the llm one 81, on the development laptop
 under memory pressure. Not a product latency measurement: not measured yet.
 
+## Tuning (one session, 2026-10-26; dev only)
+
+**Error analysis** on the pre-tuning hybrid run.
+- **Signature areas typed `other` (22).**
+  - 15 are office boxes on #1 page 4 without label text: the grey "INITIALS" hint is never a label
+    (Phase 2 rule 1), and counting initials as signatures is a labelling convention.
+  - The rest have their caption *below* the box, which the frontend does not give as the label.
+
+  Neither is fixable in the pass without tuning toward a convention, or without an IR change
+  outside this milestone.
+- **Other people's fields typed as the user's:** `other` → `full_name` (17), mostly rules typing
+  "Name" under nominee / witness / related-person headings, "Maiden Name", "Name in Hindi".
+- **Dates:** "Issue / Expiry Date", "Date of Admission" and "dated" typed by rules as the date of
+  filling. The model missed the parts of "this __ day of __".
+- **Education tables:** `passing_year` (0/8) and `institution_name` (0/3). Their labels are column
+  headings far above, often missing.
+
+**Changes, each measured with `make eval MODE=hybrid RECORD=1`** (fillable: reference type
+neither `other` nor `unknown`; Δ against the previous row):
+
+| Row | Commit | Change | All | Fillable | Fillable, from scratch | Fillable, pre-filled | Macro (fillable) | Rule-typed (correct) | Predicted fillable (correct) |
+|---|---|---|---|---|---|---|---|---|---|
+| Pre-tuning | `ee3c22e` | — | 57.4 % (301/524) | 57.3 % (138/241) | 17/30 | 121/211 | 53.7 % | 134 (81) | not computed |
+| Change 1 | `fa6c544` | Rules need a strict majority of the label; "No.", "Number" are generic; labels or headings about another person or asking in Hindi are left to the LLM | 60.5 % (+3.1) | 58.1 % (+0.8) | 18/30 (+1) | 122/211 (+1) | 58.4 % (+4.7) | 85 (65): precision 60.4 → 76.5 % | 250 (140): 56.0 % |
+| Change 2 | `97a5205` | Prompt v2: classify for the person filling the form; "I / I/We ___" is `full_name`; names in Hindi are `other`; only the signing date and its parts are `date_of_filling`; table cells may carry their column heading | 64.3 % (+3.8) | 58.1 % (±0) | 20/30 (+2) | 120/211 (−2) | 54.5 % (−3.9) | 85 (65) | 231 (140): 60.6 % |
+
+**Kept: both changes.** Prompt v2 leaves the correct fillable fields unchanged (140) but makes 19
+fewer wrong fillable predictions (110 → 91). In the product, a wrong prediction means a profile
+value written into the wrong box.
+
+Its costs, recorded:
+- pre-filled fillable is 2 fields lower than change 1 (1 lower than pre-tuning);
+- macro falls 3.9 points: it swings on forms with 2–4 fillable fields, where one field moves a
+  form by 25–50 points.
+
+The table example in prompt v2 ("Year", "Name of School / Institute") comes from dev form #25.
+
+**Final (tuned) report:** `…-hybrid-tuned-20261026-97a5205` (a replay of change 2 at its commit).
+`eval/baseline.json` moves to it: both of its tracked metrics are higher than pre-tuning (all
+57.4 → 64.3 %, fillable 57.3 → 58.1 %), so the CI bar rises. The llm-only mode was not re-run
+after tuning; its pre-tuning report stands. The reference labels were not changed during tuning.
+
+**Left for later** (known limitations):
+- signature captions below the box;
+- office boxes whose only text is a grey hint;
+- education tables whose column headings are far from the cell;
+- `other` vs `full_name` on claim forms, where the claimant is the nominee.
+
 ## In my own words
 
