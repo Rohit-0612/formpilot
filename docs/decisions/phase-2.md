@@ -1,13 +1,87 @@
 # Phase 2 — Form IR and flat-PDF frontend: decision record
 
-> Status: **in progress** (started 2026-10-11 on branch `phase-2-flat-frontend`). Steps 0–10
-> are done; **next is Step 11**. A fresh session continues from the "Remaining plan" section below.
-> Decisions are recorded here as they are taken; the close-out sections are filled in at the end
-> of the phase.
+> Status: **close-out drafted 2026-10-26** on branch `phase-2-flat-frontend`. Steps 1–11 are done,
+> labels v5 are committed, and Step 11 tuning is closed at fix 7. Gate 2 waits for the human's
+> visual check of the viewer on 5 forms; the PR to `main` follows it. The full step-by-step record
+> is kept under "Key decisions and alternatives considered → Detailed record".
 
-## Decisions taken when the plan was approved (human, 2026-10-11)
+## What was built
 
-### D1. Form IR: per-page text-layer quality (SPEC §4 change)
+| Deliverable (PLAN Phase 2) | Where |
+|---|---|
+| Form IR (SPEC §4, with D1's per-page text-layer quality), semantic types (SPEC §5, D2 sensitive flags), one coordinate system with conversions | `backend/app/ir/models.py`, `semantic_types.py`, `coords.py`, `geometry.py` |
+| Source kind and per-page text-layer check (`ok` / `garbled` / `none`); OCR pages traced, never guessed | `backend/app/frontends/detect.py` |
+| Flat frontend (primary path, PyMuPDF only) | `backend/app/frontends/flat.py` |
+| AcroForm frontend (secondary; text, checkbox, radio, choice; synthetic fixtures only) | `backend/app/frontends/acroform.py` |
+| Page images rendered in the worker | `backend/app/frontends/page_images.py` |
+| Upload with size, magic-byte (API) and page (worker) limits → `analyze` job → IR version 1; read endpoints (D3, D4, D7); masking of sensitive values | `backend/app/api/uploads.py`, `api/routes/documents.py`, `api/routes/jobs.py`, `services/analysis.py`, `services/documents.py`, `services/masking.py`, `jobs/tasks.py` |
+| Stale-job reaper and `jobs.started_at` (D6) | `backend/app/jobs/worker.py`, migration `0002_jobs_started_at.py` |
+| Web: upload page, job progress, page viewer with field boxes (no editing) | `web/src/app/documents/new/`, `web/src/app/documents/[id]/`, `web/src/components/page-viewer.tsx` |
+| Synthetic PDF fixtures (flat, fillable, text-layer cases) | `backend/tests/fixtures/pdfs.py` |
+| Labelling tooling (Label Studio 1.23.2: tasks, conversion, schema, subset, rule images) | `eval/labelling/` |
+| Human labels for the 11 dev forms with a usable text layer (labels v5) | `eval/labels/` |
+| Detection eval: writing-spot match (primary) and IoU ≥ 0.5 (SPEC metric), pooled and macro averages, from-scratch vs pre-filled split, by kind, per form | `eval/detection.py`, `make eval-detect`, reports in `eval/reports/` |
+
+The flat frontend finds:
+- leaders: underscores, dots, ellipses and dashes;
+- drawn lines;
+- empty boxes and table cells rebuilt from lines, including boxes with rounded corners;
+- comb rows (D8, with grey-hinted parts and wide cells: labelling rules 1–2);
+- checkboxes;
+- the empty part of a cell with its label inside (rule 3);
+- blanks after a colon with nothing drawn.
+
+It also assigns each field its label and its context (the heading above it).
+
+**Measured** (dev split only; report `…step11-7-hyphen-leaders-v5-20261026-714c3d3`):
+
+| | Precision / recall |
+|---|---|
+| Writing spot, pooled | **95.1 % / 92.4 %** (TP 645, FP 33, FN 53) |
+| Macro | 96.6 / 90.4 |
+| From scratch (#21, #41) | 91.3 / 92.6 |
+| Pre-filled | 95.6 / 92.4 |
+| IoU ≥ 0.5 | 88.1 / 85.5 |
+
+The pre-tuning baseline on the same labels was 85.7 / 77.2. Test-split numbers: not measured yet
+(Phase 5b).
+
+**Tests in the close-out run** (2026-10-26):
+- `make lint`: exit 0;
+- `make test`: 824 passed, 66 deselected;
+- `make test-int`: 66 passed, 824 deselected.
+
+## Key decisions and alternatives considered
+
+Each decision is recorded in full in the detailed record below; this is the summary.
+
+| Decision | Alternatives | Why this one |
+|---|---|---|
+| **D1** `FormIR.pages: list[PageInfo]` with a per-page `text_layer` | `page_sizes` plus `ocr_pages` (two lists that can drift apart); a `SourceKind` per page | OCR routing is per page; "what the document is" stays separate from "how good this page's text is" |
+| **D2** sensitive types: `aadhaar`, `pan`, `bank_account_number`, `passport_number`, `voter_id` | whole SPEC §5 groups (IDs, bank) | Government IDs and the account number are sensitive; bank name and IFSC are public, and masking them only adds friction |
+| **D3** page limit enforced in the worker | open the PDF in the API | SPEC §11: PDFs are opened only in the worker; size and magic bytes are still rejected synchronously (413 / 415) |
+| **D4** `python-multipart` | a raw `application/pdf` body | SPEC §8 specifies a multipart upload |
+| **D5** PyMuPDF as a runtime dependency | — | The frontends and page rendering run in the worker; AGPL-3.0 is already the licence |
+| **D6** stale-job reaper on worker startup | none (jobs stuck in `analyzing`) | A crashed worker must not leave a document stuck |
+| **D8** a comb row is one field, split at clear gaps and separators; amended twice (gap relative to the row's own spacing, capped at one cell width) | one field per cell; a fixed gap threshold | One field per thing a person writes; real forms space their cells differently |
+| **D9** dotted leaders are entry areas | underscores only | On the dev forms, dots are more common than underscores |
+| **Label Studio** for labelling | VIA, a custom labeller | Pre-annotations, a local Docker run, no project dependency |
+| **Anchoring check:** #21 and #41 labelled from scratch, reported separately | pre-fill every form | Shows whether pre-filled boxes bias the labels (they can only move numbers in the detector's favour) |
+| **Writing-spot match** as the primary metric; IoU ≥ 0.5 kept as the SPEC metric | IoU only | Hand-drawn box heights vary a lot while the writing spot (start, end, row) is the same; box height is not scored |
+| **Macro average** next to pooled | pooled only | #1 holds a large share of all boxes |
+| **Step 11:** one fix per commit with an ablation row, dev only; from scratch as the main signal | tune several rules at once | Each change measured on its own; regressions visible |
+| **Fix 8 deferred** (signatures above a caption) | do it in Step 11 | It would help only pre-filled forms and risks false positives on #21 / #41; it overlaps the open signature decision |
+| **Pending label fixes batched** into labels v5, plus a held-out check (#1 pages 5, 8, 9) | relabel after each finding | One relabel and one re-run of the whole table instead of five |
+| **OpenCV raster fallback stays in Phase 6** | add it in Phase 2 | The error analysis found no miss caused by boxes drawn as images |
+| **v1 re-scope and milestone gates** (2026-10-26) | keep step gates and all phases in v1 | A complete, live, measured v1 sooner, with the same quality rules |
+
+### Detailed record
+
+The record as it was written during the phase, unchanged except for its heading levels.
+
+#### Decisions taken when the plan was approved (human, 2026-10-11)
+
+##### D1. Form IR: per-page text-layer quality (SPEC §4 change)
 
 **Problem.** `SourceKind` is per document, but the text-layer quality check (SPEC §6.1) works per
 page: a flat PDF can have one page in a legacy Hindi font (garbled) or one scanned page. The IR
@@ -40,14 +114,14 @@ and `text_layer: TextLayer`:
 - Keep `page_sizes` and add `ocr_pages: list[int]`: two parallel lists that can drift apart.
 - A `SourceKind` per page: mixes "what the document is" with "how good this page's text is".
 
-### D2. Sensitive semantic types
+##### D2. Sensitive semantic types
 
 CLAUDE.md §3 named four sensitive types; SPEC §5's headings marked whole groups (IDs, bank) as
 sensitive. **Decision:** `aadhaar`, `pan`, `bank_account_number`, `passport_number`, `voter_id`
 (CLAUDE.md's four plus `voter_id`, also a government ID number). `bank_name`, `ifsc` and
 `bank_branch` are public information; masking them would only add friction. SPEC §5 updated.
 
-### D3. Upload page limit is enforced in the worker
+##### D3. Upload page limit is enforced in the worker
 
 SPEC §8 lists a 50-page upload limit, but SPEC §11 says PDFs are opened only in the worker, and
 counting pages requires opening the PDF. **Decision:** the API checks size (20 MB) and magic bytes
@@ -56,24 +130,24 @@ the page limit: the document becomes `failed` with job error `TooManyPages`, sho
 message by `GET /documents/{id}`. Page images for the viewer are also rendered in the worker and
 stored; the API only serves bytes. (SPEC §8 is updated with the upload step.)
 
-### D4. New dependency `python-multipart`
+##### D4. New dependency `python-multipart`
 
 FastAPI's multipart parser, needed for `POST /documents` (SPEC §8 "upload (multipart)").
 Alternative: a raw `application/pdf` body (no dependency), rejected as a departure from SPEC §8.
 The upload is capped by `Content-Length` and by reading at most limit + 1 bytes.
 
-### D5. PyMuPDF becomes a runtime dependency
+##### D5. PyMuPDF becomes a runtime dependency
 
 Moved from the dev group to the main dependencies (same version, 1.28.2), because the frontends
 and page rendering run in the worker. AGPL-3.0 is already the repository licence.
 
-### D6. `jobs.started_at` and the stale-job reaper
+##### D6. `jobs.started_at` and the stale-job reaper
 
 Migration `0002` adds `jobs.started_at timestamptz NULL`, set by `JobStore.mark_running`. On
 worker startup, jobs that are `running` with `COALESCE(started_at, created_at)` older than
 `JOB_TIMEOUT_SECONDS` are marked `failed` / `Stale`, and their documents `analyzing -> failed`.
 
-### D7. API contract for Phase 2 (subset of SPEC §8)
+##### D7. API contract for Phase 2 (subset of SPEC §8)
 
 - `POST /documents` (multipart `file`) → 202 `{document_id, job_id}`
 - `GET /documents/{id}` → `{id, original_filename, status, source_kind, page_count, created_at,
@@ -83,7 +157,7 @@ worker startup, jobs that are `running` with `COALESCE(started_at, created_at)` 
 - `GET /jobs/{id}`
 - Another user's document or job → 404 (not 403), so ids are not confirmed.
 
-### D8. Comb boxes (detector and labelling convention)
+##### D8. Comb boxes (detector and labelling convention)
 
 A row of per-character cells is **one** field, with `max_chars` = the number of cells. The row
 is split into separate fields where the gap between cells is clearly larger than the normal cell
@@ -91,24 +165,24 @@ spacing (e.g. more than one cell width), or where printed text or a separator si
 (e.g. `DD MM YYYY` groups). Each checkbox square is its own field; grouping into radio options is
 later work. Written into the labelling README and tested in `flat.py`.
 
-### D9. Dotted leaders are entry areas
+##### D9. Dotted leaders are entry areas
 
 Runs of dots (`.....`, `…`) count as entry areas, like underscore runs; on the dev forms they are
 more common than underscores. A detail of `flat.py` within SPEC §6.1, not a spec change.
 
-### Labelling tool: Label Studio
+##### Labelling tool: Label Studio
 
 Chosen by the human over VIA and a custom labeller (trade-offs in the Phase 2 plan). Run via
 Docker outside the repo; not a project dependency. Anchoring check: the human labels #21 and #41
 from scratch first, without pre-annotation; a script later compares those labels with the
 detector output to show whether pre-annotation biases the labels.
 
-### Phase 0 task left open
+##### Phase 0 task left open
 
 "Collect 30 forms" stays unticked with its note (20 collected; Phase 0 closed with 20 by the
 human's decision).
 
-## Step 1 — Form IR, semantic types, coordinates
+#### Step 1 — Form IR, semantic types, coordinates
 
 - **StrEnum** for all IR enums (as in `app/db/models.py`); same JSON as SPEC's `(str, Enum)`.
 - **Semantic types** (`app/ir/semantic_types.py`): one `TypeInfo` per type with description,
@@ -129,7 +203,7 @@ human's decision).
     the 20 collected forms has a `/Rotate`, but the conversion handles 0/90/180/270 and is
     tested against PyMuPDF.
 
-## Step 2 — PyMuPDF at runtime, synthetic PDF fixtures
+#### Step 2 — PyMuPDF at runtime, synthetic PDF fixtures
 
 - **PyMuPDF moved to the main dependencies (D5)**, same version 1.28.2; `uv.lock` only moves it
   out of the dev group.
@@ -175,7 +249,7 @@ human's decision).
 - Not verified locally: the Docker daemon was not running, so the slim image with PyMuPDF was
   not built here; the CI compose-smoke job builds it from scratch.
 
-## Step 3 — Source kind and per-page text layer (`app/frontends/detect.py`)
+#### Step 3 — Source kind and per-page text layer (`app/frontends/detect.py`)
 
 - Implements D1 as amended: `none` needs both fewer than 50 non-space characters **and** image
   coverage above 0.5 of the page ("most of the page area"); exactly half is not most. A blank
@@ -193,7 +267,7 @@ human's decision).
   other 11 forms `ok`. #3's 43 images cover less than 30 % of any page. Consequence of D1: #37
   is now source kind `scanned` (Phase 0 called it "flat"), because its only page is garbled.
 
-## Step 4 — Flat frontend (`app/frontends/flat.py`)
+#### Step 4 — Flat frontend (`app/frontends/flat.py`)
 
 - **Entry areas** (PyMuPDF only): leader runs from per-character boxes (underscores; dots and
   ellipses, where 1–3 dots stay part of the text, e.g. "No.", "e.g.", "true."); horizontal
@@ -236,7 +310,7 @@ human's decision).
   The human's labelling rules for these cases are in the Step 5 section.
 - Overlays for visual checks go to `eval/overlays/` (gitignored, like the PDFs).
 
-## Step 5 — Label Studio tooling (`eval/labelling/`)
+#### Step 5 — Label Studio tooling (`eval/labelling/`)
 
 - **Labelling rules (human, 2026-10-16)**, written into `eval/labelling/README.md` and the
   target for Step 11 tuning. Top rule: *draw a box where a person would write, split into the
@@ -303,7 +377,7 @@ human's decision).
   did not change the bytes of existing fixtures (the recorded Label Studio export pins their
   SHA-256; the converter rejected the export when they changed, as it should).
 
-## Step 6 — Detection eval (`eval/detection.py`, `make eval-detect`)
+#### Step 6 — Detection eval (`eval/detection.py`, `make eval-detect`)
 
 - **What it computes** (before the full Phase 3 harness): for every dev PDF with a label file,
   run `detect` + `flat.run` (pure functions, no database or worker) and, per labelled page whose
@@ -326,7 +400,7 @@ human's decision).
   not scored, as expected.
 - The matching functions are plain and importable, for reuse by Phase 3's `run_eval.py`.
 
-## Step 7 — Stale jobs and storage wiring (D6)
+#### Step 7 — Stale jobs and storage wiring (D6)
 
 - **Migration `0002`** adds `jobs.started_at timestamptz NULL` (upgrade adds, downgrade drops;
   `0001` untouched). `JobStore.mark_running` sets it to `now()`. SPEC §7 lists the column.
@@ -356,7 +430,7 @@ human's decision).
 - **Limitation:** only `analyzing` documents are moved to `failed`. A stale `render` job (Phase
   5) would leave its document `rendering`; to revisit when the render job exists.
 
-## Step 8 — Upload, analyze job, read endpoints (D3, D4, D7)
+#### Step 8 — Upload, analyze job, read endpoints (D3, D4, D7)
 
 Plan approved by the human on 2026-10-18, with the four proposals below and three additions.
 
@@ -427,7 +501,7 @@ Plan approved by the human on 2026-10-18, with the four proposals below and thre
   endpoints; masked IR response with the database unchanged; no file name or value in the logs.
   The test worker helper moved to `tests/integration/workers.py`.
 
-## Step 9 — AcroForm frontend (minimal; plan approved 2026-10-19)
+#### Step 9 — AcroForm frontend (minimal; plan approved 2026-10-19)
 
 - **Why minimal, and why now.** PLAN lists `frontends/acroform.py` as a secondary Phase 2
   deliverable; SPEC §2 keeps the fillable path small and tested on synthetic fixtures, because
@@ -466,7 +540,7 @@ Plan approved by the human on 2026-10-18, with the four proposals below and thre
   a `fillable_basic` upload through the real worker → `ready`, `fillable`, five fields of the
   expected kinds. No API change (`make types` gives no diff).
 
-## Step 10 — Web: upload, progress, page viewer (plan approved 2026-10-19)
+#### Step 10 — Web: upload, progress, page viewer (plan approved 2026-10-19)
 
 - **Pages:** `/documents/new` (upload), `/documents/[id]` (status polled every 1.5 s while
   `uploaded` / `analyzing`, then the viewer or the failure), dashboard link "Upload a form".
@@ -506,7 +580,7 @@ Plan approved by the human on 2026-10-18, with the four proposals below and thre
   copies them. Images are served only to the owner (`private, no-store`), so this exposes nothing
   to anyone else; noted for Phase 5, when filled values are rendered.
 
-## Labelling subset and no-box areas (human, 2026-10-17)
+#### Labelling subset and no-box areas (human, 2026-10-17)
 
 - **Subset scored by the detection eval** (1-based pages): forms #2, #6, #21, #23, #25, #30,
   #32, #39 and #41 in full; #1 pages 1 and 4 only; #3 page 2 only. Fixed in
@@ -519,7 +593,7 @@ Plan approved by the human on 2026-10-18, with the four proposals below and thre
   `text` label; photograph and thumb-impression areas get no box. Written into
   `eval/labelling/README.md` (table under "Do not box").
 
-### One label edit made by Claude Code (human request, 2026-10-18)
+##### One label edit made by Claude Code (human request, 2026-10-18)
 
 The only label change not made by the human by hand. CLAUDE.md §6 says Claude never creates
 or edits labels; the human made an exception for this one edit, asked for it explicitly and checks
@@ -543,7 +617,7 @@ it visually.
   else changed. The human also re-checked #6 page 2 and #32 page 1 (every detector box kept
   unchanged) and confirmed them as correct.
 
-### Second relabel by Claude Code (human request, 2026-10-19)
+##### Second relabel by Claude Code (human request, 2026-10-19)
 
 Four annotation edits, made in Label Studio by Claude Code at the human's request, after the
 human confirmed each one. Like the #25 fix, an exception to CLAUDE.md §6 (Claude never edits
@@ -587,7 +661,7 @@ labels) granted for these edits only.
   conversion (option A). All 11 files validate (schema, PDF SHA-256, page count,
   `verified_by_human`, `prefilled_from` null only for #21 / #41, every subset page labelled).
 
-### Third relabel by Claude Code (human request, 2026-10-21)
+##### Third relabel by Claude Code (human request, 2026-10-21)
 
 Two annotation edits on #1, made in Label Studio by Claude Code at the human's request; like the
 earlier relabels, an exception to CLAUDE.md §6 granted for these edits only. They answer the
@@ -631,7 +705,7 @@ label questions raised by fix 2 (below, under the ablation table).
   SHA-256, page count, `verified_by_human`, `prefilled_from` null only for #21 / #41, every
   subset page labelled).
 
-### Fourth relabel by Claude Code, and the human's re-review of #21 and #41 (2026-10-21)
+##### Fourth relabel by Claude Code, and the human's re-review of #21 and #41 (2026-10-21)
 
 - **A detector-prompted correction to a from-scratch form.** Fix 5 (blanks after a colon) found
   two blanks on #21 page 2 that have no label: "Policy No:" and "Name of the Post Office:" at the
@@ -669,7 +743,7 @@ label questions raised by fix 2 (below, under the ablation table).
   kept as converted (option A). All 11 files validate (schema, PDF SHA-256, page count,
   `verified_by_human`, `prefilled_from` null only for #21 / #41, every subset page labelled).
 
-### Export and conversion run by Claude Code (human request, 2026-10-18)
+##### Export and conversion run by Claude Code (human request, 2026-10-18)
 
 After the human had verified the labels by hand, Claude Code ran the export and the conversion
 at the human's request (the hand-off rule "Claude never runs the converter on a real export"
@@ -689,7 +763,7 @@ was lifted for this run).
   match their PDF's SHA-256 and page count, have `verified_by_human: true`, and #21 / #41 have
   `prefilled_from: null`. No email address or other personal data is in the label files.
 
-## Pre-tuning baseline (before Step 11, 2026-10-18)
+#### Pre-tuning baseline (before Step 11, 2026-10-18)
 
 `make eval-detect TAG=pre-step11-tuning` (new `--tag` option: names the report files and title)
 → `eval/reports/phase2-detection-dev-pre-step11-tuning-20261017-2e70d9d.{json,md}` (the date
@@ -714,7 +788,7 @@ in the name is the UTC run date). Labelling subset only; IoU ≥ 0.5.
   revisiting); nothing was changed.
 - Lowest recall among pre-filled forms: #30 48.4 %, #23 65.6 %; comb recall 62.5 % (60/96).
 
-## Writing-spot matching (human decision 2026-10-19; written before any number was computed)
+#### Writing-spot matching (human decision 2026-10-19; written before any number was computed)
 
 **Principle (human).** The detection eval measures whether the detector found the same
 **writing spot** as the labeller — the same place on the page where a person writes — not
@@ -768,7 +842,7 @@ baseline is re-reported under both metrics in a new report. No label is changed.
 detection metric is IoU ≥ 0.5; this adds a primary metric for Phase 2 detection and keeps the
 SPEC metric — SPEC §10 gets a note pointing here.
 
-### Baseline under both metrics (2026-10-19)
+##### Baseline under both metrics (2026-10-19)
 
 Same detector and labels as the pre-tuning report, with the rule above implemented:
 `make eval-detect TAG=pre-step11-tuning-both-metrics` →
@@ -788,7 +862,7 @@ The IoU ≥ 0.5 numbers equal the committed pre-tuning report exactly (that repo
   misses on the pre-filled forms; Step 11 looks at the missed spots on #21 and #41.
 - Lowest writing-spot recall: #30 48.4 %, comb rows 62.5 % (60/96), #23 68.8 %.
 
-## D8 amended: split comb rows at gaps relative to the row (human, 2026-10-19; written before any number was computed)
+#### D8 amended: split comb rows at gaps relative to the row (human, 2026-10-19; written before any number was computed)
 
 **Observation that prompted it.** On a synthetic test form of the human's (not in the eval
 dataset; never used for tuning) a date row of 16 pt cells grouped `DD │ MM │ YYYY` by 8 pt gaps,
@@ -833,7 +907,7 @@ touch. Written before re-measuring.
 is reported to the human — improvements and regressions, especially #1 and #25. The human's
 synthetic test form stays out of tuning.
 
-## Macro average (human request 2026-10-21; written before any number was computed)
+#### Macro average (human request 2026-10-21; written before any number was computed)
 
 **Why (human).** #1 holds a large share of all labelled boxes on the scored pages, so the pooled
 (micro) precision and recall are mostly #1. A macro average weights every form equally.
@@ -849,7 +923,7 @@ pooled numbers, which stay the primary summary in the report and the ablation ta
 before the macro existed get it from the per-form counts in their committed reports, with the
 same function (`eval.detection.macro`); no detector is re-run for that.
 
-## Step 11 — tuning on dev: ablation table (from baseline v5)
+#### Step 11 — tuning on dev: ablation table (from baseline v5)
 
 **Baselines.** The committed pre-tuning report (`…pre-step11-tuning-20261017-2e70d9d`, labels v1)
 is unchanged. Each relabel re-measures the earlier rows on the new labels with the detector they
@@ -1302,7 +1376,7 @@ it.
    middle, labelled 21 + 18 cells). Rule 1 as written gives one box per row. Recorded as
    detector misses unless the human decides otherwise.
 
-## Step 11 — closing (human decision, 2026-10-22)
+#### Step 11 — closing (human decision, 2026-10-22)
 
 **Tuning is closed at fix 7.** Fixes done, in order: 1, 2, 5, 3, 4, 6, 7, one commit each, each
 measured on the dev labels only. Fix 8 was not done (below). No test-set form was run.
@@ -1379,7 +1453,7 @@ Step 11.
 **Integration tests at the end of Step 11: done** (the last item of the Step 11 plan,
 2026-10-22). `make test-int` at `32c2c34`: 66 passed, 824 deselected.
 
-## v1 re-scope and milestone gates (human decision, 2026-10-26)
+#### v1 re-scope and milestone gates (human decision, 2026-10-26)
 
 **Why.** Phase 2 took about two weeks, mostly because of process: a stop after every step, an
 ablation row per fix, and five relabels. The human wants a complete, measured, live v1 soon
@@ -1408,12 +1482,12 @@ ablation row per fix, and five relabels. The human wants a complete, measured, l
 
 **Also corrected:** CLAUDE.md §3 listed four sensitive types; D2 had added `voter_id`.
 
-## Remaining plan (hand-off, 2026-10-17)
+#### Remaining plan (hand-off, 2026-10-17)
 
 Everything a fresh session needs to continue Phase 2 from the repo alone. It supersedes the plan
 approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) still apply.
 
-### How to work
+##### How to work
 
 - Read `CLAUDE.md`, `docs/SPEC.md`, `docs/PLAN.md` and this file first.
 - **One step per turn.** After each step: run the tests, commit (conventional message), push,
@@ -1425,7 +1499,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   numbers; never commit dev-form PDFs or renders of them (`eval/overlays/`,
   `eval/labelling/examples/`, `eval/labelling/work/` are gitignored).
 
-### Where things stand
+##### Where things stand
 
 - Branch `phase-2-flat-frontend`; Steps 0–10 committed and pushed (Steps 7–10: see their
   sections above). CI green on every pushed head up to Step 6 (run 38937110232 on `63ba5e2`).
@@ -1441,7 +1515,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   Do not regenerate the tasks (`python -m eval.labelling.tasks --force`) while labelling is in
   progress: re-importing duplicates tasks.
 
-### Step 7 — Storage wiring and stale jobs (D6)
+##### Step 7 — Storage wiring and stale jobs (D6)
 
 - **D6 (approved):** migration `0002` adds `jobs.started_at timestamptz NULL`;
   `JobStore.mark_running` sets it. On worker startup, jobs that are `running` with
@@ -1461,7 +1535,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   `started_at` uses `created_at`) and moves their `analyzing` documents to `failed`. Unit —
   `make_storage` and `get_storage`.
 
-### Step 8 — Upload, analyze job, read endpoints (D3, D4, D7)
+##### Step 8 — Upload, analyze job, read endpoints (D3, D4, D7)
 
 - **D3 (approved):** the API never opens a PDF (SPEC §11). It checks size (`MAX_UPLOAD_MB`,
   default 20) and magic bytes (`%PDF-` within the first 1024 bytes) and rejects synchronously:
@@ -1505,7 +1579,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   415; oversized → 413; the 51-page fixture → `failed` / `TooManyPages`; the encrypted fixture →
   `failed`; another user → 404; captured logs contain no filenames or values.
 
-### Step 9 — AcroForm frontend (secondary)
+##### Step 9 — AcroForm frontend (secondary)
 
 - `app/frontends/acroform.py`, routed from `analysis.py` for `fillable`. Text, checkbox, radio,
   choice; options with export values (checkbox on-state, e.g. `/Agreed`; radio group = one
@@ -1516,7 +1590,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   "coordinate conversion bottom-left ↔ top-left": the raw `/Rect` read from the PDF object,
   converted with `app/ir/coords.py`, equals the IR bbox (offset CropBox).
 
-### Step 10 — Web: upload, progress, viewer
+##### Step 10 — Web: upload, progress, viewer
 
 - `web/src/app/documents/new/page.tsx` (upload), `web/src/app/documents/[id]/page.tsx` (status
   polled with TanStack Query until `ready`/`failed`, readable error), `web/src/components/
@@ -1526,7 +1600,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 - Tests: lint, typecheck, build (CI); a manual `make up` run uploading a dev form. The human
   does the visual check on 5 forms (Gate 2 item).
 
-### Step 11 — Eval on the human labels, tuning, OpenCV decision
+##### Step 11 — Eval on the human labels, tuning, OpenCV decision
 
 - Needs the human's label files in `eval/labels/`. Run `make eval-detect`; commit the report in
   `eval/reports/`. Tune `flat.py` on dev only, re-run, commit each report.
@@ -1542,7 +1616,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 - Seen but not part of the detection metric: some labels are incomplete (#25 row 3 lost
   "Father's" and the superscript "th"); label quality matters for Phase 3.
 
-### Step 12 — Close-out
+##### Step 12 — Close-out
 
 - `/end-phase 2`: finish this record (what was built, alternatives, limitations), tick the PLAN
   items that have evidence. Gate 2 acceptance (`docs/PLAN.md`): eval report in `eval/reports/`;
@@ -1550,7 +1624,7 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   Step 9); non-PDF / oversized upload rejected with a clear error (Step 8). Only the human ticks
   the gate. After the gate: PR to `main` with `gh pr create` (summary + acceptance results).
 
-### Open items
+##### Open items
 
 - Human: labelling (above); Phase 1 teach-back and the "In my own words" sections of
   `phase-0.md`, `phase-1.md` and this file.
@@ -1563,16 +1637,6 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
   through the API, not by clicking.
 - Labels for the scanned/garbled dev forms (#37, #38, #42) are a Phase 6 task.
 - Phase 3 must mark office-use fields so FormPilot never fills them (added to `docs/PLAN.md`).
-
-## Known issues
-
-- **PyMuPDF SWIG `DeprecationWarning` on import (suppressed in pytest).** PyMuPDF 1.28.2's
-  SWIG-generated extension types (`SwigPyPacked`, `SwigPyObject`, `swigvarlink`) have no
-  `__module__`, and Python 3.12 warns when they are imported. It is inside PyMuPDF and harmless.
-  Python attributes the warning to `importlib._bootstrap`, not to `pymupdf`, so the
-  `filterwarnings` entry in `backend/pyproject.toml` cannot be scoped by module; it matches only
-  these three exact messages as `DeprecationWarning`. Revisit when PyMuPDF ships bindings built
-  with a SWIG version that sets `__module__`.
 
 ## Known limitations
 
@@ -1651,5 +1715,59 @@ approved in the 2026-10-11 session; the decisions above (D1–D9, Steps 1–6) s
 - **Undetected garbling.** Unicode Devanagari with wrongly extracted vowel signs (form #30) is
   not detected by the heuristics and stays `ok`.
 
-## In my own words
+## Open issues
 
+### Acceptance checks not ticked by Claude
+- **"Boxes drawn in the viewer line up with the form's fields (human visual check on 5 forms)."**
+  This is a human check; it has not been done yet. The Gate 2 checklist (which 5 forms to open)
+  is given to the human with this close-out. The PR to `main` waits for it.
+
+### For the human
+- **Gate 2:** the visual check above; then the human ticks the gate.
+- **Teach-back answers and "In my own words":** pending for Phase 1 and Phase 2. From v1 on, a
+  short checkpoint at the end of each milestone (PLAN.md).
+
+### Known issues
+- **PyMuPDF SWIG `DeprecationWarning` on import (suppressed in pytest).** PyMuPDF 1.28.2's
+  SWIG-generated extension types (`SwigPyPacked`, `SwigPyObject`, `swigvarlink`) have no
+  `__module__`, and Python 3.12 warns when they are imported. It is inside PyMuPDF and harmless.
+  Python attributes the warning to `importlib._bootstrap`, not to `pymupdf`, so the
+  `filterwarnings` entry in `backend/pyproject.toml` cannot be scoped by module; it matches only
+  these three exact messages as `DeprecationWarning`. Revisit when PyMuPDF ships bindings built
+  with a SWIG version that sets `__module__`.
+- **The Label Studio database backup of 2026-10-23 is lost.** It was taken before Claude Code's
+  database edit for pending label fix 2. It lived in the session scratchpad, and `/tmp` was
+  cleared. The human verified the edit, and the v4 export keeps the annotation's earlier state.
+
+### Deferred (decided)
+- **Fix 8** (signature areas above a caption, nothing drawn): after v1 (PLAN.md).
+- **Remaining detection errors** (labels v4 inventory, "Step 11 — closing"): tables whose
+  columns exist only as header text, tick spots with no printed square, headings ending in a
+  colon, the empty "OR" column, blanks after a label without a colon. Each is a known
+  limitation.
+- **Rule 3's held-out precision is 3 / 7** on #1 pages 5, 8, 9 (labels v5). Tightening it is the
+  human's decision; it is also to be checked on the test set.
+
+## Notes for the next phase
+
+- **Milestone M1 (Phase 3) starts with one plan, approved once** (CLAUDE.md §1, milestone gates).
+  It must name up front:
+  - the Form IR change for marking office-use and signature fields as never filled;
+  - the LLM provider dependencies;
+  - whether Groq qualifies (free tier with no card or payment).
+- **Privacy invariant:** sensitive and phone values never reach a remote LLM provider; enforce it
+  at the provider layer and test it.
+- **Semantic-type labels are written blind** by the human, in the existing label files
+  (`eval/labels/`, schema in `eval/labelling/schema.py`). Detection labels stay as they are.
+- **Label text is rough in places.** A label is sometimes a neighbouring line's words, the line
+  above a leader instead of the caption below, or garbled Devanagari (#30). The understanding
+  pass must not assume clean labels; the context field (the heading above) helps.
+- **`max_chars` on combs and the `writing_line` of line entries** are what the fit pass needs.
+  Boxes are 1.2 × the font size high on the writing line, comb boxes are the cell union, and
+  cell blanks (rule 3) are the cell's empty part.
+- **Scanned and garbled pages** have no fields, only a trace event "needs OCR" (Phase 6, after
+  v1). Three dev forms (#37, #38, #42) are like this.
+- **Eval tooling to reuse:** `eval/detection.py` (matching rules, reports) and the worktree
+  procedure for re-measuring old commits on new labels (detailed record, Step 11).
+
+## In my own words

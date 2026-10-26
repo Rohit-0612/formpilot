@@ -132,7 +132,8 @@ Teach-back questions (human answers in `phase-1.md`)
 Goal: upload a flat (text-layer) PDF and see its detected fields as a Form IR.
 
 Human tasks (before the gate)
-- [ ] Label the entry boxes of the dev forms (tool to be decided at the start of Phase 2).
+- [x] Label the entry boxes of the dev forms (tool to be decided at the start of Phase 2).
+      (Label Studio; labels v5 for the 11 dev forms with a usable text layer, `eval/labels/`.)
 
 Deliverables
 - `ir/models.py` exactly as SPEC §4; `ir/semantic_types.py` with the list from SPEC §5
@@ -159,10 +160,14 @@ Deliverables
   column if needed.
 
 Acceptance
-- [ ] Detection precision/recall on the dev flat forms reported (eval report in `eval/reports/`).
+- [x] Detection precision/recall on the dev flat forms reported (eval report in `eval/reports/`).
+      (`…step11-7-hyphen-leaders-v5-20261026-714c3d3`: writing spot 95.1 / 92.4, IoU ≥ 0.5 88.1 /
+      85.5; eval tests pass in `make test`, 2026-10-26.)
 - [ ] Boxes drawn in the viewer line up with the form's fields (human visual check on 5 forms).
-- [ ] Coordinate conversion has unit tests (bottom-left ↔ top-left).
-- [ ] Uploading a non-PDF or an oversized file is rejected with a clear error.
+- [x] Coordinate conversion has unit tests (bottom-left ↔ top-left).
+      (`backend/tests/unit/test_coords.py`, 43 passed, 2026-10-26.)
+- [x] Uploading a non-PDF or an oversized file is rejected with a clear error.
+      (415 / 413, `tests/integration/test_documents_api.py`, passed in `make test-int`, 2026-10-26.)
 
 Teach-back
 1. Why is there one IR instead of letting each input type have its own pipeline?
