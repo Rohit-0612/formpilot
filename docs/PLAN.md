@@ -183,7 +183,7 @@ Teach-back
 Goal: every field gets a semantic type, and we can measure how well.
 
 Reference labels first
-- [ ] Semantic reference labels for the dev forms, written blind by Claude Code in
+- [x] Semantic reference labels for the dev forms, written blind by Claude Code in
       `eval/labels_semantic/` (human decision, 2026-10-26: no human labelling or audit; reports
       say the labels are Claude-written).
 
@@ -215,10 +215,15 @@ Deliverables
 - `make eval` target.
 
 Acceptance
-- [ ] Unit tests for the rule matcher and for LLM-output validation (valid, invalid, retry path).
-- [ ] Eval report on `dev` exists for all three modes, committed in `eval/reports/`.
-- [ ] Replay mode reproduces the same numbers without a running model.
-- [ ] `eval/baseline.json` created from the hybrid run.
+- [x] Unit tests for the rule matcher and for LLM-output validation (valid, invalid, retry path).
+      (`backend/tests/unit/test_understand.py`, `test_llm.py`.)
+- [x] Eval report on `dev` exists for all three modes, committed in `eval/reports/`.
+      (`phase3-understanding-dev-{rules,llm,hybrid}-pre-tuning-20261026-ee3c22e`; tuned hybrid
+      `…-hybrid-tuned-20261026-97a5205`. Reference labels Claude-written, P3-D6.)
+- [x] Replay mode reproduces the same numbers without a running model.
+      (Every recorded run replayed identically with the provider at a dead address; unit test
+      `test_record_then_replay_gives_the_same_numbers`.)
+- [x] `eval/baseline.json` created from the hybrid run. (Tuned hybrid, `97a5205`.)
 
 Teach-back
 1. Why rules first and the LLM second? What does the eval say about it?

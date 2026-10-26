@@ -1,10 +1,56 @@
 # Phase 3 — Field understanding + eval harness: decision record
 
-> Status: **in progress** (milestone M1, started 2026-10-26 on branch `phase-3-understanding`,
-> from `main` after the Phase 2 merge). The close-out sections are filled in at the end of the
-> milestone.
+> Status: **close-out drafted 2026-10-27** (milestone M1, branch `phase-3-understanding`, from
+> `main` after the Phase 2 merge). Gate 3 is the human's. The full record is kept under "Key
+> decisions and alternatives considered → Detailed record".
 
-## Plan approved by the human (2026-10-26)
+## What was built
+
+| Deliverable (PLAN Phase 3) | Where |
+|---|---|
+| Fields that are never filled (office use, signatures): `Field.no_fill_reason`, the only IR change (P3-D1); AcroForm signature widgets become never-filled text fields | `backend/app/ir/models.py`, `backend/app/frontends/acroform.py`, SPEC §4 |
+| LLM layer: interface with a privacy guard (no sensitive or phone value to a remote provider; Ollama cloud models and non-local hosts count as remote), Ollama provider, fake provider, record/replay cache | `backend/app/llm/` |
+| Understanding pass: rule matcher on the `semantic_types.py` keywords, then a batched LLM call per page (JSON schema, Pydantic, one retry, `unknown`), never-fill marks, review status | `backend/app/passes/understand.py`, `backend/app/passes/context.py` |
+| Versioned prompts | `backend/app/llm/prompts/understand_v1.md` (pre-tuning), `understand_v2.md` (current) |
+| The analyze job runs the pass after detection and stores IR version 2, within a deadline | `backend/app/services/analysis.py` |
+| Semantic labelling: a blind labelling page, merge for human labels, and Claude-written reference labels (P3-D6) | `eval/labelling/semantic.py`, `eval/labels_semantic/` |
+| Understanding eval with rules / llm / hybrid modes and record / replay (`make eval`), reports, baseline | `eval/run_eval.py`, `eval/reports/phase3-*`, `eval/llm_cache/understand/`, `eval/baseline.json` |
+
+**Measured on dev.** Reference labels are **Claude-written, not human** (P3-D6), so accuracy is
+agreement with them. Compared: 524 fields (the reference fields the detector found). Fillable:
+reference type neither `other` nor `unknown` (241).
+
+| Run | All | Fillable | Fillable, from scratch | Fillable, pre-filled |
+|---|---|---|---|---|
+| Pre-tuning, rules only | 17.4 % | 33.6 % | 15/30 | 66/211 |
+| Pre-tuning, llm only | 57.6 % | 55.2 % | 18/30 | 115/211 |
+| Pre-tuning, hybrid | 57.4 % | 57.3 % | 17/30 | 121/211 |
+| **Tuned, hybrid (product)** | **64.3 %** | **58.1 %** | 20/30 | 120/211 |
+
+- Tuned hybrid, precision of predicted fillable types: 60.6 % (140/231).
+- Replaying the recorded answers reproduces every run exactly without a model.
+- Test split: not measured yet (release measurement, Phase 5b, detection only).
+
+**Tests in the close-out run:** see "Open issues" → close-out checks.
+
+## Key decisions and alternatives considered
+
+| Decision | Alternatives | Why this one |
+|---|---|---|
+| **P3-D1** `no_fill_reason` on `Field`; AcroForm signatures as `text` fields | a new `FieldStatus`; `FieldKind.SIGNATURE` for both frontends (rejected by the human) | Status is the fill workflow, not a reason; the kind describes the entry shape, and the flat detector is scored on signature areas as `text` |
+| **P3-D2** no `GroqProvider` yet | build it now | Groq's own pages do not confirm that the free tier needs no card, which was the human's condition |
+| **P3-D3** one analyze job: v1 stored first, then understanding with a deadline, then v2 | a separate `understand` job type | That job would need a database migration (job types are a CHECK constraint) the plan did not include; v1 is never lost |
+| **P3-D3** at most 20 fields per LLM request | one request per page (SPEC §6.2) | Dense pages (over 100 fields) and a slow local model: shorter answers, no context overflow |
+| **P3-D4** rules and prompt frozen before the labels; pre-tuning reports kept | tune while labelling | Honest headline numbers (human rule) |
+| **P3-D6** reference labels written by Claude Code, blind, no human audit | a 60-field human audit; a 150-field human sample | The human's choice (no manual work). Disclosed in every report; agreement with a stronger model, not human truth |
+| Fillable accuracy reported next to overall accuracy | overall accuracy only | 52 % of the reference fields are `other`, so the overall number flatters |
+| Tuning: strict-majority rules, other-person guard, prompt v2 | more keywords; tuning toward labelling conventions (initials as signatures) | Product rules: never fill a profile value into another person's field; fewer wrong fillable predictions (110 → 91) |
+
+### Detailed record
+
+The record as written during the milestone, unchanged except for its heading levels.
+
+#### Plan approved by the human (2026-10-26)
 
 The M1 plan was approved once, with three changes by the human (milestone gates, CLAUDE.md §1):
 
@@ -28,9 +74,9 @@ the end of the milestone.
 - Semantic types are labelled for text and comb fields only (567 on the scored dev pages);
   checkboxes are excluded.
 
-## Decisions
+#### Decisions
 
-### P3-D1. Fields that are never filled: `Field.no_fill_reason` (SPEC §4 change)
+##### P3-D1. Fields that are never filled: `Field.no_fill_reason` (SPEC §4 change)
 
 **Problem.** Office-use fields ("For office use", "For bank use only") and signature areas are
 boxed like any other field (Phase 2 labelling rules), but FormPilot must never fill them: not
@@ -57,7 +103,7 @@ AcroForm frontend skipped signature widgets (Phase 2, Step 9).
 - `FieldKind.SIGNATURE` for both frontends: rejected by the human. The kind describes the entry
   shape, and the flat detector is scored on signature areas as `text`.
 
-### P3-D2. Groq is not built yet
+##### P3-D2. Groq is not built yet
 
 Groq's own documentation (console.groq.com, rate-limits page, checked 2026-10-26) does not say
 whether the Free tier needs a payment method; third-party pages say it does not, and Groq asks
@@ -65,7 +111,7 @@ for one only to upgrade to the Developer tier. The human's condition ("only if i
 needs no card or payment") cannot be confirmed from Groq's own pages, so `GroqProvider` is not
 built in this pass. It is added only if the human's own sign-up shows no card is asked for.
 
-### P3-D3. Understanding pass as built (steps 2–4)
+##### P3-D3. Understanding pass as built (steps 2–4)
 
 - **LLM layer** (`backend/app/llm/`): `LLMProvider` with a privacy guard in its one public method
   (a remote provider refuses requests carrying values of the sensitive or phone types); an Ollama
@@ -90,7 +136,7 @@ built in this pass. It is added only if the human's own sign-up shows no card is
   development laptop under memory pressure; the eval will record LLM responses once and replay
   them.
 
-### P3-D4. Frozen before the blind labelling (headline-number discipline)
+##### P3-D4. Frozen before the blind labelling (headline-number discipline)
 
 The rule keywords (`backend/app/ir/semantic_types.py`), the matcher
 (`backend/app/passes/understand.py`) and the prompt (`backend/app/llm/prompts/understand_v1.md`)
@@ -98,7 +144,7 @@ are frozen at commit `c7c7bd9` (2026-10-26, before the human labels). The deadli
 analyze-job wiring (`8852394`) do not change what the pass decides for a field. The first eval
 run after the labelling is the pre-tuning report.
 
-### P3-D5. Blind labelling tool (step 5)
+##### P3-D5. Blind labelling tool (step 5)
 
 `make label-semantic` writes a local page (`eval/labelling/work/semantic/`, gitignored) with one
 crop per field: the page around the labelled box, outlined in red. It reads only the label files
@@ -111,7 +157,7 @@ export whose fields no longer match (id, page, box, kind), and it never replaces
 Scope: 567 text and comb fields on the scored pages. The labelling conventions are in
 `eval/labelling/README.md`.
 
-### P3-D6. Semantic reference labels written by Claude Code (human decision, 2026-10-26)
+##### P3-D6. Semantic reference labels written by Claude Code (human decision, 2026-10-26)
 
 **Decision.** The human asked Claude Code to do the labelling and everything after it, so that no
 manual work is needed, and chose "Claude only, no human audit" over two alternatives:
@@ -156,7 +202,7 @@ different, much larger model. It is not accuracy against human ground truth.
 `other` everywhere would reach 52 %, so the eval also reports accuracy on the fields whose type
 is neither `other` nor `unknown` (261), and per type.
 
-## Pre-tuning eval (2026-10-26; kept unchanged as history)
+#### Pre-tuning eval (2026-10-26; kept unchanged as history)
 
 `make eval` on the dev split at `ee3c22e`: the rules and prompt as frozen in `c7c7bd9`, the
 reference labels of P3-D6, and the model `qwen3:8b` through local Ollama. **Reference labels are
@@ -183,7 +229,7 @@ recorded runs.
 **Latency:** the hybrid recording took 66 minutes and the llm one 81, on the development laptop
 under memory pressure. Not a product latency measurement: not measured yet.
 
-## Tuning (one session, 2026-10-26; dev only)
+#### Tuning (one session, 2026-10-26; dev only)
 
 **Error analysis** on the pre-tuning hybrid run.
 - **Signature areas typed `other` (22).**
@@ -231,5 +277,68 @@ after tuning; its pre-tuning report stands. The reference labels were not change
 - education tables whose column headings are far from the cell;
 - `other` vs `full_name` on claim forms, where the claimant is the nominee.
 
-## In my own words
+## Known limitations
 
+- **Accuracy is agreement with Claude-written reference labels** (P3-D6), not with human ground
+  truth; no human audited them.
+- **Small support.**
+  - 241 fillable fields on 11 dev forms; from scratch only 30 (#21, #41).
+  - The macro average swings by 25–50 points per field on forms with 2–4 fillable fields.
+- **Signature areas with their caption below** are mostly typed `other`: the frontend gives the
+  label above or left, never the caption below (an IR or frontend change, after v1).
+- **Office boxes whose only text is a grey hint** ("INITIALS") have no label text: hints are
+  never labels (Phase 2 rule 1).
+- **Education tables:** `passing_year` (0/8) and `institution_name` are rarely found when the
+  column heading is far from the cell.
+- **Claim forms, where the claimant is the nominee,** are ambiguous to the model: fields labelled
+  "nominee" are the user's own there, but another person's on a nomination form.
+- **Latency:** not measured yet. On the development laptop under memory pressure, local
+  `qwen3:8b` took about 3.6 s per field. The analyze job stops LLM calls at its deadline, and the
+  fields left are `unknown` / `NEEDS_REVIEW`.
+- **The CI eval gate cannot replay the dev eval yet:** the dev PDFs are not in the repository
+  (M4 plan).
+- **Ollama only;** Groq is not built (P3-D2).
+
+## Open issues
+
+### Acceptance checks
+All four Phase 3 acceptance checks are verified (PLAN.md):
+- the rule matcher and LLM-output validation tests;
+- dev reports for all three modes;
+- replay reproduces the numbers;
+- `baseline.json` from the hybrid run.
+
+The gate is the human's.
+
+### For the human
+- **Gate 3.**
+- **"In my own words" checkpoint** (optional, about 10 minutes):
+  1. Why do the rules run before the LLM, and what did the eval show about that?
+  2. Why is the model's self-reported confidence not a probability?
+  3. Why does the eval report fillable accuracy next to overall accuracy?
+- **Groq:** tell Claude Code whether Groq's free sign-up asked for a card; `GroqProvider` is
+  added only if it did not.
+
+### Close-out checks (2026-10-27)
+Recorded in the close-out commit message (`make lint`, `make test`, `make test-int`; CI on the
+branch).
+
+## Notes for the next phase
+
+- **M2 (Phase 4: vault, matching, questions, answers, validation, fit)** starts with one plan
+  for approval (milestone gates).
+- **Read IR version 2** (the latest) for semantic types:
+  - `semantic_method` is `rule`, `llm` or `none`;
+  - fields with `no_fill_reason` must never be asked, matched or rendered;
+  - `NEEDS_REVIEW` marks low confidence.
+- **Answers parsing (SPEC §6.5)** is the first LLM request that carries values. The privacy guard
+  is already in `LLMProvider.complete_json`: set `LLMRequest.carries` to the semantic types of
+  the values sent.
+- **Personas** (`eval/personas/`, three synthetic people) are drafted by Claude Code and checked
+  by the human (PLAN Phase 4).
+- **Fill correctness and validator evals** can reuse `eval/run_eval.py`'s matching, its
+  record/replay cache and its report layout.
+- **The understanding cache keys include the prompt:** a new prompt version needs a new
+  recording (about an hour on the development laptop).
+
+## In my own words
