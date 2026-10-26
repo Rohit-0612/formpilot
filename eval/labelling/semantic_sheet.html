@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semantic labels</title>
+<style>
+  :root { --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --line: #d8d8d2; --accent: #b4231c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+           padding: 10px 16px; border-bottom: 1px solid var(--line); background: #fff; }
+  header .grow { flex: 1; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px; }
+  .crop { background: #fff; border: 1px solid var(--line); padding: 8px; overflow: auto; }
+  .crop img { max-width: 100%; display: block; }
+  .where { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+  label { font-weight: 600; display: block; margin: 12px 0 4px; }
+  input[type=text] { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--line); }
+  .desc { color: var(--muted); min-height: 2.6em; margin-top: 6px; }
+  .done { color: #1f6f3a; font-weight: 600; }
+  button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  aside { font-size: 13px; }
+  aside ul { list-style: none; padding: 0; margin: 0; max-height: 60vh; overflow: auto; }
+  aside li { padding: 2px 0; border-bottom: 1px solid #ecece6; }
+  aside code { font-weight: 600; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style></head>
+<body>
+<header>
+  <strong>Semantic labels</strong><span id="progress"></span><span class="grow"></span>
+  <button id="prev" title="Previous field (Alt+Left)">Prev</button>
+  <button id="next" title="Next field (Alt+Right)">Next</button>
+  <button id="todo" title="Next field without a type (Alt+U)">Next unlabelled</button>
+  <button id="export">Export JSON</button>
+  <label style="display:inline;font-weight:400"><input type="file" id="import" accept=".json"> Import</label>
+</header>
+<main>
+  <section>
+    <p class="where" id="where"></p>
+    <div class="crop"><img id="image" alt="The field, outlined in red, with the page around it"></div>
+  </section>
+  <aside>
+    <label for="type">What does the red box ask for?</label>
+    <input type="text" id="type" list="types" autocomplete="off" placeholder="type to search, Enter to save">
+    <datalist id="types"></datalist>
+    <div class="desc" id="desc"></div>
+    <p id="status"></p>
+    <p>Use <code>other</code> when the field asks for something that is not in the list.</p>
+    <ul id="all"></ul>
+  </aside>
+</main>
+<script>
+const ITEMS = __ITEMS__;
+const TYPES = __TYPES__;
+const SCHEMA = "__SCHEMA__";
+const STORE = "formpilot-semantic-v1";
+const byValue = Object.fromEntries(TYPES.map(t => [t.value, t]));
+let answers = {};
+try { answers = JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (e) { answers = {}; }
+let at = Math.max(0, ITEMS.findIndex(i => !answers[i.key]));
+const $ = id => document.getElementById(id);
+for (const t of TYPES) {
+  const o = document.createElement("option"); o.value = t.value; o.label = t.description; $("types").append(o);
+  const li = document.createElement("li"); li.innerHTML = "<code></code> "; li.firstChild.textContent = t.value;
+  li.append(t.description); $("all").append(li);
+}
+function save() { try { localStorage.setItem(STORE, JSON.stringify(answers)); } catch (e) {} }
+function show() {
+  const item = ITEMS[at];
+  $("image").src = item.image;
+  $("where").textContent = `${item.form}, page ${item.page + 1}, ${item.id}${item.comb ? " (row of character boxes)" : ""}`;
+  $("type").value = answers[item.key] || "";
+  describe();
+  const n = ITEMS.filter(i => answers[i.key]).length;
+  $("progress").textContent = `${at + 1} / ${ITEMS.length} — labelled ${n}`;
+  $("status").innerHTML = answers[item.key] ? '<span class="done">saved</span>' : "";
+  $("type").focus();
+}
+function describe() { const t = byValue[$("type").value.trim()]; $("desc").textContent = t ? t.description : ""; }
+function move(step) { at = Math.min(ITEMS.length - 1, Math.max(0, at + step)); show(); }
+function nextTodo() { const i = ITEMS.findIndex((it, k) => k > at && !answers[it.key]); if (i >= 0) { at = i; show(); } }
+$("type").addEventListener("input", describe);
+$("type").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const value = $("type").value.trim();
+  if (!byValue[value]) { $("status").textContent = "Not a type in the list."; return; }
+  answers[ITEMS[at].key] = value; save();
+  if (at < ITEMS.length - 1) move(1); else show();
+});
+document.addEventListener("keydown", e => {
+  if (!e.altKey) return;
+  if (e.key === "ArrowLeft") move(-1);
+  if (e.key === "ArrowRight") move(1);
+  if (e.key === "u" || e.key === "U") nextTodo();
+});
+$("prev").onclick = () => move(-1);
+$("next").onclick = () => move(1);
+$("todo").onclick = nextTodo;
+$("export").onclick = () => {
+  const labels = ITEMS.filter(i => answers[i.key]).map(i => ({form: i.form, id: i.id, page: i.page, bbox: i.bbox, semantic_type: answers[i.key]}));
+  const blob = new Blob([JSON.stringify({schema: SCHEMA, labels}, null, 1)], {type: "application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `semantic-labels-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`; a.click();
+};
+$("import").onchange = async e => {
+  const data = JSON.parse(await e.target.files[0].text());
+  if (data.schema !== SCHEMA) { alert("Not a semantic-label export."); return; }
+  for (const l of data.labels) answers[`${l.form}/${l.id}`] = l.semantic_type;
+  save(); show();
+};
+show();
+</script>
+</body></html>

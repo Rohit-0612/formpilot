@@ -65,5 +65,51 @@ for one only to upgrade to the Developer tier. The human's condition ("only if i
 needs no card or payment") cannot be confirmed from Groq's own pages, so `GroqProvider` is not
 built in this pass. It is added only if the human's own sign-up shows no card is asked for.
 
+### P3-D3. Understanding pass as built (steps 2–4)
+
+- **LLM layer** (`backend/app/llm/`): `LLMProvider` with a privacy guard in its one public method
+  (a remote provider refuses requests carrying values of the sensitive or phone types); an Ollama
+  provider (schema-constrained JSON, temperature 0, thinking off, 8192-token context); a fake
+  provider; a record / replay cache keyed by provider, model, prompt, request and schema.
+  - An Ollama cloud model or a non-local host counts as remote.
+  - Ollama's default 4096-token context could not hold the prompt plus a batch, hence 8192.
+- **Rule matcher:** the label's content words against `semantic_types.py`'s keywords (written in
+  Phase 2, unchanged). A unique strong match means the longest keyword covers at least half of the
+  label and no other type matches words outside it. Format and instruction words ("DD/MM/YYYY",
+  "block letters") don't count. Current vs permanent address comes from the heading or label.
+- **LLM:** the remaining fields of a page, at most 20 per request. SPEC §6.2 says one request
+  per page; the split keeps answers short on dense pages (#1 page 1 has more than 100 fields).
+- **In the analyze job:** IR version 1 (detection) is stored and the document is `ready`
+  first, then the pass runs and IR version 2 is appended. The pass gets a deadline (job timeout
+  minus 30 s); LLM batches after it are skipped and their fields stay unknown. A separate
+  `understand` job would need a database migration (job types are a CHECK constraint) that the
+  plan did not include.
+- **Never filled:** signature fields and fields under an office-use heading get status
+  `SKIPPED` with their `no_fill_reason`; confidence below 0.7 gives `NEEDS_REVIEW`.
+- **Latency:** not measured yet. A smoke run on #21 (52 fields) took about three minutes on the
+  development laptop under memory pressure; the eval will record LLM responses once and replay
+  them.
+
+### P3-D4. Frozen before the blind labelling (headline-number discipline)
+
+The rule keywords (`backend/app/ir/semantic_types.py`), the matcher
+(`backend/app/passes/understand.py`) and the prompt (`backend/app/llm/prompts/understand_v1.md`)
+are frozen at commit `c7c7bd9` (2026-10-26, before the human labels). The deadline and the
+analyze-job wiring (`8852394`) do not change what the pass decides for a field. The first eval
+run after the labelling is the pre-tuning report.
+
+### P3-D5. Blind labelling tool (step 5)
+
+`make label-semantic` writes a local page (`eval/labelling/work/semantic/`, gitignored) with one
+crop per field: the page around the labelled box, outlined in red. It reads only the label files
+and the PDFs, so neither detector output nor extracted label text nor a model answer can show.
+
+`make label-semantic-merge` writes only `semantic_type` into the label files. It refuses an
+export whose fields no longer match (id, page, box, kind), and it never replaces a type without
+`--overwrite`.
+
+Scope: 567 text and comb fields on the scored pages. The labelling conventions are in
+`eval/labelling/README.md`.
+
 ## In my own words
 

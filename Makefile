@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-examples label-images eval-detect
+.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-examples label-images eval-detect
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -66,6 +66,15 @@ label-tasks:
 label-convert:
 	@test -n "$(EXPORT)" || (echo "usage: make label-convert EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
 	$(EVAL_PY) eval.labelling.convert "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
+
+## Blind semantic-type labelling (Phase 3): write the local labelling page (gitignored)
+label-semantic:
+	$(EVAL_PY) eval.labelling.semantic sheet
+
+## Merge a semantic-label export into eval/labels/ (only semantic_type is written)
+label-semantic-merge:
+	@test -n "$(EXPORT)" || (echo "usage: make label-semantic-merge EXPORT=path/to/export.json [OVERWRITE=1]" && exit 2)
+	$(EVAL_PY) eval.labelling.semantic merge "$(EXPORT)" $(if $(OVERWRITE),--overwrite,)
 
 ## Render the README example images from the synthetic fixtures (committed)
 label-images:
