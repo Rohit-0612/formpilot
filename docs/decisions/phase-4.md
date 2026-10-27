@@ -58,6 +58,36 @@ Written and committed before the first fill eval run, so the choice cannot follo
 - One session: if no candidate is good enough, the result is reported as it is; no new
   candidates are added after the run.
 
+### Fill-policy tuning session: result (2026-10-27)
+
+Reports: `eval/reports/phase4-fill-dev-groq-openai-gpt-oss-120b-tuning-20261027-b315f23.md`
+and `…-ollama-qwen3-8b-comparison-…`. Full persona (`asha_verma`), dev, 241 compared fields with
+a fillable reference type. Reference labels Claude-written (P3-D6), personas not checked by a
+human (P4-D3).
+
+| Candidate | Groq: fill precision | Groq: coverage | qwen3:8b: fill precision | qwen3:8b: coverage |
+|---|--:|--:|--:|--:|
+| No policy (every predicted type) | 64.8 % (127/196) | 52.7 % | 57.6 % (117/203) | 48.5 % |
+| LLM ≥ 0.90 | 68.1 % (111/163) | 46.1 % | 57.9 % (117/202) | 48.5 % |
+| LLM ≥ 0.95 | 75.6 % (102/135) | 42.3 % | 70.1 % (89/127) | 36.9 % |
+| LLM ≥ 0.99 | 79.8 % (79/99) | 32.8 % | 68.3 % (82/120) | 34.0 % |
+| Rules only | 74.0 % (54/73) | 22.4 % | 74.0 % (54/73) | 22.4 % |
+| LLM ≥ 0.90, once per form | 70.0 % (91/130) | 37.8 % | 63.1 % (99/157) | 41.1 % |
+| LLM ≥ 0.95, once per form | 79.0 % (83/105) | 34.4 % | 76.0 % (73/96) | 30.3 % |
+| **LLM ≥ 0.99, once per form (chosen)** | **86.5 % (64/74)** | **26.6 %** | 74.2 % (66/89) | 27.4 % |
+| Rules only, once per form | 81.4 % (48/59) | 19.9 % | 81.4 % (48/59) | 19.9 % |
+
+- **Chosen by the rule:** LLM confidence ≥ 0.99 and person or date types at most once per form.
+  **Target met on Groq** (86.5 % ≥ 85 %); it is now the product default (`FILL_MIN_CONFIDENCE`
+  0.99, `FILL_ONCE_PER_FORM` true). Value correctness under it: 86.5 %. The other personas:
+  `ravi_kumar` 92.2 % (64 filled), `meera_iyer` 84.6 % (52 filled).
+- **qwen3:8b (the fallback) does not reach the target** with any candidate; under the chosen
+  policy it fills at 74.2 %. On the Ollama fallback, fills are less precise (known limitation).
+- "No policy" here (64.8 %) is below the understanding eval's fillable precision (67.7 %,
+  151/223) because only fields the persona can fill count: never-fill fields, types without a
+  profile value (`place`, `signature`) and unmatched options are not filled.
+- The baseline (`eval/baseline.json`, `fill`) holds the chosen policy's Groq numbers.
+
 ## Known limitations
 
 Not yet (in progress).

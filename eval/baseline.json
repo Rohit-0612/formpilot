@@ -5,5 +5,13 @@
     "accuracy": 0.6431297709923665,
     "accuracy_fillable": 0.5809128630705395,
     "reference_labels": "Claude-written (P3-D6)"
+  },
+  "fill": {
+    "provider": "groq:openai/gpt-oss-120b",
+    "policy": "LLM confidence >= 0.99, once per form",
+    "report": "phase4-fill-dev-groq-openai-gpt-oss-120b-tuning-20261027-b315f23.json",
+    "fill_precision": 0.8648648648648649,
+    "coverage": 0.26556016597510373,
+    "target_met": true
   }
 }
