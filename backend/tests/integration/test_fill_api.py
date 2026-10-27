@@ -27,7 +27,7 @@ pytestmark = pytest.mark.usefixtures("truncate_all")
 
 DOCS = "/api/v1/documents"
 PAN = "AAAPV1234A"
-AADHAAR = "230000000014"  # Verhoeff-valid synthetic
+AADHAAR = "230000000017"  # Verhoeff-valid synthetic
 MOBILE = "9000012345"
 EMAIL = "asha.verma@example.com"
 FULL = {
@@ -124,7 +124,7 @@ async def test_a_partial_profile_asks_what_it_lacks_and_answers_fill_and_save(
          "sensitive_opt_in": ["pan"]},
         {"question_id": questions["What is your mobile number?"]["id"], "value": "+91 90000 12345"},
         {"question_id": questions["The form asks: “Remarks”. What should go here?"]["id"],
-         "value": "Aadhaar 2300 0000 0014 on file"},
+         "value": "Aadhaar 2300 0000 0017 on file"},
     ]  # fmt: skip
     accepted = await client.post(f"{DOCS}/{document_id}/answers", json={"answers": answers})
     assert accepted.status_code == 202, accepted.text
@@ -148,7 +148,7 @@ async def test_a_partial_profile_asks_what_it_lacks_and_answers_fill_and_save(
     assert by_label["Mobile number"]["value"] == MOBILE
     # an Aadhaar inside a note: shown to its owner (masking matches whole values, a known
     # limitation) but encrypted in the database (checked below)
-    assert by_label["Remarks"]["value"] == "Aadhaar 2300 0000 0014 on file"
+    assert by_label["Remarks"]["value"] == "Aadhaar 2300 0000 0017 on file"
     profile = (await client.get("/api/v1/profile")).json()
     assert profile["values"]["email"] == EMAIL and profile["values"]["pan"] == "XXXX234A"
     assert "phone_mobile" not in profile["values"]  # not ticked for saving
@@ -162,10 +162,10 @@ async def test_a_partial_profile_asks_what_it_lacks_and_answers_fill_and_save(
             )
         ).all()
     stored = json.dumps(list(rows))
-    for secret in (PAN, MOBILE, AADHAAR, "2300 0000 0014"):
+    for secret in (PAN, MOBILE, AADHAAR, "2300 0000 0017"):
         assert secret not in stored, secret
     captured = capsys.readouterr()
-    for secret in (*SECRETS, "2300 0000 0014"):
+    for secret in (*SECRETS, "2300 0000 0017"):
         assert secret not in captured.out + captured.err, secret
 
 

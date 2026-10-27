@@ -24,11 +24,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.ir.models import ValueSource
+from app.ir.models import FieldStatus, ValueSource
 from app.logging import configure_logging
 from app.passes import match
 from app.passes.context import PassContext
 from app.passes.match import PERSON_AND_DATE_TYPES, FillPolicy
+from app.passes.questions import plan
 from eval import run_eval
 from eval.labelling.schema import DATASET_DIR, LABELS_DIR, REFERENCE_DIR, REPO_ROOT
 from eval.labelling.subset import DEV_SUBSET
@@ -102,6 +103,23 @@ def score(result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillP
     return FillScore(filled, type_correct, value_correct, fillable)
 
 
+def questions_per_form(
+    result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillPolicy
+) -> dict[str, dict[str, int]]:
+    """Per form (scored pages): fields needing input after filling, and the questions asked."""
+    ctx = PassContext(clock=lambda: run_eval.FIXED_TIME, profile=profile)
+    out = {}
+    for form in result.forms:
+        if form.understood is None:
+            continue
+        filled = match.run(form.understood, ctx, policy)
+        out[form.form] = {
+            "fields_needing_input": sum(f.status is FieldStatus.NEEDS_INPUT for f in filled.fields),
+            "questions": len(plan(filled, policy)),
+        }
+    return out
+
+
 def choose(scores: Mapping[str, FillScore]) -> tuple[str, bool]:
     """The chosen candidate and whether it meets the precision target (rule in the docstring)."""
 
@@ -129,6 +147,7 @@ def report(
     chosen: str,
     met: bool,
     tag: str | None,
+    questions: Mapping[str, Mapping[str, Mapping[str, int]]] | None = None,
 ) -> dict[str, object]:
     return {
         "kind": "fill",
@@ -150,6 +169,7 @@ def report(
             name: {persona: s.as_dict() for persona, s in by_persona.items()}
             for name, by_persona in table.items()
         },
+        "questions_per_form": questions or {},
     }
 
 
@@ -193,6 +213,31 @@ def markdown(data: Mapping[str, object]) -> str:
         f"| {_pct(candidates[data['chosen']][p]['fill_precision'])} |"  # type: ignore[index]
         for p in personas
     ]
+    per_profile: Mapping[str, Mapping[str, Mapping[str, int]]] = data["questions_per_form"]  # type: ignore[assignment]
+    if per_profile:
+        names = list(per_profile)
+        lines += [
+            "",
+            "## Questions per form (chosen policy, scored pages)",
+            "",
+            "Fields needing input after filling, and the questions that ask for them.",
+            "",
+            "| Form | " + " | ".join(f"`{n}`: fields / questions" for n in names) + " |",
+            "|---|" + "--:|" * len(names),
+        ]
+        forms = list(next(iter(per_profile.values())))
+        for form in [*forms, "total"]:
+            cells = []
+            for n in names:
+                rows = per_profile[n]
+                if form == "total":
+                    f = sum(r["fields_needing_input"] for r in rows.values())
+                    q = sum(r["questions"] for r in rows.values())
+                else:
+                    f, q = rows[form]["fields_needing_input"], rows[form]["questions"]
+                cells.append(f"{f} / {q}")
+            name = "**Total**" if form == "total" else form
+            lines.append(f"| {name} | " + " | ".join(cells) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -230,7 +275,12 @@ def main(argv: list[str] | None = None) -> int:
         for name, policy in CANDIDATES.items()
     }
     chosen, met = choose({name: by[FULL_PERSONA] for name, by in table.items()})
-    data = report(result, table, chosen, met, args.tag)
+    profiles = {FULL_PERSONA: personas[FULL_PERSONA], "empty profile": {}}
+    questions = {
+        name: questions_per_form(result, profile, CANDIDATES[chosen])
+        for name, profile in profiles.items()
+    }
+    data = report(result, table, chosen, met, args.tag, questions)
     stamp = result.created_at[:10].replace("-", "")
     tag = f"-{args.tag}" if args.tag else ""
     commit = result.detector.removeprefix("flat@")

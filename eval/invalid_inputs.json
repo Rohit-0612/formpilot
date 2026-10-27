@@ -1,0 +1,190 @@
+{
+  "note": "Synthetic wrong values for the validator eval (SPEC §10). Written by Claude Code with the validators; some are realistic errors that format rules cannot catch, so the catch rate is not 100 % by construction.",
+  "inputs": [
+    {
+      "semantic_type": "pan",
+      "value": "ABCD1234F",
+      "why": "a letter missing"
+    },
+    {
+      "semantic_type": "pan",
+      "value": "ABCDE12345",
+      "why": "last character is a digit"
+    },
+    {
+      "semantic_type": "pan",
+      "value": "ABCDEI234F",
+      "why": "letter I instead of digit 1"
+    },
+    {
+      "semantic_type": "pan",
+      "value": "ABCDE1234",
+      "why": "check letter missing"
+    },
+    {
+      "semantic_type": "pan",
+      "value": "ABCDE1234FG",
+      "why": "one character too many"
+    },
+    {
+      "semantic_type": "pan",
+      "value": "ABCDP1234F",
+      "why": "valid shape (holder-type letter is not checked)"
+    },
+    {
+      "semantic_type": "aadhaar",
+      "value": "230001000017",
+      "why": "one digit mistyped (Verhoeff)"
+    },
+    {
+      "semantic_type": "aadhaar",
+      "value": "203546789010",
+      "why": "two adjacent digits swapped (Verhoeff)"
+    },
+    {
+      "semantic_type": "aadhaar",
+      "value": "1234 5678 9012",
+      "why": "starts with 1"
+    },
+    {
+      "semantic_type": "aadhaar",
+      "value": "2345 6789 012",
+      "why": "11 digits"
+    },
+    {
+      "semantic_type": "aadhaar",
+      "value": "2345 6789 01234",
+      "why": "13 digits"
+    },
+    {
+      "semantic_type": "aadhaar",
+      "value": "0300 0000 0014",
+      "why": "starts with 0"
+    },
+    {
+      "semantic_type": "ifsc",
+      "value": "SBIN1001234",
+      "why": "fifth character is not 0"
+    },
+    {
+      "semantic_type": "ifsc",
+      "value": "SBI0001234",
+      "why": "10 characters"
+    },
+    {
+      "semantic_type": "ifsc",
+      "value": "SBIN00012345",
+      "why": "12 characters"
+    },
+    {
+      "semantic_type": "ifsc",
+      "value": "5BIN0001234",
+      "why": "digit in the bank code"
+    },
+    {
+      "semantic_type": "current_pincode",
+      "value": "011001",
+      "why": "starts with 0"
+    },
+    {
+      "semantic_type": "current_pincode",
+      "value": "41100",
+      "why": "5 digits"
+    },
+    {
+      "semantic_type": "current_pincode",
+      "value": "4110011",
+      "why": "7 digits"
+    },
+    {
+      "semantic_type": "current_pincode",
+      "value": "41l001",
+      "why": "letter l instead of 1"
+    },
+    {
+      "semantic_type": "current_pincode",
+      "value": "999999",
+      "why": "valid shape (not a real PIN code; existence is not checked)"
+    },
+    {
+      "semantic_type": "phone_mobile",
+      "value": "5876543210",
+      "why": "starts with 5"
+    },
+    {
+      "semantic_type": "phone_mobile",
+      "value": "987654321",
+      "why": "9 digits"
+    },
+    {
+      "semantic_type": "phone_mobile",
+      "value": "98765432100",
+      "why": "11 digits"
+    },
+    {
+      "semantic_type": "phone_mobile",
+      "value": "+44 9876543210",
+      "why": "foreign prefix"
+    },
+    {
+      "semantic_type": "phone_mobile",
+      "value": "020 2612 3456",
+      "why": "a landline"
+    },
+    {
+      "semantic_type": "email",
+      "value": "asha.example.com",
+      "why": "no @"
+    },
+    {
+      "semantic_type": "email",
+      "value": "asha@",
+      "why": "no domain"
+    },
+    {
+      "semantic_type": "email",
+      "value": "@example.com",
+      "why": "no name"
+    },
+    {
+      "semantic_type": "email",
+      "value": "asha verma@example.com",
+      "why": "a space"
+    },
+    {
+      "semantic_type": "email",
+      "value": "asha@example",
+      "why": "no top-level domain"
+    },
+    {
+      "semantic_type": "email",
+      "value": "asha@exmaple.com",
+      "why": "a typo in the domain (deliverability is not checked)"
+    },
+    {
+      "semantic_type": "date_of_birth",
+      "value": "31/02/1999",
+      "why": "no such day"
+    },
+    {
+      "semantic_type": "date_of_birth",
+      "value": "1999-03-05",
+      "why": "another format than the form asks for"
+    },
+    {
+      "semantic_type": "date_of_birth",
+      "value": "05/13/1999",
+      "why": "month 13"
+    },
+    {
+      "semantic_type": "date_of_birth",
+      "value": "01/01/2099",
+      "why": "in the future"
+    },
+    {
+      "semantic_type": "date_of_birth",
+      "value": "05/03/1899",
+      "why": "valid but implausible (age is not checked)"
+    }
+  ]
+}

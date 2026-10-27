@@ -1,0 +1,29 @@
+{
+  "kind": "validators",
+  "detector": "flat@55f95e4",
+  "created_at": "2026-10-27T07:02:33+00:00",
+  "invalid_inputs": 37,
+  "caught": 33,
+  "catch_rate": 0.8918918918918919,
+  "missed": [
+    {
+      "semantic_type": "pan",
+      "why": "valid shape (holder-type letter is not checked)"
+    },
+    {
+      "semantic_type": "current_pincode",
+      "why": "valid shape (not a real PIN code; existence is not checked)"
+    },
+    {
+      "semantic_type": "email",
+      "why": "a typo in the domain (deliverability is not checked)"
+    },
+    {
+      "semantic_type": "date_of_birth",
+      "why": "valid but implausible (age is not checked)"
+    }
+  ],
+  "persona_values_checked": 21,
+  "false_rejects": [],
+  "false_reject_rate": 0.0
+}
