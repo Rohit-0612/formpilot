@@ -1,12 +1,15 @@
 import uuid
 from datetime import datetime
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.api.schemas.ir import MaskedFormIR
 from app.db.models import DocumentStatus, JobStatus, JobType
 from app.ir.models import SourceKind
 from app.passes.answers import Answer
 from app.passes.questions import Question
+from app.services.review import MAX_VALUE_LENGTH
 
 
 class UploadResponse(BaseModel):
@@ -61,3 +64,28 @@ class AnswersRequest(BaseModel):
 
 class JobAccepted(BaseModel):
     job_id: uuid.UUID
+
+
+class FieldEdit(BaseModel):
+    """A review action on one field (SPEC §6.8). `value`: the user's value; null or an empty
+    string clears the field (it is asked again); left out: unchanged. `confirmed`: true confirms
+    the field (also accepting a suggestion), false takes the confirm back; left out: unchanged."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: str | None = Field(default=None, max_length=MAX_VALUE_LENGTH)
+    confirmed: bool | None = None
+
+    @model_validator(mode="after")
+    def _something(self) -> Self:
+        if not self.model_fields_set & {"value", "confirmed"}:
+            raise ValueError("send a value, confirmed, or both")
+        return self
+
+
+class ReviewResponse(BaseModel):
+    """The form after a review action (values masked as in GET /ir) and how many fields the
+    action changed (0: nothing to do)."""
+
+    ir: MaskedFormIR
+    changed: int

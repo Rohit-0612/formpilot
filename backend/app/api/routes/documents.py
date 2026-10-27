@@ -1,16 +1,25 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 
 from app.api import API_PREFIX
-from app.api.deps import CurrentUser, get_app_settings, get_document_service, get_queue
+from app.api.deps import (
+    CurrentUser,
+    get_app_settings,
+    get_document_service,
+    get_queue,
+    get_review_service,
+)
 from app.api.schemas.documents import (
     AnswersRequest,
     DocumentResponse,
+    FieldEdit,
     JobAccepted,
     JobSummary,
     QuestionsResponse,
+    ReviewResponse,
     UploadResponse,
 )
 from app.api.schemas.ir import MaskedFormIR
@@ -25,13 +34,25 @@ from app.services.documents import (
     looks_like_pdf,
 )
 from app.services.jobs import JobEnqueueError, JobQueue
+from app.services.review import (
+    DocumentBusyError,
+    FieldNotFoundError,
+    ReviewError,
+    ReviewService,
+    Transform,
+    confirm_all,
+    edit_field,
+    review_context,
+)
 
 router = APIRouter(prefix=f"{API_PREFIX}/documents", tags=["documents"])
 
 Documents = Annotated[DocumentService, Depends(get_document_service)]
 AppSettings = Annotated[Settings, Depends(get_app_settings)]
 Queue = Annotated[JobQueue, Depends(get_queue)]
+Review = Annotated[ReviewService, Depends(get_review_service)]
 DocumentId = Annotated[uuid.UUID, Path()]
+FieldId = Annotated[str, Path(min_length=1, max_length=64)]
 
 _NOT_FOUND = "Document not found"
 _NOT_FOUND_RESPONSE: dict[int | str, dict[str, Any]] = {
@@ -221,3 +242,87 @@ async def get_page_image(
     return Response(
         content=image, media_type="image/png", headers={"Cache-Control": "private, no-store"}
     )
+
+
+_REVIEW_RESPONSES: dict[int | str, dict[str, Any]] = {
+    status.HTTP_404_NOT_FOUND: {"description": "Not found, not analysed yet, or no such field"},
+    status.HTTP_409_CONFLICT: {
+        "description": "Not possible now: a job is running, the field is never filled, or it "
+        "has no value to confirm"
+    },
+}
+
+
+async def _review(
+    document_id: uuid.UUID, user: CurrentUser, documents: DocumentService, review: ReviewService,
+    transform: Transform,
+) -> ReviewResponse:  # fmt: skip
+    document = await _owned(documents, document_id, user)
+    try:
+        ir, changes = await review.apply(document, user.id, transform)
+    except FieldNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from None
+    except ReviewError as exc:  # busy, never filled, nothing to confirm: messages hold no value
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from None
+    return ReviewResponse(
+        ir=MaskedFormIR.model_validate(ir.model_dump(mode="json")), changed=len(changes)
+    )
+
+
+@router.patch(
+    "/{document_id}/fields/{field_id}",
+    response_model=ReviewResponse,
+    responses=_REVIEW_RESPONSES,
+)
+async def patch_field(
+    document_id: DocumentId,
+    field_id: FieldId,
+    body: FieldEdit,
+    user: CurrentUser,
+    documents: Documents,
+    review: Review,
+    settings: AppSettings,
+) -> ReviewResponse:
+    """Edit, clear, confirm or unconfirm one field (SPEC §6.8)."""
+    ctx = review_context(lambda: datetime.now(UTC), settings)
+    value = {"value": body.value} if "value" in body.model_fields_set else {}
+    return await _review(
+        document_id, user, documents, review,
+        lambda ir: edit_field(ir, field_id, ctx, confirmed=body.confirmed, **value),
+    )  # fmt: skip
+
+
+@router.post(
+    "/{document_id}/confirm-all",
+    response_model=ReviewResponse,
+    responses=_REVIEW_RESPONSES,
+)
+async def post_confirm_all(
+    document_id: DocumentId,
+    user: CurrentUser,
+    documents: Documents,
+    review: Review,
+    settings: AppSettings,
+) -> ReviewResponse:
+    """Confirm every filled field whose checks passed and whose value is not the LLM's
+    (decision P5-D7); suggestions and fields with a warning need their own confirm."""
+    ctx = review_context(lambda: datetime.now(UTC), settings)
+    return await _review(document_id, user, documents, review, lambda ir: confirm_all(ir, ctx))
+
+
+@router.delete(
+    "/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": _NOT_FOUND},
+        status.HTTP_409_CONFLICT: {"description": "A job of the document is running"},
+    },
+)
+async def delete_document(document_id: DocumentId, user: CurrentUser, documents: Documents) -> None:
+    """Delete the document now: the upload, page images, filled PDF, IR versions and jobs."""
+    document = await _owned(documents, document_id, user)
+    try:
+        await documents.delete(document)
+    except DocumentBusyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from None

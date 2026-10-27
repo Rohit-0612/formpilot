@@ -22,6 +22,7 @@ from app.passes.questions import Question
 from app.services import filling, ir_store
 from app.services.analysis import original_key, page_key
 from app.services.jobs import JobEnqueueError, JobQueue, JobService
+from app.services.review import DocumentBusyError, job_running
 from app.storage.base import ObjectNotFoundError, Storage
 from app.vault.crypto import VaultCipher
 
@@ -157,6 +158,17 @@ class DocumentService:
         except JobEnqueueError:
             await self._storage.delete(filling.answers_key(document.id, job_id))
             raise
+
+    async def delete(self, document: Document) -> None:
+        """Deletes the document's files, then the document with its IR versions, jobs and audit
+        events (SPEC §11: the user's delete). Refused while a job of the document is queued or
+        running, which could write files again (DocumentBusyError)."""
+        if await job_running(self._session, document.id):
+            raise DocumentBusyError("The form is still being processed. Try again in a moment.")
+        await self._storage.delete_prefix(f"documents/{document.id}")
+        await self._session.delete(document)
+        await self._session.commit()
+        log.info("document_deleted", document_id=str(document.id))
 
     async def page_image(self, document: Document, page: int) -> bytes | None:
         if document.page_count is None or not 0 <= page < document.page_count:

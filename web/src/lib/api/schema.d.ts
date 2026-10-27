@@ -117,7 +117,11 @@ export interface paths {
         get: operations["get_document_api_v1_documents__document_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Document
+         * @description Delete the document now: the upload, page images, filled PDF, IR versions and jobs.
+         */
+        delete: operations["delete_document_api_v1_documents__document_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -185,6 +189,47 @@ export interface paths {
         get: operations["get_page_image_api_v1_documents__document_id__pages__page__png_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Field
+         * @description Edit, clear, confirm or unconfirm one field (SPEC §6.8).
+         */
+        patch: operations["patch_field_api_v1_documents__document_id__fields__field_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/confirm-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Confirm All
+         * @description Confirm every filled field whose checks passed and whose value is not the LLM's
+         *     (decision P5-D7); suggestions and fields with a warning need their own confirm.
+         */
+        post: operations["post_confirm_all_api_v1_documents__document_id__confirm_all_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -369,6 +414,18 @@ export interface components {
             date_part?: components["schemas"]["DatePart"] | null;
             /** Group Id */
             group_id?: string | null;
+        };
+        /**
+         * FieldEdit
+         * @description A review action on one field (SPEC §6.8). `value`: the user's value; null or an empty
+         *     string clears the field (it is asked again); left out: unchanged. `confirmed`: true confirms
+         *     the field (also accepting a suggestion), false takes the confirm back; left out: unchanged.
+         */
+        FieldEdit: {
+            /** Value */
+            value?: string | null;
+            /** Confirmed */
+            confirmed?: boolean | null;
         };
         /**
          * FieldGroup
@@ -640,6 +697,16 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /**
+         * ReviewResponse
+         * @description The form after a review action (values masked as in GET /ir) and how many fields the
+         *     action changed (0: nothing to do).
+         */
+        ReviewResponse: {
+            ir: components["schemas"]["MaskedFormIR"];
+            /** Changed */
+            changed: number;
         };
         /**
          * SemanticType
@@ -976,6 +1043,49 @@ export interface operations {
             };
         };
     };
+    delete_document_api_v1_documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A job of the document is running */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ir_api_v1_documents__document_id__ir_get: {
         parameters: {
             query?: never;
@@ -1132,6 +1242,101 @@ export interface operations {
             };
             /** @description Not found, no such page, or not rendered */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_field_api_v1_documents__document_id__fields__field_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                field_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewResponse"];
+                };
+            };
+            /** @description Not found, not analysed yet, or no such field */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not possible now: a job is running, the field is never filled, or it has no value to confirm */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_confirm_all_api_v1_documents__document_id__confirm_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewResponse"];
+                };
+            };
+            /** @description Not found, not analysed yet, or no such field */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not possible now: a job is running, the field is never filled, or it has no value to confirm */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

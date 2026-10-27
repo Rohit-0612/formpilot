@@ -17,6 +17,7 @@ from app.security import InvalidTokenError, decode_access_token
 from app.services.documents import DocumentService
 from app.services.health import HealthService, ping_database, ping_redis
 from app.services.jobs import JobQueue, create_queue
+from app.services.review import ReviewService
 from app.services.users import UserService
 from app.storage.base import Storage
 from app.vault.crypto import VaultCipher
@@ -82,6 +83,14 @@ def get_document_service(
     return DocumentService(
         session, storage, settings.file_ttl_hours, VaultCipher(settings.vault_key)
     )
+
+
+def get_review_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    storage: Annotated[Storage, Depends(get_storage)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> ReviewService:
+    return ReviewService(session, storage, VaultCipher(settings.vault_key))
 
 
 def get_profile_service(
