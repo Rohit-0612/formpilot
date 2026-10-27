@@ -107,7 +107,7 @@ def test_aadhaar_checksum_is_reported_separately_from_the_format() -> None:
 
 
 @pytest.mark.parametrize(
-    "value", ["ABCDE1234X", "2345 6789 0125", "9876543", "SBIN1001234", "011001", "a@b"]
+    "value", ["ABCDE12345", "2345 6789 0125", "9876543", "SBIN1001234", "011001", "a@b"]
 )
 def test_messages_never_contain_the_value(value: str) -> None:
     field = _field(value=value)
