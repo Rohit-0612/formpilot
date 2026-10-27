@@ -187,7 +187,7 @@ async def analyze_document(
         document = await session.get(Document, document_id)
         if document is None:  # deleted while the job ran
             raise DocumentNotAnalyzableError
-        filled = await filling.fill_document(session, document, understood, settings)
+        filled = await filling.fill_document(session, document, understood, settings, deadline)
         await session.commit()
     doc_log.info("document_filled", **filling.counts(filled))
 

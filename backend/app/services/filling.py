@@ -1,7 +1,8 @@
 """Filling (Phase 4): the passes after understanding, and the answers job.
 
-- `fill`: match (profile, fill policy) -> validate -> fit; run by the analyze job after
-  understanding, with the document owner's profile (Form IR version 3).
+- `fill`: match (profile, fill policy) -> validate -> fit, then the phrase pass (English
+  questions for the fields asked about the form's own text, decision P5-D9); run by the analyze
+  job after understanding, with the document owner's profile (Form IR version 3).
 - `answer_document`: the answers job. The answers were stored encrypted (vault key) under the
   document's prefix by the API, keyed by the job id, because job arguments are ids only; the job
   reads and deletes them, runs answers -> validate -> fit, stores the next IR version and saves
@@ -12,6 +13,7 @@ Logs ids and counts only, never values.
 
 import asyncio
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from pydantic import BaseModel
@@ -22,7 +24,7 @@ from app.db.models import Document, Job
 from app.ir.models import FieldStatus, FormIR
 from app.llm.factory import provider_from_settings
 from app.logging import get_logger
-from app.passes import answers, fit, match, validate
+from app.passes import answers, fit, match, phrase, validate
 from app.passes.answers import Answer
 from app.passes.context import PassContext
 from app.passes.questions import Question, plan
@@ -80,14 +82,31 @@ def counts(ir: FormIR) -> dict[str, int]:
 
 
 async def fill_document(
-    session: AsyncSession, document: Document, ir: FormIR, settings: Settings
+    session: AsyncSession,
+    document: Document,
+    ir: FormIR,
+    settings: Settings,
+    deadline: datetime | None = None,
 ) -> FormIR:
-    """Fills from the owner's profile and adds the next IR version (not committed)."""
+    """Fills from the owner's profile, phrases the questions and adds the next IR version (not
+    committed)."""
     cipher = VaultCipher(settings.vault_key)
     profile = await load_profile_values(session, document.owner_id, cipher)
     filled = fill(ir, fill_context(settings, profile))
+    filled = await asyncio.to_thread(_phrase, filled, settings, deadline)
     await ir_store.add_version(session, document.id, filled, cipher)
     return filled
+
+
+def _phrase(ir: FormIR, settings: Settings, deadline: datetime | None) -> FormIR:
+    """Blocking (LLM calls): runs in a thread. The profile is not needed: only form text is sent."""
+    provider = provider_from_settings(settings)
+    try:
+        ctx = fill_context(settings, provider=provider)
+        return phrase.run(ir, replace(ctx, deadline=deadline))
+    finally:
+        if provider is not None:
+            provider.close()
 
 
 def _apply(ir: FormIR, given: list[Answer], settings: Settings) -> FormIR:

@@ -100,8 +100,9 @@ async def test_upload_analyze_and_read_back(
     ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
     assert ir["document_id"] == document_id
     assert len(ir["fields"]) == len(fixture.fields)
-    # Version 2 (understanding, rules only in tests) is the one served.
-    assert {e["pass_name"] for e in ir["trace"]} == {"frontend.flat", "understand"}
+    # The latest version is served: understanding by rules only (no model in the tests), and
+    # the phrase pass only notes that there is no model (P5-D9).
+    assert {e["pass_name"] for e in ir["trace"]} == {"frontend.flat", "understand", "phrase"}
     assert any(f["semantic_method"] == "rule" for f in ir["fields"])
     async with make_sessionmaker(engine)() as session:
         versions = await session.scalars(
