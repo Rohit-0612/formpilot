@@ -140,6 +140,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Questions */
+        get: operations["get_questions_api_v1_documents__document_id__questions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{document_id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Answers */
+        post: operations["post_answers_api_v1_documents__document_id__answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/pages/{page}.png": {
         parameters: {
             query?: never;
@@ -196,6 +230,41 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Answer */
+        Answer: {
+            /** Question Id */
+            question_id: string;
+            /** Value */
+            value?: string | null;
+            /**
+             * Parts
+             * @default {}
+             */
+            parts: {
+                [key: string]: string;
+            };
+            /** Free Text */
+            free_text?: string | null;
+            /**
+             * Save To Profile
+             * @default false
+             */
+            save_to_profile: boolean;
+            /**
+             * Sensitive Opt In
+             * @default []
+             */
+            sensitive_opt_in: string[];
+        };
+        /**
+         * AnswersRequest
+         * @description Answers to the current questions (SPEC §6.5). `parts` keys are semantic types; a
+         *     sensitive value is saved to the profile only if its key is in `sensitive_opt_in`.
+         */
+        AnswersRequest: {
+            /** Answers */
+            answers: components["schemas"]["Answer"][];
+        };
         /** BBox */
         BBox: {
             /** Page */
@@ -208,6 +277,13 @@ export interface components {
             x1: number;
             /** Y1 */
             y1: number;
+        };
+        /** Choice */
+        Choice: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
         };
         /** DocumentResponse */
         DocumentResponse: {
@@ -313,6 +389,19 @@ export interface components {
              * @enum {string}
              */
             redis: "ok" | "error";
+        };
+        /**
+         * InputKind
+         * @enum {string}
+         */
+        InputKind: "text" | "date" | "choice" | "yes_no";
+        /** JobAccepted */
+        JobAccepted: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
         };
         /** JobResponse */
         JobResponse: {
@@ -452,6 +541,56 @@ export interface components {
             sensitive_opt_in?: {
                 [key: string]: boolean;
             };
+        };
+        /** Question */
+        Question: {
+            /** Id */
+            id: string;
+            /** Prompt */
+            prompt: string;
+            /** Group */
+            group: string | null;
+            /** Parts */
+            parts: components["schemas"]["QuestionPart"][];
+            /**
+             * Free Text
+             * @default false
+             */
+            free_text: boolean;
+            /**
+             * Can Save
+             * @default false
+             */
+            can_save: boolean;
+        };
+        /** QuestionPart */
+        QuestionPart: {
+            /** Field Ids */
+            field_ids: string[];
+            semantic_type: components["schemas"]["SemanticType"] | null;
+            /** Label */
+            label: string;
+            input: components["schemas"]["InputKind"];
+            /**
+             * Choices
+             * @default []
+             */
+            choices: components["schemas"]["Choice"][];
+            /**
+             * Sensitive
+             * @default false
+             */
+            sensitive: boolean;
+        };
+        /**
+         * QuestionsResponse
+         * @description The questions for the fields that still need input (SPEC §6.4).
+         */
+        QuestionsResponse: {
+            /** Questions */
+            questions: components["schemas"]["Question"][];
+            /** Fields Needing Input */
+            fields_needing_input: number;
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -833,6 +972,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_questions_api_v1_documents__document_id__questions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionsResponse"];
+                };
+            };
+            /** @description Not found or not analysed yet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_answers_api_v1_documents__document_id__answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswersRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Not found or not analysed yet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Answers for questions that are not asked now */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The job could not be queued */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

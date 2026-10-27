@@ -1,5 +1,5 @@
 """The analyze job: uploaded PDF -> Form IR version 1 + page images, then the understanding pass
--> Form IR version 2 (worker only, SPEC §11).
+-> Form IR version 2, then filling from the owner's profile -> version 3 (worker only, SPEC §11).
 
 Version 1 (detection) is stored and the document is `ready` before understanding starts, so a
 slow or failing LLM never loses the detected fields. Understanding gets a deadline inside the
@@ -31,7 +31,7 @@ from app.llm.factory import provider_from_settings
 from app.logging import get_logger
 from app.passes import understand
 from app.passes.context import PassContext
-from app.services import ir_store
+from app.services import filling, ir_store
 from app.storage.base import Storage
 from app.vault.crypto import VaultCipher
 
@@ -181,6 +181,15 @@ async def analyze_document(
         never_fill=sum(1 for f in understood.fields if f.no_fill_reason is not None),
         duration_ms=round((time.perf_counter() - began) * 1000, 1),
     )
+
+    # Phase 4: fill from the owner's profile, validate, fit -> version 3.
+    async with sessionmaker() as session:
+        document = await session.get(Document, document_id)
+        if document is None:  # deleted while the job ran
+            raise DocumentNotAnalyzableError
+        filled = await filling.fill_document(session, document, understood, settings)
+        await session.commit()
+    doc_log.info("document_filled", **filling.counts(filled))
 
 
 def _understand(ir: FormIR, settings: Settings, deadline: datetime) -> FormIR:

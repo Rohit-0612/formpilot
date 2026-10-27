@@ -112,6 +112,13 @@ def _type_label(t: T) -> str:
     return t.value.replace("_", " ").capitalize()
 
 
+def _in_sentence(label: str) -> str:
+    """ "Email address" -> "email address"; acronyms keep their case ("PAN", "IFSC")."""
+    if len(label) > 1 and label[1].isupper():
+        return label
+    return label[:1].lower() + label[1:]
+
+
 def _form_label(f: Field) -> str:
     return (f.label_text or f.context_text or "this box").strip()
 
@@ -134,7 +141,7 @@ def _typed_prompt(t: T, f: Field, kind: InputKind) -> str:
     if kind is InputKind.CHOICE:
         return f"Which applies to you for “{_form_label(f)}”?"
     if SEMANTIC_TYPES[t].profile_key is not None:
-        return f"What is your {_type_label(t)[0].lower() + _type_label(t)[1:]}?"
+        return f"What is your {_in_sentence(_type_label(t))}?"
     return f"What should go in “{_form_label(f)}”?"
 
 

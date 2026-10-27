@@ -326,6 +326,124 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/questions": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Questions",
+        "operationId": "get_questions_api_v1_documents__document_id__questions_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not analysed yet"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/answers": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Post Answers",
+        "operationId": "post_answers_api_v1_documents__document_id__answers_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found or not analysed yet"
+          },
+          "409": {
+            "description": "Answers for questions that are not asked now"
+          },
+          "503": {
+            "description": "The job could not be queued"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/documents/{document_id}/pages/{page}.png": {
       "get": {
         "tags": [
@@ -502,6 +620,81 @@
   },
   "components": {
     "schemas": {
+      "Answer": {
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "title": "Question Id"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "parts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Parts",
+            "default": {}
+          },
+          "free_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Text"
+          },
+          "save_to_profile": {
+            "type": "boolean",
+            "title": "Save To Profile",
+            "default": false
+          },
+          "sensitive_opt_in": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sensitive Opt In",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "question_id"
+        ],
+        "title": "Answer"
+      },
+      "AnswersRequest": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/Answer"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Answers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answers"
+        ],
+        "title": "AnswersRequest",
+        "description": "Answers to the current questions (SPEC §6.5). `parts` keys are semantic types; a\nsensitive value is saved to the profile only if its key is in `sensitive_opt_in`."
+      },
       "BBox": {
         "properties": {
           "page": {
@@ -536,6 +729,24 @@
           "y1"
         ],
         "title": "BBox"
+      },
+      "Choice": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "Choice"
       },
       "DocumentResponse": {
         "properties": {
@@ -844,6 +1055,30 @@
           "redis"
         ],
         "title": "HealthResponse"
+      },
+      "InputKind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "date",
+          "choice",
+          "yes_no"
+        ],
+        "title": "InputKind"
+      },
+      "JobAccepted": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id"
+        ],
+        "title": "JobAccepted"
       },
       "JobResponse": {
         "properties": {
@@ -1192,6 +1427,125 @@
         "type": "object",
         "title": "ProfileUpdate",
         "description": "Values to set (null deletes) and per-field opt-ins for sensitive values. A sensitive value\nis saved only with its opt-in (in this request or earlier); opting out deletes it."
+      },
+      "Question": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionPart"
+            },
+            "type": "array",
+            "title": "Parts"
+          },
+          "free_text": {
+            "type": "boolean",
+            "title": "Free Text",
+            "default": false
+          },
+          "can_save": {
+            "type": "boolean",
+            "title": "Can Save",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "prompt",
+          "group",
+          "parts"
+        ],
+        "title": "Question"
+      },
+      "QuestionPart": {
+        "properties": {
+          "field_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Field Ids"
+          },
+          "semantic_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SemanticType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "input": {
+            "$ref": "#/components/schemas/InputKind"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/Choice"
+            },
+            "type": "array",
+            "title": "Choices",
+            "default": []
+          },
+          "sensitive": {
+            "type": "boolean",
+            "title": "Sensitive",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_ids",
+          "semantic_type",
+          "label",
+          "input"
+        ],
+        "title": "QuestionPart"
+      },
+      "QuestionsResponse": {
+        "properties": {
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/Question"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "fields_needing_input": {
+            "type": "integer",
+            "title": "Fields Needing Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "questions",
+          "fields_needing_input"
+        ],
+        "title": "QuestionsResponse",
+        "description": "The questions for the fields that still need input (SPEC §6.4)."
       },
       "RegisterRequest": {
         "properties": {

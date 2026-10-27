@@ -97,7 +97,8 @@ async def test_upload_analyze_and_read_back(
         versions = await session.scalars(
             select(FormIRVersion.version).where(FormIRVersion.document_id == uuid.UUID(document_id))
         )
-        assert sorted(versions) == [1, 2]
+        # 1 detection, 2 understanding, 3 filling (Phase 4)
+        assert sorted(versions) == [1, 2, 3]
 
     page = await client.get(f"{DOCS}/{document_id}/pages/0.png")
     assert page.status_code == 200

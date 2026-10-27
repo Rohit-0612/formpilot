@@ -460,6 +460,39 @@ def flat_comb() -> PdfFixture:
     )
 
 
+def flat_persona_form() -> PdfFixture:
+    """An applicant form whose labels the rule matcher types, plus one box it cannot (Phase 4:
+    with a full profile only that box is asked; decision P4-D4)."""
+    doc = _new_doc(A4)
+    page = doc[0]
+    _text(page, 72, 80, "APPLICANT DETAILS", font=BOLD_FONT, size=12)
+    rows = (
+        (120, "Full name:", 40),
+        (150, "Father's name:", 36),
+        (180, "Date of birth (DD/MM/YYYY):", 22),
+        (210, "Mobile number:", 24),
+        (240, "Email:", 40),
+        (320, "City:", 30),
+        (350, "PIN code:", 16),
+        (420, "Remarks:", 40),
+    )
+    _text(page, 72, 285, "CURRENT ADDRESS", font=BOLD_FONT, size=12)
+    fields = [
+        _labelled_leader(page, 0, 72, baseline, label, "_" * length)
+        for baseline, label, length in rows
+    ]
+    _text(page, 72, 474, "PAN")
+    fields.append(ExpectedField(0, _comb(page, 160, 460, 10), FieldKind.TEXT, "PAN", max_chars=10))
+    return PdfFixture(
+        "flat_persona_form",
+        "Applicant details with typed labels, a PAN comb and a remarks line",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
 def flat_comb_gap_groups() -> PdfFixture:
     """Comb groups split by gaps narrower than a cell (amended D8, 2026-10-19): a date row
     DD | MM | YYYY with 8 pt gaps and a name row FIRST | LAST with a 10 pt gap, captions printed
@@ -1151,6 +1184,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_boxes,
         flat_checkboxes,
         flat_comb,
+        flat_persona_form,
         flat_comb_gap_groups,
         flat_colon_blanks,
         flat_rounded_boxes,

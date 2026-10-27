@@ -150,3 +150,9 @@ def test_fewer_questions_than_fields() -> None:
     ir = _ir(*[_f(i, t) for i, t in enumerate(types)], _f(4, T.EMAIL), _f(5, T.EMAIL))
 
     assert len(plan(ir, POLICY)) == 2
+
+
+def test_prompts_keep_acronyms() -> None:
+    prompts = [q.prompt for q in plan(_ir(_f(0, T.PAN), _f(1, T.EMAIL), _f(2, T.VOTER_ID)), POLICY)]
+
+    assert prompts == ["What is your PAN?", "What is your email address?", "What is your voter ID?"]
