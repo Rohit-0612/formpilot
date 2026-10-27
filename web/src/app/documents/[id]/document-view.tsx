@@ -9,6 +9,8 @@ import { useRequireUser } from "@/lib/api/auth";
 import { type DocumentInfo, isAnalysing, useDocument, useMaskedIr } from "@/lib/api/documents";
 import { userMessage } from "@/lib/api/errors";
 
+import { QuestionsPanel } from "./questions-panel";
+
 const SOURCE_KIND: Record<string, string> = {
   flat_text: "PDF with a text layer",
   fillable: "fillable PDF form",
@@ -71,15 +73,29 @@ function Ready({ documentId, document }: { documentId: string; document: Documen
   if (ir.isError) {
     return <Notice tone="error">{userMessage(ir.error)}</Notice>;
   }
-  const fieldCount = ir.data.fields?.length ?? 0;
+  const fields = ir.data.fields ?? [];
+  const fieldCount = fields.length;
+  const fromProfile = fields.filter(
+    (f) => f.value_source === "profile" || f.value_source === "derived",
+  ).length;
   const kind = document.source_kind ? SOURCE_KIND[document.source_kind] : null;
   return (
     <>
       <p className="mb-4 text-sm text-slate-600">
         {kind ? `${kind[0].toUpperCase()}${kind.slice(1)}, ` : ""}
         {ir.data.pages.length} {ir.data.pages.length === 1 ? "page" : "pages"}, {fieldCount}{" "}
-        {fieldCount === 1 ? "field" : "fields"} detected.
+        {fieldCount === 1 ? "field" : "fields"} detected, {fromProfile} filled from{" "}
+        <Link href="/profile" className="underline">
+          your profile
+        </Link>
+        .
       </p>
+      <section aria-labelledby="questions-heading" className="mb-8">
+        <h2 id="questions-heading" className="mb-3 text-lg font-semibold">
+          Questions
+        </h2>
+        <QuestionsPanel documentId={documentId} />
+      </section>
       <PageViewer documentId={documentId} ir={ir.data} />
     </>
   );

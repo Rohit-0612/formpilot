@@ -23,6 +23,9 @@ export function AppHeader({ email }: { email: string }) {
               {userMessage(logout.error)}
             </span>
           ) : null}
+          <Link href="/profile" className="font-medium hover:underline">
+            Profile
+          </Link>
           <span className="text-slate-600">{email}</span>
           <button
             type="button"

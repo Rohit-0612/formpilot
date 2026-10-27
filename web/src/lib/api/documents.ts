@@ -97,7 +97,8 @@ export function useMaskedIr(documentId: string, enabled: boolean) {
       return data;
     },
     enabled,
-    staleTime: Infinity, // version 1 never changes in Phase 2
+    // A new version arrives after answers; useAnswersJob invalidates this query then.
+    staleTime: Infinity,
     retry: false,
   });
 }
