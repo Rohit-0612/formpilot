@@ -1,6 +1,7 @@
-"""LLM layer (Phase 3): privacy guard, Ollama request and errors, fake provider, record / replay.
+"""LLM layer (Phase 3): privacy guard, Ollama and Groq requests and errors, fake provider,
+record / replay.
 
-No network: Ollama is reached through httpx.MockTransport.
+No network: Ollama and Groq are reached through httpx.MockTransport.
 """
 
 import json
@@ -8,10 +9,12 @@ from pathlib import Path
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from app.ir.semantic_types import SENSITIVE_TYPES, SemanticType
 from app.llm.cache import CachedProvider, cache_key
 from app.llm.fake import FakeProvider
+from app.llm.groq import GroqProvider, strict_schema
 from app.llm.ollama import OllamaProvider, is_cloud_model
 from app.llm.provider import NEVER_REMOTE, LLMError, LLMRequest, PrivacyError
 
@@ -131,6 +134,126 @@ def test_ollama_connection_error_is_an_llm_error() -> None:
 
     with pytest.raises(LLMError):
         _ollama(handler).complete_json(_request())
+
+
+# --- Groq -----------------------------------------------------------------------------------
+
+GROQ_KEY = "gsk_test_not_a_real_key"
+GROQ_OK = {"choices": [{"message": {"role": "assistant", "content": '{"ok":true}'}}]}
+
+
+def _groq(handler: object, key: str | None = GROQ_KEY, sleeps: list[float] | None = None):
+    client = httpx.Client(transport=httpx.MockTransport(handler))  # type: ignore[arg-type]
+    return GroqProvider(
+        SecretStr(key) if key is not None else None,
+        "openai/gpt-oss-120b",
+        client=client,
+        sleep=(sleeps.append if sleeps is not None else lambda _: None),
+    )
+
+
+def test_groq_is_always_remote_and_refuses_a_phone_without_any_http_call() -> None:
+    calls: list[httpx.Request] = []
+    provider = _groq(lambda r: calls.append(r) or httpx.Response(200, json=GROQ_OK))
+
+    assert provider.is_remote
+    with pytest.raises(PrivacyError):
+        provider.complete_json(_request(carries=frozenset({SemanticType.PHONE_MOBILE})))
+    assert calls == []
+
+
+def test_groq_sends_a_strict_schema_deterministic_chat_with_the_key() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=GROQ_OK)
+
+    assert _groq(handler).complete_json(_request()) == '{"ok":true}'
+    request = seen[0]
+    body = json.loads(request.content)
+    assert request.url == "https://api.groq.com/openai/v1/chat/completions"
+    assert request.headers["authorization"] == f"Bearer {GROQ_KEY}"
+    assert body["model"] == "openai/gpt-oss-120b"
+    assert body["temperature"] == 0 and body["stream"] is False
+    assert body["response_format"]["type"] == "json_schema"
+    assert body["response_format"]["json_schema"]["strict"] is True
+    assert body["response_format"]["json_schema"]["schema"] == strict_schema(SCHEMA)
+    assert [m["role"] for m in body["messages"]] == ["system", "user"]
+
+
+def test_strict_schema_closes_every_object_and_keeps_the_rest() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "fields": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "c": {"type": "number", "maximum": 1}},
+                    "required": ["id", "c"],
+                },
+            }
+        },
+        "required": ["fields"],
+    }
+
+    strict = strict_schema(schema)
+
+    assert strict["additionalProperties"] is False
+    item = strict["properties"]["fields"]["items"]
+    assert item["additionalProperties"] is False
+    assert item["properties"]["c"] == {"type": "number", "maximum": 1}
+    assert "additionalProperties" not in schema  # the request's schema is not changed
+
+
+def test_groq_without_a_key_fails_before_any_http_call() -> None:
+    calls: list[httpx.Request] = []
+
+    with pytest.raises(LLMError, match="GROQ_API_KEY is not set"):
+        _groq(lambda r: calls.append(r) or httpx.Response(200), key=None).complete_json(_request())
+    assert calls == []
+
+
+def test_groq_waits_out_a_short_rate_limit_then_answers() -> None:
+    responses = [
+        httpx.Response(429, headers={"retry-after": "7"}),
+        httpx.Response(200, json=GROQ_OK),
+    ]
+    sleeps: list[float] = []
+
+    assert _groq(lambda _: responses.pop(0), sleeps=sleeps).complete_json(_request()) == (
+        '{"ok":true}'
+    )
+    assert sleeps == [7.0]
+
+
+def test_groq_gives_up_on_a_long_rate_limit() -> None:
+    sleeps: list[float] = []
+    provider = _groq(lambda _: httpx.Response(429, headers={"retry-after": "3600"}), sleeps=sleeps)
+
+    with pytest.raises(LLMError, match="HTTP 429"):
+        provider.complete_json(_request())
+    assert sleeps == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(401, json={"error": {"message": f"Invalid API Key {GROQ_KEY}"}}),
+        httpx.Response(200, json={"choices": []}),
+        httpx.Response(200, json={"choices": [{"message": {"content": " "}}]}),
+        httpx.Response(200, text="not json"),
+    ],
+)
+def test_groq_failures_are_llm_errors_that_never_show_the_key(response: httpx.Response) -> None:
+    with pytest.raises(LLMError) as error:
+        _groq(lambda _: response).complete_json(_request())
+
+    assert GROQ_KEY not in str(error.value)
+    # no chained httpx exception (it would carry the request and its headers)
+    assert error.value.__cause__ is None
+    assert error.value.__context__ is None or error.value.__suppress_context__
 
 
 # --- fake provider ----------------------------------------------------------------------------

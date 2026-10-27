@@ -1,0 +1,3 @@
+{
+ "response": "{\"fields\":[{\"id\":\"p8_f062\",\"semantic_type\":\"current_city\",\"confidence\":0.97},{\"id\":\"p8_f063\",\"semantic_type\":\"current_district\",\"confidence\":0.97},{\"id\":\"p8_f064\",\"semantic_type\":\"current_address_line2\",\"confidence\":0.62},{\"id\":\"p8_f065\",\"semantic_type\":\"current_state\",\"confidence\":0.97},{\"id\":\"p8_f066\",\"semantic_type\":\"current_country\",\"confidence\":0.97},{\"id\":\"p8_f067\",\"semantic_type\":\"current_pincode\",\"confidence\":0.97},{\"id\":\"p8_f068\",\"semantic_type\":\"signature\",\"confidence\":0.99}]}"
+}

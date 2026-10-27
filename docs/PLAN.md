@@ -189,7 +189,8 @@ Reference labels first
 
 Deliverables
 - `llm/provider.py` (interface), `ollama.py` (local default), `fake.py`, `cache.py`
-  (record/replay). `groq.py` only if Groq's free tier needs no card or payment.
+  (record/replay). `groq.py` only if Groq's free tier needs no card or payment (it needed none:
+  built after Gate 3, decision P3-D7).
 - The privacy rule above is enforced at the provider layer: no value of a sensitive or phone
   type reaches a remote provider; covered by a test.
 - `passes/understand.py`: rule matcher, then batched LLM per page with JSON-schema output,

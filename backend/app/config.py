@@ -37,10 +37,19 @@ class QueueSettings(BaseSettings):
     redis_url: str
 
 
-class Settings(DatabaseSettings, QueueSettings):
+class GroqSettings(BaseSettings):
+    """Only the Groq key, for host-side tools such as the understanding eval."""
+
     model_config = _SETTINGS_CONFIG
 
-    # database_url and redis_url are inherited.
+    # Optional, remote: sensitive and phone values are never sent (app/llm/provider.py)
+    groq_api_key: SecretStr | None = None
+
+
+class Settings(DatabaseSettings, QueueSettings, GroqSettings):
+    model_config = _SETTINGS_CONFIG
+
+    # database_url, redis_url and groq_api_key are inherited.
 
     # Auth
     jwt_secret: SecretStr
@@ -68,8 +77,9 @@ class Settings(DatabaseSettings, QueueSettings):
     job_timeout_seconds: int = Field(default=300, gt=0)
 
     # Field understanding (Phase 3): "none" runs the rule matcher only
-    llm_provider: Literal["none", "ollama"] = "none"
+    llm_provider: Literal["none", "ollama", "groq"] = "none"
     ollama_base_url: str = "http://localhost:11434"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
     llm_model: str = "qwen3:8b"
     llm_timeout_seconds: float = Field(default=300.0, gt=0)
     # Fields whose semantic confidence is below this get status NEEDS_REVIEW (SPEC §6.2)

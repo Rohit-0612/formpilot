@@ -1,6 +1,7 @@
 """The configured provider, or None when the understanding pass runs its rules only."""
 
 from app.config import Settings
+from app.llm.groq import GroqProvider
 from app.llm.ollama import OllamaProvider
 from app.llm.provider import LLMProvider
 
@@ -10,6 +11,13 @@ def provider_from_settings(settings: Settings) -> LLMProvider | None:
         return OllamaProvider(
             settings.ollama_base_url,
             settings.llm_model,
+            timeout_seconds=settings.llm_timeout_seconds,
+        )
+    if settings.llm_provider == "groq":
+        return GroqProvider(
+            settings.groq_api_key,
+            settings.llm_model,
+            base_url=settings.groq_base_url,
             timeout_seconds=settings.llm_timeout_seconds,
         )
     return None

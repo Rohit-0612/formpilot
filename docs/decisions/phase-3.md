@@ -1,8 +1,10 @@
 # Phase 3 — Field understanding + eval harness: decision record
 
 > Status: **close-out drafted 2026-10-27** (milestone M1, branch `phase-3-understanding`, from
-> `main` after the Phase 2 merge). Gate 3 is the human's. The full record is kept under "Key
-> decisions and alternatives considered → Detailed record".
+> `main` after the Phase 2 merge). **Gate 3 passed** (the human's decision, 2026-10-27; PR #3
+> merged). After the gate: `GroqProvider` and a provider comparison (P3-D7, branch
+> `phase-3-groq`). The full record is kept under "Key decisions and alternatives considered →
+> Detailed record".
 
 ## What was built
 
@@ -31,6 +33,19 @@ reference type neither `other` nor `unknown` (241).
 - Replaying the recorded answers reproduces every run exactly without a model.
 - Test split: not measured yet (release measurement, Phase 5b, detection only).
 
+**Provider comparison (after Gate 3, P3-D7).** Hybrid on dev, the same rules and prompt v2, one
+recorded run per provider, no tuning on Groq. Reports:
+`eval/reports/phase3-understanding-dev-hybrid-provider-*-bec1cf8.{json,md}`.
+
+| Provider | All | Fillable | Fillable precision |
+|---|---|---|---|
+| Ollama `qwen3:8b` (local, the default; replay of the tuned run) | 64.3 % (337/524) | 58.1 % (140/241) | 60.6 % (140/231) |
+| Groq `openai/gpt-oss-120b` (remote) | 70.4 % (369/524) | 62.7 % (151/241) | 67.7 % (151/223) |
+
+*Fillable precision:* of the fields given a fillable type, the share with the right type. The
+Groq run took 11.7 min for 42 requests under the free tier's rate limits; the requests carry
+printed form text only.
+
 **Tests in the close-out run:** see "Open issues" → close-out checks.
 
 ## Key decisions and alternatives considered
@@ -38,7 +53,8 @@ reference type neither `other` nor `unknown` (241).
 | Decision | Alternatives | Why this one |
 |---|---|---|
 | **P3-D1** `no_fill_reason` on `Field`; AcroForm signatures as `text` fields | a new `FieldStatus`; `FieldKind.SIGNATURE` for both frontends (rejected by the human) | Status is the fill workflow, not a reason; the kind describes the entry shape, and the flat detector is scored on signature areas as `text` |
-| **P3-D2** no `GroqProvider` yet | build it now | Groq's own pages do not confirm that the free tier needs no card, which was the human's condition |
+| **P3-D2** no `GroqProvider` yet (superseded by P3-D7) | build it now | Groq's own pages do not confirm that the free tier needs no card, which was the human's condition |
+| **P3-D7** `GroqProvider` after Gate 3: strict JSON schema, always remote, key from `GROQ_API_KEY`; Ollama stays the default | JSON-object mode; making Groq the default | The human confirmed that the free tier asked for no card. Strict schema = no malformed answers. A local default keeps the product free and offline |
 | **P3-D3** one analyze job: v1 stored first, then understanding with a deadline, then v2 | a separate `understand` job type | That job would need a database migration (job types are a CHECK constraint) the plan did not include; v1 is never lost |
 | **P3-D3** at most 20 fields per LLM request | one request per page (SPEC §6.2) | Dense pages (over 100 fields) and a slow local model: shorter answers, no context overflow |
 | **P3-D4** rules and prompt frozen before the labels; pre-tuning reports kept | tune while labelling | Honest headline numbers (human rule) |
@@ -110,6 +126,23 @@ whether the Free tier needs a payment method; third-party pages say it does not,
 for one only to upgrade to the Developer tier. The human's condition ("only if its free tier
 needs no card or payment") cannot be confirmed from Groq's own pages, so `GroqProvider` is not
 built in this pass. It is added only if the human's own sign-up shows no card is asked for.
+
+##### P3-D7. Groq after Gate 3 (2026-10-27)
+
+The human confirmed that Groq's free sign-up asked for no card, so P3-D2's condition is met.
+- `backend/app/llm/groq.py`: OpenAI-compatible chat API with a strict JSON schema (every object
+  closed by `strict_schema`; the request's schema, and so the cache key, is unchanged),
+  temperature 0, always remote (the privacy guard applies). A short rate limit (HTTP 429 with a
+  `retry-after` of at most 60 s) is retried up to 3 times; a longer one fails the batch.
+- The key: `GROQ_API_KEY` as a `SecretStr` (`GroqSettings`, inherited by `Settings`); errors
+  never carry it (no chained httpx exception, which would hold the request headers). Without a
+  key the provider still builds, so CI replays without one.
+- Eval: `--provider groq` (`make eval PROVIDER=groq MODEL=...`) and a new metric, fillable
+  precision, in every report.
+- Alternatives: JSON-object mode (valid JSON, no schema; strict mode was confirmed to accept
+  the understanding schema in a smoke call with synthetic labels); Groq as the default (the
+  product should stay free and work offline; the human's rule keeps Ollama the default).
+- Measured: see "What was built" → provider comparison.
 
 ##### P3-D3. Understanding pass as built (steps 2–4)
 
@@ -297,7 +330,9 @@ after tuning; its pre-tuning report stands. The reference labels were not change
   fields left are `unknown` / `NEEDS_REVIEW`.
 - **The CI eval gate cannot replay the dev eval yet:** the dev PDFs are not in the repository
   (M4 plan).
-- **Ollama only;** Groq is not built (P3-D2).
+- **Groq is optional and remote.** The free tier allows 8K tokens per minute for
+  `openai/gpt-oss-120b`, so a dense form can wait on rate limits (a wait over 60 s fails the
+  batch, and its fields stay `unknown`). The comparison is one dev run, not tuned.
 
 ## Open issues
 
@@ -311,27 +346,23 @@ All four Phase 3 acceptance checks are verified (PLAN.md):
 The gate is the human's.
 
 ### For the human
-- **Gate 3.**
 - **"In my own words" checkpoint** (optional, about 10 minutes):
   1. Why do the rules run before the LLM, and what did the eval show about that?
   2. Why is the model's self-reported confidence not a probability?
   3. Why does the eval report fillable accuracy next to overall accuracy?
-- **Groq:** tell Claude Code whether Groq's free sign-up asked for a card; `GroqProvider` is
-  added only if it did not.
 
 ### Close-out checks (2026-10-27)
 Recorded in the close-out commit message (`make lint`, `make test`, `make test-int`; CI on the
 branch).
 
-### Status at hand-off (2026-10-27)
-- M1 is done; PR #3 (`phase-3-understanding` → `main`) is open and mergeable, waiting for the
-  human's Gate 3 and merge.
-- The human added a Groq API key to their local `.env` (gitignored, never committed). Whether
-  Groq's sign-up asked for a card is not recorded yet; P3-D2's condition still applies.
-- **Next steps:**
-  1. the human merges PR #3 and ticks Gate 3;
-  2. `GroqProvider` (only if the free tier needed no card);
-  3. the M2 (Phase 4) plan for approval.
+### Status (2026-10-27)
+- Gate 3 passed (the human's decision); PR #3 merged with a merge commit; Gate 3 ticked on
+  `main`.
+- Groq's free sign-up asked for no card (the human's confirmation). The key is in the human's
+  local `.env` only (gitignored); no key is in a tracked file or in git history (checked).
+  CI replays the recorded answers and has no key.
+- `GroqProvider` and the provider comparison are on branch `phase-3-groq` (P3-D7).
+- **Next:** the M2 (Phase 4) plan for approval.
 
 ## Notes for the next phase
 

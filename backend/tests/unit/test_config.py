@@ -4,6 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from app.config import DatabaseSettings, Settings
+from app.llm.factory import provider_from_settings
+from app.llm.groq import GroqProvider
 
 VALID_SECRET = "a" * 64
 
@@ -89,3 +91,22 @@ def test_database_settings_need_only_database_url(clean_env: pytest.MonkeyPatch)
     clean_env.setenv("DATABASE_URL", "postgresql+psycopg://u:p@db:5432/x")
 
     assert DatabaseSettings(_env_file=None).database_url == "postgresql+psycopg://u:p@db:5432/x"
+
+
+def test_groq_provider_takes_its_key_from_the_environment_and_hides_it(
+    base_env: pytest.MonkeyPatch,
+) -> None:
+    base_env.setenv("LLM_PROVIDER", "groq")
+    base_env.setenv("LLM_MODEL", "openai/gpt-oss-120b")
+    base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
+
+    settings = Settings(_env_file=None)
+    provider = provider_from_settings(settings)
+
+    assert isinstance(provider, GroqProvider) and provider.is_remote
+    assert provider.model == "openai/gpt-oss-120b"
+    assert "gsk_test_not_a_real_key" not in repr(settings)
+
+
+def test_groq_key_is_optional(base_env: pytest.MonkeyPatch) -> None:
+    assert Settings(_env_file=None).groq_api_key is None
