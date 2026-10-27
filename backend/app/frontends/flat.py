@@ -29,6 +29,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from itertools import pairwise
+from typing import Literal
 from uuid import UUID
 
 import pymupdf
@@ -43,6 +44,7 @@ from app.ir.models import (
     TraceEvent,
     ValidationResult,
 )
+from app.ir.phrases import mentions_office_use
 
 STAGE = "frontend.flat"
 
@@ -164,6 +166,7 @@ class _Candidate:
     label: str | None = None
     context: str | None = None
     validations: list[ValidationResult] = field(default_factory=list)
+    no_fill_reason: Literal["office_use"] | None = None
 
     @property
     def line_type(self) -> bool:
@@ -1190,6 +1193,32 @@ def _assign_text(candidates: list[_Candidate], text: _PageText) -> None:
 # --- page and document --------------------------------------------------------------------
 
 
+# An office-use box is a small panel; a page frame that happens to hold the words must not mark
+# every field on the page.
+OFFICE_BOX_MAX_PAGE_SHARE = 0.15
+
+
+def _mark_office_use(
+    candidates: list[_Candidate], boxes: list[Rect], text: _PageText, page_area: float
+) -> None:
+    """A field inside a drawn box whose own text says "for office use" (in any line, not only
+    the nearest heading; garbled Hindi tolerated) is never filled (decision P3-D1)."""
+    for cand in candidates:
+        enclosing = [
+            r
+            for r in boxes
+            if _contains(r, cand.rect)
+            and _area(r) > 1.2 * _area(cand.rect)
+            and _area(r) <= OFFICE_BOX_MAX_PAGE_SHARE * page_area
+        ]
+        if not enclosing:
+            continue
+        box = min(enclosing, key=_area)
+        inside = " ".join(line.text for line in text.lines if _contains(box, line.rect))
+        if mentions_office_use(inside):
+            cand.no_fill_reason = "office_use"
+
+
 def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     text = _extract_text(page)
     drawings = _extract_drawings(page)
@@ -1204,6 +1233,7 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     candidates += _colon_candidates(text, drawings, cells, candidates)
     kept, dropped = _resolve_overlaps(candidates)
     _assign_text(kept, text)
+    _mark_office_use(kept, cells, text, page_area)
     notes = [
         f"dropped {cand.source} overlapping {other.source}"
         if other is not None
@@ -1312,6 +1342,7 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     bbox=bbox,
                     max_chars=cand.max_chars,
                     validations=cand.validations,
+                    no_fill_reason=cand.no_fill_reason,
                 )
             )
             trace.append(
@@ -1319,6 +1350,15 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     pass_name=STAGE, field_id=field_id, change=f"detected {cand.source}", at=at
                 )
             )
+            if cand.no_fill_reason is not None:
+                trace.append(
+                    TraceEvent(
+                        pass_name=STAGE,
+                        field_id=field_id,
+                        change="no_fill_reason office_use (inside an office-use box)",
+                        at=at,
+                    )
+                )
         trace += [
             TraceEvent(pass_name=STAGE, field_id=None, change=f"page {page_no}: {note}", at=at)
             for note in notes

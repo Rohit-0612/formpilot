@@ -17,7 +17,6 @@ Trace events name types and methods, never values.
 
 import json
 import re
-import unicodedata
 from collections import defaultdict
 from functools import cache
 from pathlib import Path
@@ -27,6 +26,7 @@ import pydantic
 from pydantic import BaseModel
 
 from app.ir.models import Field, FieldKind, FieldStatus, FormIR, TraceEvent
+from app.ir.phrases import clean_text, mentions_office_use
 from app.ir.semantic_types import SEMANTIC_TYPES, SemanticType
 from app.llm.provider import LLMError, LLMProvider, LLMRequest
 from app.passes.context import PassContext
@@ -48,15 +48,6 @@ _STOPWORDS = frozenset(
 # A leading "1.", "2)", "(a)", "b.", "(iv)": numbering, not part of the label.
 _ENUMERATOR = re.compile(r"^\s*\(?(\d{1,3}|[a-z]|[ivx]{1,4})[.)]\s*")
 # Office-use headings and labels: the fields under them are never filled (P3-D1).
-OFFICE_USE_PHRASES = (
-    "for office use",
-    "office use only",
-    "for official use",
-    "for bank use",
-    "bank use only",
-    "karyalaya upyog",
-    "कार्यालय उपयोग",
-)
 # A label or heading about someone other than the person filling the form, or asking in Hindi:
 # the rules never type it (a profile value would be wrong); the LLM decides (tuning, 2026-10-26).
 OTHER_PERSON_WORDS = (
@@ -86,11 +77,7 @@ _CURRENT_HINTS = (
 # --- normalisation ---------------------------------------------------------------------------
 
 
-def _clean(text: str) -> str:
-    """Lower case; letters (any script, with their vowel signs), digits and apostrophes kept."""
-    text = unicodedata.normalize("NFC", text.lower()).replace("\u2019", "'").replace("`", "'")
-    chars = [ch if ch == "'" or unicodedata.category(ch)[0] in "LNM" else " " for ch in text]
-    return " ".join("".join(chars).split())
+_clean = clean_text
 
 
 def tokens(text: str | None) -> tuple[str, ...]:
@@ -353,8 +340,7 @@ def _mark(field: Field, ctx: PassContext, trace: list[TraceEvent]) -> Field:
     if reason is None and field.semantic_type is SemanticType.SIGNATURE:
         reason = "signature"
     if reason is None and (
-        _has_any(field.context_text, OFFICE_USE_PHRASES)
-        or _has_any(field.label_text, OFFICE_USE_PHRASES)
+        mentions_office_use(field.context_text) or mentions_office_use(field.label_text)
     ):
         reason = "office_use"
     if reason is not None:

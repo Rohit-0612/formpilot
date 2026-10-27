@@ -493,6 +493,28 @@ def flat_persona_form() -> PdfFixture:
     )
 
 
+def flat_office_use_box() -> PdfFixture:
+    """A small drawn box whose own note says "For office use only" (plain text, not a heading),
+    under the bold heading of the applicant section: only the box tells the entry inside is not
+    for the applicant (decision P3-D1)."""
+    doc = _new_doc(A4)
+    page = doc[0]
+    _text(page, 72, 80, "APPLICANT DETAILS", font=BOLD_FONT, size=12)
+    fields = [_labelled_leader(page, 0, 72, 120, "Full name:", "_" * 30)]
+    box = (330.0, 140.0, 540.0, 200.0)
+    _rect(page, box)
+    _text(page, 336, 156, "For office use only")
+    fields.append(_labelled_leader(page, 0, 336, 186, "Ref. no.:", "_" * 20))
+    return PdfFixture(
+        "flat_office_use_box",
+        "An office-use note inside a drawn box, under the applicant heading",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
 def flat_comb_gap_groups() -> PdfFixture:
     """Comb groups split by gaps narrower than a cell (amended D8, 2026-10-19): a date row
     DD | MM | YYYY with 8 pt gaps and a name row FIRST | LAST with a 10 pt gap, captions printed
@@ -1185,6 +1207,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_checkboxes,
         flat_comb,
         flat_persona_form,
+        flat_office_use_box,
         flat_comb_gap_groups,
         flat_colon_blanks,
         flat_rounded_boxes,
