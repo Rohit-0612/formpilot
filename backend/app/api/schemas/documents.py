@@ -16,6 +16,9 @@ class UploadResponse(BaseModel):
 
 class JobSummary(BaseModel):
     id: uuid.UUID
+    # analyze runs on after the document is `ready` (understanding and filling); the web app
+    # keeps polling while it is queued or running
+    type: JobType
     status: JobStatus
     error_message: str | None  # readable, never a value
 

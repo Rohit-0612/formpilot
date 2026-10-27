@@ -6,7 +6,13 @@ import type { ReactNode } from "react";
 import { AppHeader } from "@/components/app-header";
 import { PageViewer } from "@/components/page-viewer";
 import { useRequireUser } from "@/lib/api/auth";
-import { type DocumentInfo, isAnalysing, useDocument, useMaskedIr } from "@/lib/api/documents";
+import {
+  analysisStep,
+  type DocumentInfo,
+  isAnalysing,
+  useDocument,
+  useMaskedIr,
+} from "@/lib/api/documents";
 import { userMessage } from "@/lib/api/errors";
 
 import { QuestionsPanel } from "./questions-panel";
@@ -41,11 +47,15 @@ function UploadAnother() {
   );
 }
 
+const STEP_MESSAGE = {
+  waiting: "Waiting for the analysis to start…",
+  detecting: "Analysing the form…",
+  filling: "Understanding and filling the form…",
+  done: "",
+} as const;
+
 function Analysing({ document }: { document: DocumentInfo }) {
-  const message =
-    document.status === "uploaded"
-      ? "Waiting for the analysis to start…"
-      : "Analysing the form…";
+  const message = STEP_MESSAGE[analysisStep(document)];
   return (
     <Notice tone="info">
       <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent align-middle" />

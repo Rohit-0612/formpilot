@@ -1163,6 +1163,9 @@
             "format": "uuid",
             "title": "Id"
           },
+          "type": {
+            "$ref": "#/components/schemas/JobType"
+          },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
           },
@@ -1181,6 +1184,7 @@
         "type": "object",
         "required": [
           "id",
+          "type",
           "status",
           "error_message"
         ],

@@ -72,7 +72,12 @@ async def test_upload_analyze_and_read_back(
         None,
         None,
     )
-    assert before["job"] == {"id": job_id, "status": "queued", "error_message": None}
+    assert before["job"] == {
+        "id": job_id,
+        "type": "analyze",
+        "status": "queued",
+        "error_message": None,
+    }
     assert before["original_filename"] == SECRET_NAME
     not_yet = await client.get(f"{DOCS}/{document_id}/ir")
     assert not_yet.status_code == 404
@@ -85,7 +90,12 @@ async def test_upload_analyze_and_read_back(
         "flat_text",
         1,
     )
-    assert document["job"] == {"id": job_id, "status": "done", "error_message": None}
+    assert document["job"] == {
+        "id": job_id,
+        "type": "analyze",
+        "status": "done",
+        "error_message": None,
+    }
 
     ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
     assert ir["document_id"] == document_id

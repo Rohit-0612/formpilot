@@ -122,6 +122,7 @@ async def get_document(
             else JobSummary.model_validate(
                 {
                     "id": job.id,
+                    "type": job.type,
                     "status": job.status,
                     "error_message": job_error_message(job.error, max_pages=settings.max_pages),
                 }

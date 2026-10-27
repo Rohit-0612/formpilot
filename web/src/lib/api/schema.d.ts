@@ -436,6 +436,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            type: components["schemas"]["JobType"];
             status: components["schemas"]["JobStatus"];
             /** Error Message */
             error_message: string | null;
