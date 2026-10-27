@@ -286,6 +286,8 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** @enum {string} */
+        DatePart: "day" | "month" | "year";
         /** DocumentResponse */
         DocumentResponse: {
             /**
@@ -364,6 +366,28 @@ export interface components {
             uppercase: boolean;
             /** Question Text */
             question_text?: string | null;
+            date_part?: components["schemas"]["DatePart"] | null;
+            /** Group Id */
+            group_id?: string | null;
+        };
+        /**
+         * FieldGroup
+         * @description Fields answered together (decision P5-D8), set by the frontend:
+         *     - `choices`: the tick boxes of one row after one label ("Gender: [ ] Male [ ] Female"),
+         *       asked as one choice;
+         *     - `table_row`: the entry cells of one row of a table with several rows; a profile holds one
+         *       value per type, so they are never filled from it and are asked row by row.
+         */
+        FieldGroup: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "choices" | "table_row";
+            /** Label */
+            label: string | null;
         };
         /**
          * FieldKind
@@ -487,6 +511,8 @@ export interface components {
             pages: components["schemas"]["PageInfo"][];
             /** Fields */
             fields?: components["schemas"]["Field"][];
+            /** Groups */
+            groups?: components["schemas"]["FieldGroup"][];
             /** Trace */
             trace?: components["schemas"]["TraceEvent"][];
         };

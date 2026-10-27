@@ -110,6 +110,9 @@ class ValidationResult(_IRModel):
     message: str | None = None  # human-readable, never contains the value itself
 
 
+type DatePart = Literal["day", "month", "year"]
+
+
 class Field(_IRModel):
     id: str = pydantic.Field(min_length=1, max_length=64)  # stable in a document, e.g. "p0_f012"
     kind: FieldKind
@@ -134,10 +137,28 @@ class Field(_IRModel):
     # A format hint such as "(in capital letters)" on the field or its page: the value is
     # written upper-case (fit pass and renderer). Set by the frontend (Phase 5).
     uppercase: bool = False
-    # A short English question for the field from the understanding call, translated from Hindi
-    # and repaired where the text layer is garbled (decision P5-D6). Printed form text only,
-    # never a value; None for rule-typed fields and without a model.
+    # A short English question for the field, from the phrase pass (decisions P5-D6, P5-D9):
+    # translated from Hindi and repaired where the text layer is garbled. Printed form text only,
+    # never a value; None for fields that are not asked, and without a model.
     question_text: str | None = pydantic.Field(default=None, min_length=1, max_length=200)
+    # One part of a date written in several boxes (DD | MM | YYYY): the field holds only that
+    # part of the date of its semantic type (decision P5-D8). Set by the frontend.
+    date_part: DatePart | None = None
+    # The group the field is answered with (`FormIR.groups`, decision P5-D8), if any.
+    group_id: str | None = None
+
+
+class FieldGroup(_IRModel):
+    """Fields answered together (decision P5-D8), set by the frontend:
+    - `choices`: the tick boxes of one row after one label ("Gender: [ ] Male [ ] Female"),
+      asked as one choice;
+    - `table_row`: the entry cells of one row of a table with several rows; a profile holds one
+      value per type, so they are never filled from it and are asked row by row.
+    """
+
+    id: str = pydantic.Field(min_length=1, max_length=64)  # stable in a document, e.g. "p0_g001"
+    kind: Literal["choices", "table_row"]
+    label: str | None  # the row's own text: "13. Hostel Required?", "Class X"
 
 
 class TraceEvent(_IRModel):
@@ -153,6 +174,7 @@ class FormIR(_IRModel):
     source_kind: SourceKind
     pages: list[PageInfo]  # index in this list == BBox.page
     fields: list[Field] = pydantic.Field(default_factory=list)
+    groups: list[FieldGroup] = pydantic.Field(default_factory=list)
     trace: list[TraceEvent] = pydantic.Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -165,4 +187,10 @@ class FormIR(_IRModel):
             boxes = [field.bbox] + [opt.bbox for opt in field.options if opt.bbox is not None]
             if any(box.page >= page_count for box in boxes):
                 raise ValueError(f"field {field.id} refers to a page that does not exist")
+        group_ids = [group.id for group in self.groups]
+        if len(group_ids) != len(set(group_ids)):
+            raise ValueError("group ids must be unique within a document")
+        for field in self.fields:
+            if field.group_id is not None and field.group_id not in group_ids:
+                raise ValueError(f"field {field.id} refers to a group that does not exist")
         return self

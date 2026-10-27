@@ -166,7 +166,14 @@ class Field(BaseModel):
     no_fill_reason: Literal["office_use", "signature"] | None = None  # never filled (P3-D1)
     font_size: float | None = None  # set by the fit pass (§6.7), used by the renderer
     uppercase: bool = False       # "(in capital letters)" hint: written upper-case (Phase 5)
-    question_text: str | None = None  # English question from the understanding call (P5-D6)
+    question_text: str | None = None  # English question from the phrase pass (P5-D6, P5-D9)
+    date_part: Literal["day", "month", "year"] | None = None  # DD | MM | YYYY boxes (P5-D8)
+    group_id: str | None = None   # FormIR.groups: answered with these fields (P5-D8)
+
+class FieldGroup(BaseModel):      # P5-D8, set by the frontend
+    id: str                       # e.g. "p0_g001"
+    kind: Literal["choices", "table_row"]  # tick boxes of one row / one row of a table
+    label: str | None             # the row's own text: "Gender", "Class X"
 
 class TraceEvent(BaseModel):
     pass_name: str; field_id: str | None; change: str; at: datetime
@@ -177,12 +184,14 @@ class FormIR(BaseModel):
     source_kind: SourceKind
     pages: list[PageInfo]         # index in this list == BBox.page
     fields: list[Field]
+    groups: list[FieldGroup] = []
     trace: list[TraceEvent] = []
 ```
 
 Rules: field ids are never reused within a document; passes never delete fields (they may mark
-them `SKIPPED`); every change is appended to `trace`. A `FormIR` validates that field ids are
-unique and that every box refers to an existing page; IR models reject unknown keys.
+them `SKIPPED`); every change is appended to `trace`. A `FormIR` validates that field and group
+ids are unique, that every box refers to an existing page and every `group_id` to an existing
+group; IR models reject unknown keys.
 
 `pages` replaced the original `page_sizes: list[tuple[float, float]]` (decision D1 in
 `docs/decisions/phase-2.md`) so that text-layer quality can be recorded per page.

@@ -748,6 +748,14 @@
         ],
         "title": "Choice"
       },
+      "DatePart": {
+        "type": "string",
+        "enum": [
+          "day",
+          "month",
+          "year"
+        ]
+      },
       "DocumentResponse": {
         "properties": {
           "id": {
@@ -987,6 +995,27 @@
               }
             ],
             "title": "Question Text"
+          },
+          "date_part": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatePart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
           }
         },
         "additionalProperties": false,
@@ -1000,6 +1029,44 @@
           "bbox"
         ],
         "title": "Field"
+      },
+      "FieldGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "choices",
+              "table_row"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
+        "title": "FieldGroup",
+        "description": "Fields answered together (decision P5-D8), set by the frontend:\n- `choices`: the tick boxes of one row after one label (\"Gender: [ ] Male [ ] Female\"),\n  asked as one choice;\n- `table_row`: the entry cells of one row of a table with several rows; a profile holds one\n  value per type, so they are never filled from it and are asked row by row."
       },
       "FieldKind": {
         "type": "string",
@@ -1269,6 +1336,13 @@
             },
             "type": "array",
             "title": "Fields"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/FieldGroup"
+            },
+            "type": "array",
+            "title": "Groups"
           },
           "trace": {
             "items": {

@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from app.ir.models import (
     BBox,
     Field,
+    FieldGroup,
     FieldKind,
     FieldStatus,
     FormIR,
@@ -182,6 +183,7 @@ def test_text_layer_values() -> None:
         {"question_text": ""},
         {"question_text": "x" * 201},
         {"status": "maybe"},
+        {"date_part": "week"},
     ],
 )
 def test_field_rejects_invalid_values(overrides: dict[str, Any]) -> None:
@@ -222,12 +224,43 @@ def test_phase_5_additions_round_trip() -> None:
 def test_ir_stored_before_phase_5_still_loads() -> None:
     """The Phase 5 additions keep schema_version 1: older stored IRs load with the defaults."""
     data = _full_ir().model_dump(mode="json")
+    del data["groups"]
     for field in data["fields"]:
-        del field["uppercase"], field["question_text"]
+        del field["uppercase"], field["question_text"], field["date_part"], field["group_id"]
 
     restored = FormIR.model_validate(data)
 
     assert all(not f.uppercase and f.question_text is None for f in restored.fields)
+    assert all(f.date_part is None and f.group_id is None for f in restored.fields)
+    assert restored.groups == []
+
+
+def test_date_parts_and_groups_round_trip() -> None:
+    """P5-D8: a date in DD | MM | YYYY boxes, and a table row answered together."""
+    ir = _ir(
+        fields=[
+            _field("p0_f000", date_part="day"),
+            _field("p0_f001", date_part="year", group_id="p0_g000"),
+        ],
+        groups=[FieldGroup(id="p0_g000", kind="table_row", label="Class X")],
+    )
+
+    restored = FormIR.model_validate_json(ir.model_dump_json())
+
+    assert [f.date_part for f in restored.fields] == ["day", "year"]
+    assert restored.fields[1].group_id == "p0_g000"
+    assert restored.groups[0].kind == "table_row" and restored.groups[0].label == "Class X"
+
+
+def test_field_in_a_missing_group_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="group that does not exist"):
+        _ir(fields=[_field(group_id="p0_g009")])
+
+
+def test_duplicate_group_ids_are_rejected() -> None:
+    group = FieldGroup(id="p0_g000", kind="choices", label="Gender")
+    with pytest.raises(ValidationError, match="group ids must be unique"):
+        _ir(groups=[group, group])
 
 
 def test_trace_event_requires_timezone() -> None:
