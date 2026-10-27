@@ -95,28 +95,45 @@ def resolve(f: Field, profile: Mapping[str, str], today: date) -> tuple[str, Val
     return stored, ValueSource.PROFILE
 
 
-def run(ir: FormIR, ctx: PassContext, policy: FillPolicy | None = None) -> FormIR:
-    policy = policy or FillPolicy(
+def policy_for(ctx: PassContext) -> FillPolicy:
+    return FillPolicy(
         min_llm_confidence=ctx.fill_min_confidence,
         once_per_form=PERSON_AND_DATE_TYPES if ctx.fill_once_per_form else frozenset(),
     )
+
+
+def typed_field_ids(ir: FormIR, policy: FillPolicy) -> set[str]:
+    """The fields whose semantic type the policy trusts: confident, and for a once-per-form type
+    the first such field in reading order. Only these are filled from, or saved to, the profile;
+    the others are asked with the form's own label."""
+    seen: set[T] = set()
+    typed: set[str] = set()
+    for f in ir.fields:
+        if f.no_fill_reason is not None or not policy.confident(f):
+            continue
+        if f.semantic_type in policy.once_per_form:
+            if f.semantic_type in seen:
+                continue
+            seen.add(f.semantic_type)
+        typed.add(f.id)
+    return typed
+
+
+def run(ir: FormIR, ctx: PassContext, policy: FillPolicy | None = None) -> FormIR:
+    policy = policy or policy_for(ctx)
     today = ctx.today()
-    filled_types: set[T] = set()
+    typed = typed_field_ids(ir, policy)
     trace: list[TraceEvent] = []
     fields: list[Field] = []
     for f in ir.fields:
         if f.no_fill_reason is not None or f.value is not None:
             fields.append(f)
             continue
-        found = None
-        once_blocked = f.semantic_type in policy.once_per_form and f.semantic_type in filled_types
-        if policy.confident(f) and not once_blocked:
-            found = resolve(f, ctx.profile, today)
+        found = resolve(f, ctx.profile, today) if f.id in typed else None
         if found is None:
             fields.append(f.model_copy(update={"status": FieldStatus.NEEDS_INPUT}))
             continue
         value, source = found
-        filled_types.add(f.semantic_type)
         fields.append(
             f.model_copy(
                 update={"value": value, "value_source": source, "status": FieldStatus.FILLED}
