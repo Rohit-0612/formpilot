@@ -132,7 +132,9 @@ class Option(BaseModel):          # for checkbox / radio / choice
 
 class ValueSource(str, Enum):
     PROFILE = "profile"; USER_ANSWER = "user_answer"
-    LLM_INFERRED = "llm_inferred"; USER_EDIT = "user_edit"; NONE = "none"
+    LLM_INFERRED = "llm_inferred"; USER_EDIT = "user_edit"
+    DERIVED = "derived"           # computed in code: age, today's date, full name (Phase 4)
+    NONE = "none"
 
 class FieldStatus(str, Enum):
     DETECTED = "detected"; FILLED = "filled"; NEEDS_INPUT = "needs_input"
@@ -160,6 +162,7 @@ class Field(BaseModel):
     validations: list[ValidationResult] = []
     status: FieldStatus = FieldStatus.DETECTED
     no_fill_reason: Literal["office_use", "signature"] | None = None  # never filled (P3-D1)
+    font_size: float | None = None  # set by the fit pass (§6.7), used by the renderer
 
 class TraceEvent(BaseModel):
     pass_name: str; field_id: str | None; change: str; at: datetime
@@ -257,7 +260,13 @@ The eval compares three modes: rules-only, LLM-only, rules+LLM. This comparison 
 
 Deterministic lookup: `semantic_type → profile key → value`. Derived values are computed in code
 (e.g. `full_name` from first/middle/last; `age` from `date_of_birth` and today's date;
-`date_of_filling` = today). Filled fields get `value_source=PROFILE`, status `FILLED`.
+`date_of_filling` = today). Filled fields get `value_source=PROFILE` (`DERIVED` for computed
+values), status `FILLED`.
+
+**Precision-first fill policy** (human decision, 2026-10-27, P4-D2): a field is filled only if it
+has no `no_fill_reason` and its semantic type is confident under the policy chosen on dev (target
+fill precision ≥ 85 %, `docs/decisions/phase-4.md`). Every other field stays empty with status
+`NEEDS_INPUT` and is asked with the form's own label.
 
 ### 6.4 Question planning pass
 
@@ -316,10 +325,11 @@ Only `CONFIRMED` fields are rendered.
   created_at, expires_at)` — status: `uploaded | analyzing | ready | rendering | done | failed`
 - `form_ir_versions(id, document_id, version, ir_json JSONB, created_at)` — append-only
 - `jobs(id, document_id, type, status, error, created_at, started_at, finished_at)` — types:
-  `analyze`, `render`; `started_at` is used to fail jobs left running by a crashed worker
+  `analyze`, `render`, `answers` (Phase 4); `started_at` is used to fail jobs left running by a crashed worker
   (decision D6 in `docs/decisions/phase-2.md`)
 - `profiles(user_id, encrypted_blob, updated_at)` — encrypted with Fernet; key from env
-- `audit_events(id, document_id, field_id, event, actor, created_at)` — no values stored
+- `audit_events(id, document_id, user_id, field_id, event, actor, created_at)` — no values
+  stored; `document_id` or `user_id` is set (profile events have no document; Phase 4)
 
 Files (uploads, rendered outputs) live in a `Storage` interface; v1 uses a local volume.
 
@@ -333,7 +343,7 @@ Files (uploads, rendered outputs) live in a `Storage` interface; v1 uses a local
 | GET | `/documents/{id}/pages/{n}.png` | rendered page image for the viewer |
 | GET | `/documents/{id}/ir` | latest Form IR (sensitive values masked) |
 | GET | `/documents/{id}/questions` | current question list |
-| POST | `/documents/{id}/answers` | submit answers → re-runs answers/validate/fit passes |
+| POST | `/documents/{id}/answers` | submit answers → 202 `{job_id}`; an `answers` job runs the answers/validate/fit passes |
 | PATCH | `/documents/{id}/fields/{field_id}` | edit value, bbox, or status |
 | POST | `/documents/{id}/confirm-all` | confirm fields with no warnings |
 | POST | `/documents/{id}/render` | → 202 `{job_id}` |
@@ -374,7 +384,7 @@ that no response contains a plain `FormIR`.
 | PDF | PyMuPDF | read widgets, words with coordinates, drawings, rendering. **AGPL-3.0**: the repo is public and licensed AGPL-3.0 |
 | OCR (after v1) | Tesseract via pytesseract | `eng` + `hin` language packs, both required |
 | Vision (after v1) | OpenCV | lines, boxes, perspective |
-| LLM | `LLMProvider` interface: `OllamaProvider` (default, local), `GroqProvider` (optional API, only if its free tier needs no card or payment), `FakeProvider` (tests); sensitive and phone values never reach a remote provider (§11) | model name from config; start with a 7–8B instruct model, fall back to 3B on low-RAM machines |
+| LLM | `LLMProvider` interface: `GroqProvider` (`openai/gpt-oss-120b`, the default when `GROQ_API_KEY` is set; human decision P4-D1), `OllamaProvider` (local, the fallback), `FakeProvider` (tests); sensitive and phone values never reach a remote provider (§11) | model names from config; Ollama starts with a 7–8B instruct model, 3B on low-RAM machines |
 | LLM cache | recorded responses keyed by hash(provider, model, prompt, schema) | makes CI eval deterministic and free |
 | Frontend | Next.js (App Router), TypeScript, Tailwind, TanStack Query, pdf page images from API | types generated with `openapi-typescript` |
 | Tests | pytest, Playwright (one happy-path e2e) | |
@@ -402,6 +412,7 @@ Metrics:
 |---|---|
 | Detection precision / recall | predicted vs labelled fields, match if IoU ≥ 0.5 on the same page; Phase 2 adds a primary **writing-spot match** (same horizontal extent and same writing row, box height not scored; `docs/decisions/phase-2.md`) |
 | Semantic accuracy | share of matched fields with the correct semantic type |
+| Fill precision (key metric, Phase 4) | of the fields the fill policy fills, the share whose predicted type is the reference type; reported with fill coverage (correct fills / reference fillable fields) |
 | Fill correctness | render with a persona, read back values, compare to expected |
 | Placement IoU (v1) | mean IoU of rendered text box vs labelled entry box |
 | Validator catch rate | share of `invalid_inputs.json` rejected; plus false-reject rate on persona values |
@@ -421,6 +432,9 @@ each label file records `"verified_by_human": true`.
 - JWT auth; users can only access their own documents (checked in the service layer).
 - Vault encrypted at rest (Fernet, key from env). This protects the database dump; it is not
   end-to-end encryption and the README says so.
+- In stored IR versions, the values of the sensitive and phone types are encrypted field by
+  field with the same key (human decision, 2026-10-27, P4-D5); the rest of the IR is plain and
+  expires after 24 h.
 - Sensitive types masked in responses, never logged, saved to the vault only on explicit opt-in.
 - **Remote LLM providers never receive sensitive values** (human decision, 2026-10-26). Values
   of the sensitive types (`aadhaar`, `pan`, `bank_account_number`, `passport_number`,

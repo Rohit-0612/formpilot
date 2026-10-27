@@ -78,6 +78,8 @@ If a nested instruction file (e.g. web/CLAUDE.md) conflicts with this file, this
 - Sensitive semantic types (`aadhaar`, `pan`, `bank_account_number`, `passport_number`,
   `voter_id`; decision D2) are never saved to the profile vault unless the user opts in for that
   specific field; they are masked in API responses by default.
+- In stored IR versions, the values of the sensitive and phone types are encrypted field by field
+  with the vault key (human decision, 2026-10-27).
 - **Never send sensitive values to a remote LLM provider.** Values of the sensitive types and of
   the phone types (`phone_mobile`, `phone_alternate`) are never sent to a remote provider (e.g.
   Groq). Free-text answer parsing may send non-sensitive free text (such as an address); the
