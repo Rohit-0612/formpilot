@@ -44,6 +44,7 @@ class JobType(StrEnum):
     ANALYZE = "analyze"
     RENDER = "render"
     PING = "ping"
+    ANSWERS = "answers"  # Phase 4: parse the answers, then validate and fit (migration 0003)
 
 
 class JobStatus(StrEnum):
@@ -165,12 +166,20 @@ class Profile(Base):
 
 
 class AuditEvent(Base):
-    """What happened to which field, by whom. Never stores values."""
+    """What happened to which field, by whom. Never stores values.
+
+    A document event has a document_id; a profile event (Phase 4) has only a user_id."""
 
     __tablename__ = "audit_events"
+    __table_args__ = (
+        CheckConstraint("document_id IS NOT NULL OR user_id IS NOT NULL", name="document_or_user"),
+    )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    document_id: Mapped[uuid.UUID] = _document_fk()
+    document_id: Mapped[uuid.UUID | None] = _document_fk(nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     field_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     event: Mapped[str] = mapped_column(String(64), nullable=False)
     # "user:<uuid>" or "system"
