@@ -4,6 +4,7 @@ The API and the worker commit through their own engines, so these tests clean up
 (truncate_all) and a flushed Redis test database (redis_url) [A1]. Synthetic data only.
 """
 
+import json
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
@@ -17,8 +18,11 @@ from app.api.deps import get_queue
 from app.config import Settings
 from app.db.models import Document, FormIRVersion
 from app.db.session import make_sessionmaker
+from app.ir.semantic_types import SemanticType
 from app.main import create_app
+from app.services import ir_store
 from app.storage import make_storage
+from app.vault.crypto import VaultCipher
 from tests.fixtures import pdfs
 from tests.integration.workers import make_worker
 
@@ -280,33 +284,52 @@ async def test_other_users_get_404_and_anonymous_users_401(
 # --- masking -------------------------------------------------------------------------------
 
 
-async def test_ir_values_are_masked_in_the_response_but_not_in_the_database(
+async def test_ir_values_are_masked_in_the_response_and_encrypted_in_the_database(
     client_for: ClientFactory, live_settings: Settings, engine: AsyncEngine
 ) -> None:
-    """IRs have no values before Phase 4, so a later IR version with values is written directly
-    (the worker writes versions 1 and 2: detection, then understanding)."""
+    """Masked in the response (SPEC §8); in the stored row, sensitive and phone values are
+    encrypted and the rest is plain (decision P4-D5, PLAN Phase 4 acceptance). A version with
+    values is added through the IR store, as the Phase 4 passes do."""
     client = await client_for()
     document_id = uuid.UUID(
         (await _upload(client, pdfs.get("flat_boxes").data)).json()["document_id"]
     )
     await _run_worker(live_settings)
+    cipher = VaultCipher(live_settings.vault_key)
     async with make_sessionmaker(engine)() as session:
-        version_1 = await session.scalar(
-            select(FormIRVersion.ir_json).where(FormIRVersion.version == 1)
-        )
-        assert version_1 is not None
-        fields = version_1["fields"]
-        fields[0] |= {"semantic_type": "aadhaar", "value": "2345 6789 0124"}
-        fields[1] |= {"semantic_type": "other", "value": "ABCDE1234F"}  # defence in depth
-        fields[2] |= {"semantic_type": "full_name", "value": "Asha Verma"}
-        session.add(FormIRVersion(document_id=document_id, version=3, ir_json=version_1))
+        ir = await ir_store.latest(session, document_id, cipher)
+        assert ir is not None
+        values = [
+            ("aadhaar", "2345 6789 0124"),
+            ("other", "ABCDE1234F"),  # defence in depth
+            ("phone_mobile", "9876543210"),
+            ("full_name", "Asha Verma"),
+        ]
+        fields = [
+            f.model_copy(update={"semantic_type": SemanticType(t), "value": v})
+            for f, (t, v) in zip(ir.fields, values, strict=False)
+        ]
+        ir = ir.model_copy(update={"fields": fields + ir.fields[len(fields) :]})
+        version = await ir_store.add_version(session, document_id, ir, cipher)
         await session.commit()
 
-    ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
+    response = (await client.get(f"{DOCS}/{document_id}/ir")).json()
 
-    assert [f["value"] for f in ir["fields"][:3]] == ["XXXX0124", "XXXX234F", "Asha Verma"]
+    assert [f["value"] for f in response["fields"][:4]] == [
+        "XXXX0124",
+        "XXXX234F",
+        "9876543210",  # the phone exception: the user's own number is shown
+        "Asha Verma",
+    ]
     async with make_sessionmaker(engine)() as session:
-        stored = await session.scalar(
-            select(FormIRVersion.ir_json).where(FormIRVersion.version == 3)
+        row = await session.scalar(
+            select(FormIRVersion.ir_json).where(
+                FormIRVersion.document_id == document_id, FormIRVersion.version == version
+            )
         )
-    assert stored is not None and stored["fields"][0]["value"] == "2345 6789 0124"
+    assert row is not None
+    text = json.dumps(row)
+    for secret in ("2345 6789 0124", "ABCDE1234F", "9876543210"):
+        assert secret not in text
+    assert row["fields"][3]["value"] == "Asha Verma"
+    assert all(f["value"].startswith(ir_store.SEALED_PREFIX) for f in row["fields"][:3])

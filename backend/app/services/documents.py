@@ -14,11 +14,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Document, DocumentStatus, FormIRVersion, Job, JobType
+from app.db.models import Document, DocumentStatus, Job, JobType
 from app.logging import get_logger
+from app.services import ir_store
 from app.services.analysis import original_key, page_key
 from app.services.jobs import JobEnqueueError, JobQueue, JobService
 from app.storage.base import ObjectNotFoundError, Storage
+from app.vault.crypto import VaultCipher
 
 log = get_logger(__name__)
 
@@ -61,10 +63,13 @@ def job_error_message(error: str | None, *, max_pages: int) -> str | None:
 
 
 class DocumentService:
-    def __init__(self, session: AsyncSession, storage: Storage, file_ttl_hours: int) -> None:
+    def __init__(
+        self, session: AsyncSession, storage: Storage, file_ttl_hours: int, cipher: VaultCipher
+    ) -> None:
         self._session = session
         self._storage = storage
         self._ttl = timedelta(hours=file_ttl_hours)
+        self._cipher = cipher
 
     async def upload(
         self, owner_id: uuid.UUID, filename: str, data: bytes, queue: JobQueue
@@ -116,13 +121,8 @@ class DocumentService:
         )
 
     async def latest_ir(self, document_id: uuid.UUID) -> dict[str, Any] | None:
-        """The stored (unmasked) IR JSON; callers mask it before it leaves the API."""
-        return await self._session.scalar(
-            select(FormIRVersion.ir_json)
-            .where(FormIRVersion.document_id == document_id)
-            .order_by(FormIRVersion.version.desc())
-            .limit(1)
-        )
+        """The latest IR JSON, values decrypted; callers mask it before it leaves the API."""
+        return await ir_store.latest_data(self._session, document_id, self._cipher)
 
     async def page_image(self, document: Document, page: int) -> bytes | None:
         if document.page_count is None or not 0 <= page < document.page_count:

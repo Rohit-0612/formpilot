@@ -397,6 +397,9 @@ SEMANTIC_TYPES: dict[SemanticType, TypeInfo] = {
 SENSITIVE_TYPES: frozenset[SemanticType] = frozenset(
     semantic_type for semantic_type, info in SEMANTIC_TYPES.items() if info.sensitive
 )
+PHONE_TYPES: frozenset[SemanticType] = frozenset(
+    {SemanticType.PHONE_MOBILE, SemanticType.PHONE_ALTERNATE}
+)
 
 
 def type_info(semantic_type: SemanticType) -> TypeInfo:
