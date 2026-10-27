@@ -11,7 +11,6 @@ Never logs file names or values.
 """
 
 import asyncio
-import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -31,15 +30,13 @@ from app.llm.factory import provider_from_settings
 from app.logging import get_logger
 from app.passes import understand
 from app.passes.context import PassContext
+from app.pdf import PYMUPDF_LOCK
 from app.services import filling, ir_store
 from app.storage.base import Storage
 from app.vault.crypto import VaultCipher
 
 log = get_logger(__name__)
 
-# PyMuPDF is not thread-safe, even across documents: one PDF at a time per worker process. The
-# work runs in a thread so the event loop (and arq's health check) stays responsive.
-_PYMUPDF_LOCK = threading.Lock()
 # Time kept free at the end of the job timeout for storing IR version 2.
 UNDERSTAND_MARGIN = timedelta(seconds=30)
 
@@ -82,7 +79,7 @@ def analyze_pdf(
     data: bytes, document_id: uuid.UUID, *, max_pages: int, dpi: int, at: datetime
 ) -> Analysis:
     """Pure and blocking: detect, run the frontend for the source kind, render the pages."""
-    with _PYMUPDF_LOCK:
+    with PYMUPDF_LOCK:
         try:
             doc = pymupdf.open(stream=data, filetype="pdf")
         except Exception:

@@ -680,6 +680,111 @@
         }
       }
     },
+    "/api/v1/documents/{document_id}/render": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Post Render",
+        "description": "Print the confirmed fields onto the form (only confirmed fields, invariant 7).",
+        "operationId": "post_render_api_v1_documents__document_id__render_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
+          },
+          "409": {
+            "description": "Nothing confirmed yet, or a job is running"
+          },
+          "503": {
+            "description": "The job could not be queued"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/output": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Output",
+        "operationId": "get_output_api_v1_documents__document_id__output_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The filled PDF",
+            "content": {
+              "application/pdf": {}
+            }
+          },
+          "404": {
+            "description": "Not found, or not printed since the last change"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/jobs/{job_id}": {
       "get": {
         "tags": [

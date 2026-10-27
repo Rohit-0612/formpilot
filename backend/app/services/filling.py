@@ -92,7 +92,7 @@ async def fill_document(
     committed)."""
     cipher = VaultCipher(settings.vault_key)
     profile = await load_profile_values(session, document.owner_id, cipher)
-    filled = fill(ir, fill_context(settings, profile))
+    filled = await asyncio.to_thread(fill, ir, fill_context(settings, profile))
     filled = await asyncio.to_thread(_phrase, filled, settings, deadline)
     await ir_store.add_version(session, document.id, filled, cipher)
     return filled

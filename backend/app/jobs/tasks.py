@@ -17,6 +17,7 @@ from app.logging import configure_logging, get_logger
 from app.services.analysis import analyze_document
 from app.services.filling import answer_document
 from app.services.jobs import JobStore
+from app.services.rendering import render_document
 from app.storage import make_storage
 
 log = get_logger(__name__)
@@ -87,7 +88,21 @@ async def answers(ctx: dict[str, Any], job_id: str) -> str:
     return await run_tracked(ctx, job_id, work)
 
 
-FUNCTIONS = [ping, analyze, answers]
+async def render(ctx: dict[str, Any], job_id: str) -> str:
+    """Confirmed fields -> the filled PDF (app/services/rendering.py)."""
+
+    async def work() -> None:
+        await render_document(
+            uuid.UUID(job_id),
+            sessionmaker=ctx["sessionmaker"],
+            storage=ctx["storage"],
+            settings=ctx["settings"],
+        )
+
+    return await run_tracked(ctx, job_id, work)
+
+
+FUNCTIONS = [ping, analyze, answers, render]
 
 
 async def startup(ctx: dict[str, Any]) -> None:

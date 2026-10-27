@@ -11,10 +11,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Document, DocumentStatus, Job, JobType
+from app.db.models import AuditEvent, Document, DocumentStatus, Job, JobType
 from app.ir.models import FormIR
 from app.logging import get_logger
 from app.passes.answers import Answer
@@ -22,7 +22,8 @@ from app.passes.questions import Question
 from app.services import filling, ir_store
 from app.services.analysis import original_key, page_key
 from app.services.jobs import JobEnqueueError, JobQueue, JobService
-from app.services.review import DocumentBusyError, job_running
+from app.services.rendering import NothingToRenderError, has_something_to_render
+from app.services.review import DocumentBusyError, job_running, output_key
 from app.storage.base import ObjectNotFoundError, Storage
 from app.vault.crypto import VaultCipher
 
@@ -158,6 +159,61 @@ class DocumentService:
         except JobEnqueueError:
             await self._storage.delete(filling.answers_key(document.id, job_id))
             raise
+
+    async def request_render(self, document: Document, user_id: uuid.UUID, queue: JobQueue) -> Job:
+        """Queues the render job of the confirmed fields (SPEC §6.9); the document is
+        `rendering` until it ends. NothingToRenderError if no field is confirmed,
+        DocumentBusyError while another job of the document runs."""
+        if await job_running(self._session, document.id):
+            raise DocumentBusyError("The form is still being processed. Try again in a moment.")
+        ir = await self.latest_form(document.id)
+        if ir is None or not has_something_to_render(ir):
+            raise NothingToRenderError
+        started = await self._session.execute(
+            update(Document)
+            .where(
+                Document.id == document.id,
+                Document.status.in_([DocumentStatus.READY.value, DocumentStatus.DONE.value]),
+            )
+            .values(status=DocumentStatus.RENDERING.value)
+        )
+        if started.rowcount != 1:  # type: ignore[attr-defined]
+            await self._session.rollback()
+            raise DocumentBusyError("The form is not ready to be printed.")
+        self._session.add(
+            AuditEvent(
+                document_id=document.id, user_id=user_id, event="render_requested",
+                actor=f"user:{user_id}",
+            )
+        )  # fmt: skip
+        await self._session.commit()
+        try:
+            return await JobService(self._session, queue).create_job(JobType.RENDER, document.id)
+        except JobEnqueueError:
+            await self._session.execute(
+                update(Document)
+                .where(Document.id == document.id)
+                .values(status=DocumentStatus.READY.value)
+            )
+            await self._session.commit()
+            raise
+
+    async def output(self, document: Document, user_id: uuid.UUID) -> bytes | None:
+        """The filled PDF, if it was rendered and nothing changed since (audited)."""
+        if document.status != DocumentStatus.DONE.value:
+            return None
+        try:
+            pdf = await self._storage.get(output_key(document.id))
+        except ObjectNotFoundError:
+            return None
+        self._session.add(
+            AuditEvent(
+                document_id=document.id, user_id=user_id, event="output_downloaded",
+                actor=f"user:{user_id}",
+            )
+        )  # fmt: skip
+        await self._session.commit()
+        return pdf
 
     async def delete(self, document: Document) -> None:
         """Deletes the document's files, then the document with its IR versions, jobs and audit

@@ -1,6 +1,8 @@
 import uuid
 from datetime import UTC, datetime
+from pathlib import PurePath
 from typing import Annotated, Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 
@@ -34,6 +36,7 @@ from app.services.documents import (
     looks_like_pdf,
 )
 from app.services.jobs import JobEnqueueError, JobQueue
+from app.services.rendering import NothingToRenderError
 from app.services.review import (
     DocumentBusyError,
     FieldNotFoundError,
@@ -308,6 +311,67 @@ async def post_confirm_all(
     (decision P5-D7); suggestions and fields with a warning need their own confirm."""
     ctx = review_context(lambda: datetime.now(UTC), settings)
     return await _review(document_id, user, documents, review, lambda ir: confirm_all(ir, ctx))
+
+
+@router.post(
+    "/{document_id}/render",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobAccepted,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": _NOT_FOUND},
+        status.HTTP_409_CONFLICT: {"description": "Nothing confirmed yet, or a job is running"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "The job could not be queued"},
+    },
+)
+async def post_render(
+    document_id: DocumentId, user: CurrentUser, documents: Documents, queue: Queue
+) -> JobAccepted:
+    """Print the confirmed fields onto the form (only confirmed fields, invariant 7)."""
+    document = await _owned(documents, document_id, user)
+    try:
+        job = await documents.request_render(document, user.id, queue)
+    except NothingToRenderError:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="Confirm at least one field before printing the form."
+        ) from None
+    except DocumentBusyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from None
+    except JobEnqueueError:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, detail="The form could not be printed. Try again."
+        ) from None
+    return JobAccepted(job_id=job.id)
+
+
+def _download_name(original: str) -> str:
+    stem = PurePath(original).stem or "form"
+    return f"{stem}-filled.pdf"
+
+
+@router.get(
+    "/{document_id}/output",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {"content": {"application/pdf": {}}, "description": "The filled PDF"},
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Not found, or not printed since the last change"
+        },
+    },
+)
+async def get_output(document_id: DocumentId, user: CurrentUser, documents: Documents) -> Response:
+    document = await _owned(documents, document_id, user)
+    pdf = await documents.output(document, user.id)
+    if pdf is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="The filled form is not ready")
+    name = _download_name(document.original_filename)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}",
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.delete(

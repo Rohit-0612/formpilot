@@ -28,6 +28,7 @@ from app.ir.models import (
 )
 from app.passes.context import PassContext
 from app.passes.validate import USER_DECIDES
+from app.pdf import PYMUPDF_LOCK
 
 STAGE = "fit"
 FIT_VALIDATOR = "fits_box"
@@ -79,7 +80,7 @@ def html_paragraph(text: str, size: float) -> str:
 
 @lru_cache(maxsize=256)
 def _shaped_width_at_measure_size(text: str) -> float:
-    with pymupdf.open() as doc:
+    with PYMUPDF_LOCK, pymupdf.open() as doc:
         page = doc.new_page(width=4000, height=4 * MEASURE_SIZE)
         page.insert_htmlbox(page.rect, html_paragraph(text, MEASURE_SIZE))
         spans = [
