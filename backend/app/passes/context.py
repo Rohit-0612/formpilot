@@ -28,6 +28,9 @@ class PassContext:
     # The fill policy (decision P4-D2): LLM confidence floor, person and date types once per form.
     fill_min_confidence: float = 0.99
     fill_once_per_form: bool = True
+    # Suggested values (decision P5-D1): the LLM confidence from which a field the policy does
+    # not trust is prefilled as SUGGESTED; None: no suggestions (the M2 behaviour).
+    suggest_min_confidence: float | None = None
     # The fit pass (SPEC §6.7): default and smallest font size, in points.
     fit_font_size: float = 10.0
     fit_min_font_size: float = 6.0

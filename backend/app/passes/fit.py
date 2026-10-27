@@ -85,8 +85,9 @@ def run(ir: FormIR, ctx: PassContext) -> FormIR:
         result = ValidationResult(validator=FIT_VALIDATOR, ok=message is None, message=message)
         kept = [r for r in field.validations if r.validator != FIT_VALIDATOR]
         update: dict[str, object] = {"font_size": size, "validations": [*kept, result]}
-        if message is not None:
+        if message is not None and field.status is not FieldStatus.SUGGESTED:
             update["status"] = FieldStatus.NEEDS_REVIEW
+        if message is not None:
             trace.append(
                 TraceEvent(
                     pass_name=STAGE, field_id=field.id, change="does not fit", at=ctx.clock()

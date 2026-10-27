@@ -98,6 +98,9 @@ class Settings(DatabaseSettings, QueueSettings, GroqSettings):
     # once per form
     fill_min_confidence: float = Field(default=0.99, ge=0.0, le=1.0)
     fill_once_per_form: bool = True
+    # Suggested values (decision P5-D1): an LLM-typed field below the fill confidence but at
+    # least this confident is prefilled as `suggested`, rendered only after the user confirms it
+    suggest_min_confidence: float = Field(default=0.95, ge=0.0, le=1.0)
     # Fit pass (SPEC §6.7), points
     fit_font_size: float = Field(default=10.0, gt=0)
     fit_min_font_size: float = Field(default=6.0, gt=0)

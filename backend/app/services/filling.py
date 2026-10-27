@@ -56,6 +56,7 @@ def fill_context(
         profile=profile or {},
         fill_min_confidence=settings.fill_min_confidence,
         fill_once_per_form=settings.fill_once_per_form,
+        suggest_min_confidence=settings.suggest_min_confidence,
         fit_font_size=settings.fit_font_size,
         fit_min_font_size=settings.fit_min_font_size,
     )
@@ -74,6 +75,7 @@ def counts(ir: FormIR) -> dict[str, int]:
         "filled": sum(f.status is FieldStatus.FILLED for f in ir.fields),
         "needs_input": sum(f.status is FieldStatus.NEEDS_INPUT for f in ir.fields),
         "needs_review": sum(f.status is FieldStatus.NEEDS_REVIEW for f in ir.fields),
+        "suggested": sum(f.status is FieldStatus.SUGGESTED for f in ir.fields),
     }
 
 

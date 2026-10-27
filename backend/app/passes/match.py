@@ -9,6 +9,12 @@ A field is filled only if (decision P4-D2):
 - the profile gives a value: stored (`PROFILE`) or computed in code (`DERIVED`: full name from
   its parts, age from the date of birth, today's date).
 
+Suggested values (decision P5-D1): a field the policy does not trust, typed by the LLM with a
+confidence of at least `suggest_min_confidence`, gets the profile value with status SUGGESTED:
+prefilled but unconfirmed, not asked, rendered only after the user confirms it. The once-per-form
+rule applies to suggestions as well, after the filled fields. Suggestions never change which
+fields are filled.
+
 Every other field without a value gets status NEEDS_INPUT and is asked (questions pass). The
 trace names the type and the source, never the value.
 """
@@ -119,31 +125,55 @@ def typed_field_ids(ir: FormIR, policy: FillPolicy) -> set[str]:
     return typed
 
 
+def suggested_field_ids(
+    ir: FormIR, policy: FillPolicy, floor: float | None, typed: set[str] | None = None
+) -> set[str]:
+    """The fields that get a suggested value if the profile has one (P5-D1): typed by the LLM
+    with a confidence of at least `floor` but not trusted by the policy; a once-per-form type
+    only if no trusted field and no earlier suggestion on the form has it. None: no suggestions."""
+    if floor is None:
+        return set()
+    typed = typed_field_ids(ir, policy) if typed is None else typed
+    seen = {f.semantic_type for f in ir.fields if f.id in typed}
+    suggested: set[str] = set()
+    for f in ir.fields:
+        if f.id in typed or f.no_fill_reason is not None or f.semantic_method != "llm":
+            continue
+        if f.semantic_confidence < floor or f.semantic_type in (T.OTHER, T.UNKNOWN):
+            continue
+        if f.semantic_type in policy.once_per_form:
+            if f.semantic_type in seen:
+                continue
+            seen.add(f.semantic_type)
+        suggested.add(f.id)
+    return suggested
+
+
 def run(ir: FormIR, ctx: PassContext, policy: FillPolicy | None = None) -> FormIR:
     policy = policy or policy_for(ctx)
     today = ctx.today()
     typed = typed_field_ids(ir, policy)
+    suggested = suggested_field_ids(ir, policy, ctx.suggest_min_confidence, typed)
     trace: list[TraceEvent] = []
     fields: list[Field] = []
     for f in ir.fields:
         if f.no_fill_reason is not None or f.value is not None:
             fields.append(f)
             continue
-        found = resolve(f, ctx.profile, today) if f.id in typed else None
+        found = resolve(f, ctx.profile, today) if f.id in typed | suggested else None
         if found is None:
             fields.append(f.model_copy(update={"status": FieldStatus.NEEDS_INPUT}))
             continue
         value, source = found
-        fields.append(
-            f.model_copy(
-                update={"value": value, "value_source": source, "status": FieldStatus.FILLED}
-            )
-        )
+        status = FieldStatus.FILLED if f.id in typed else FieldStatus.SUGGESTED
+        update = {"value": value, "value_source": source, "status": status}
+        fields.append(f.model_copy(update=update))
+        verb = "filled" if status is FieldStatus.FILLED else "suggested"
         trace.append(
             TraceEvent(
                 pass_name=STAGE,
                 field_id=f.id,
-                change=f"filled {f.semantic_type.value} ({source.value})",
+                change=f"{verb} {f.semantic_type.value} ({source.value})",
                 at=ctx.clock(),
             )
         )
