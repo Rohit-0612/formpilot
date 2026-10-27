@@ -133,10 +133,26 @@ def test_comb_rows_are_measured_per_cell_on_flat_forms_only() -> None:
     assert whole.validations[-1].ok and whole.font_size is not None
 
 
-def test_devanagari_cannot_be_shown_by_the_pdf_font() -> None:
-    out = fit.run(_ir(_field(0, T.FULL_NAME, "आशा वर्मा")), CTX).fields[0]
+def test_devanagari_is_measured_shaped_and_fits(  # P5-D5
+) -> None:
+    out = fit.run(_ir(_field(0, T.FULL_NAME, "श्रीमती क्षमा द्विवेदी")), CTX).fields[0]
+    narrow = fit.run(_ir(_field(0, T.FULL_NAME, "श्रीमती क्षमा द्विवेदी", width=40)), CTX).fields[0]
 
-    assert not out.validations[-1].ok and out.status is FieldStatus.NEEDS_REVIEW
+    assert out.validations[-1].ok and out.font_size == 10.0 and out.status is FieldStatus.FILLED
+    assert not narrow.validations[-1].ok and narrow.font_size == 6.0
+
+
+def test_devanagari_in_a_comb_row_and_other_scripts_are_written_by_hand() -> None:
+    comb = fit.run(_ir(_field(0, T.FULL_NAME, "आशा", width=60, max_chars=6)), CTX).fields[0]
+    tamil = fit.run(_ir(_field(0, T.FULL_NAME, "ஆஷா")), CTX).fields[0]
+
+    assert comb.validations[-1].message == (
+        "Devanagari cannot be written one letter per box; write it by hand."
+    )
+    assert tamil.validations[-1].message == (
+        "The value uses characters the PDF font cannot show; write it by hand."
+    )
+    assert comb.status is tamil.status is FieldStatus.NEEDS_REVIEW
 
 
 def test_checkboxes_and_empty_fields_are_left_alone() -> None:
