@@ -9,7 +9,10 @@ each candidate fill policy. Per policy and persona:
   share whose predicted semantic type is the reference type;
 - fill coverage: those correct fills / the compared fields with a fillable reference type;
 - value correctness: of the filled fields, the share whose value is the value the reference type
-  would get from the same persona (formatting and derived values included).
+  would get from the same persona (formatting and derived values included);
+- value precision (Phase 5): of the filled fields, the share whose value as printed is right for
+  the persona, where the reference layout says what is right: no profile value in a repeated row
+  (a table row), the day, month or year in a part of a split date (eval/value_truth.py).
 
 The policy is chosen on the full persona by a rule fixed before the run (decision P4-D2,
 docs/decisions/phase-4.md): the highest coverage among candidates with fill precision >= 85 %;
@@ -22,11 +25,13 @@ import argparse
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
-from app.ir.models import FieldStatus, ValueSource
+from app.ir.models import Field, FieldStatus, ValueSource
+from app.ir.semantic_types import SemanticType
 from app.logging import configure_logging
-from app.passes import match
+from app.passes import fit, match
 from app.passes.context import PassContext
 from app.passes.match import PERSON_AND_DATE_TYPES, FillPolicy
 from app.passes.questions import plan
@@ -34,6 +39,7 @@ from eval import run_eval
 from eval.labelling.schema import DATASET_DIR, LABELS_DIR, REFERENCE_DIR, REPO_ROOT
 from eval.labelling.subset import DEV_SUBSET
 from eval.labelling.tasks import detector_version
+from eval.value_truth import part_right, same_text
 
 PERSONAS_DIR = REPO_ROOT / "eval" / "personas"
 FULL_PERSONA = "asha_verma"
@@ -62,6 +68,7 @@ class FillScore:
     type_correct: int
     value_correct: int
     fillable: int
+    value_right: int = 0
 
     def as_dict(self) -> dict[str, float | int | None]:
         return {
@@ -72,6 +79,8 @@ class FillScore:
             "fill_precision": self.type_correct / self.filled if self.filled else None,
             "coverage": self.type_correct / self.fillable if self.fillable else None,
             "value_correctness": self.value_correct / self.filled if self.filled else None,
+            "value_right": self.value_right,
+            "value_precision": self.value_right / self.filled if self.filled else None,
         }
 
 
@@ -82,10 +91,28 @@ def load_personas(directory: Path = PERSONAS_DIR) -> dict[str, dict[str, str]]:
     }
 
 
+def value_right(c: run_eval.Compared, got: Field, profile: Mapping[str, str], today: date) -> bool:
+    """The filled value, as printed, is right for the persona (eval/value_truth.py)."""
+    printed = fit.printed(got)
+    if printed is None or c.role.repeated:
+        return False
+    if c.role.part is not None:
+        born = today if c.reference is SemanticType.DATE_OF_FILLING else None
+        if born is None:
+            try:
+                born = date.fromisoformat(profile.get("date_of_birth", ""))
+            except ValueError:
+                return False
+        return part_right(printed, born, c.role.part)
+    as_reference = got.model_copy(update={"semantic_type": c.reference})
+    expected = match.resolve(as_reference, profile, today)
+    return expected is not None and same_text(printed, expected[0])
+
+
 def score(result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillPolicy) -> FillScore:
     ctx = PassContext(clock=lambda: run_eval.FIXED_TIME, profile=profile)
     today = ctx.today()
-    filled = type_correct = value_correct = fillable = 0
+    filled = type_correct = value_correct = fillable = right = 0
     for form in result.forms:
         if form.understood is None:
             continue
@@ -100,7 +127,8 @@ def score(result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillP
             as_reference = got.model_copy(update={"semantic_type": c.reference})
             expected = match.resolve(as_reference, profile, today)
             value_correct += expected is not None and expected[0] == got.value
-    return FillScore(filled, type_correct, value_correct, fillable)
+            right += value_right(c, got, profile, today)
+    return FillScore(filled, type_correct, value_correct, fillable, right)
 
 
 def questions_per_form(
@@ -191,13 +219,16 @@ def markdown(data: Mapping[str, object]) -> str:
         + (f"; tag `{data['tag']}`" if data["tag"] else ""),
         "- *Fill precision*: of the compared fields the policy fills, the share with the right "
         "semantic type. *Coverage*: right fills / compared fields with a fillable reference "
-        "type. *Value correctness*: filled values equal to the value the reference type gets.",
+        "type. *Value correctness*: filled values equal to the value the reference type gets. "
+        "*Value precision*: filled values right for the persona as printed, where a repeated "
+        "row (a table row) has no right profile value and a split date wants its day, month or "
+        "year (eval/value_truth.py).",
         f"- **Chosen policy: {data['chosen']}** ({verdict}; chosen on `{FULL_PERSONA}`).",
         "",
         f"## Full persona (`{FULL_PERSONA}`)",
         "",
-        "| Policy | Filled | Fill precision | Coverage | Value correctness |",
-        "|---|--:|--:|--:|--:|",
+        "| Policy | Filled | Fill precision | Coverage | Value correctness | Value precision |",
+        "|---|--:|--:|--:|--:|--:|",
     ]
     for name, by_persona in candidates.items():
         s = by_persona[FULL_PERSONA]
@@ -205,7 +236,8 @@ def markdown(data: Mapping[str, object]) -> str:
         lines.append(
             f"| {name}{mark} | {s['filled']} | {_pct(s['fill_precision'])} "
             f"({s['type_correct']}/{s['filled']}) | {_pct(s['coverage'])} "
-            f"({s['type_correct']}/{s['fillable_reference']}) | {_pct(s['value_correctness'])} |"
+            f"({s['type_correct']}/{s['fillable_reference']}) | {_pct(s['value_correctness'])} "
+            f"| {_pct(s['value_precision'])} ({s['value_right']}/{s['filled']}) |"
         )
     lines += ["", "## Chosen policy, every persona", "", "| Persona | Filled | Fill precision |"]
     lines += ["|---|--:|--:|"] + [
@@ -296,13 +328,15 @@ def main(argv: list[str] | None = None) -> int:
             "report": base.with_suffix(".json").name,
             "fill_precision": full["fill_precision"],
             "coverage": full["coverage"],
+            "value_precision": full["value_precision"],
             "target_met": met,
         }
         run_eval.BASELINE.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
     full = table[chosen][FULL_PERSONA].as_dict()
     print(  # noqa: T201 - CLI output
         f"chosen: {chosen} (target met: {met}); fill precision {_pct(full['fill_precision'])}, "
-        f"coverage {_pct(full['coverage'])}\n{base.with_suffix('.md')}"
+        f"coverage {_pct(full['coverage'])}, value precision {_pct(full['value_precision'])}"
+        f"\n{base.with_suffix('.md')}"
     )
     return 0
 

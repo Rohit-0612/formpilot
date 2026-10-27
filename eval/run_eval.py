@@ -63,6 +63,7 @@ from eval.labelling.schema import (
 )
 from eval.labelling.subset import DEV_SUBSET, PageSelection, subset_pages
 from eval.labelling.tasks import detector_version
+from eval.value_truth import NO_ROLE, Role, roles
 
 REPORTS_DIR = REPO_ROOT / "eval" / "reports"
 CACHE_DIR = REPO_ROOT / "eval" / "llm_cache" / "understand"
@@ -91,6 +92,7 @@ class Compared:
     no_fill_reason: str | None
     predicted_id: str = ""  # the detected field's id (Phase 4: the fill eval)
     confidence: float = 0.0  # the semantic confidence (rule 0.95, or the model's own)
+    role: Role = NO_ROLE  # Phase 5: a repeated row or a date part (eval/value_truth.py)
 
     @property
     def correct(self) -> bool:
@@ -161,6 +163,7 @@ def evaluate_form(
     result = FormResult(
         form=label.form, from_scratch=label.prefilled_from is None, understood=understood
     )
+    role_of = roles(label.fields, reference.labels)
     result.llm_trouble = [
         e.change
         for e in understood.trace
@@ -196,6 +199,7 @@ def evaluate_form(
                     got.no_fill_reason,
                     got.id,
                     got.semantic_confidence,
+                    role_of.get(label_field.id, NO_ROLE),
                 )
             )
     return result

@@ -1,0 +1,428 @@
+{
+  "kind": "fill",
+  "split": "dev",
+  "provider": "groq:openai/gpt-oss-120b",
+  "detector": "flat@bd75acf",
+  "created_at": "2026-10-27T17:28:03+00:00",
+  "tag": "m3-value-before",
+  "reference_labels": "Reference labels: written by Claude Code (claude-opus-5-5), blind to the model's output, not by a human (decision P3-D6). Accuracy is agreement with them.",
+  "personas": "Personas: synthetic, drafted by Claude Code, not checked by a human (P4-D3).",
+  "rule": {
+    "target_precision": 0.85,
+    "min_coverage": 0.2,
+    "chosen_on": "asha_verma"
+  },
+  "chosen": "LLM confidence >= 0.99, once per form",
+  "target_met": true,
+  "candidates": {
+    "every predicted type (no policy)": {
+      "asha_verma": {
+        "filled": 196,
+        "type_correct": 127,
+        "value_correct": 128,
+        "fillable_reference": 241,
+        "fill_precision": 0.6479591836734694,
+        "coverage": 0.5269709543568465,
+        "value_correctness": 0.6530612244897959,
+        "value_right": 104,
+        "value_precision": 0.5306122448979592
+      },
+      "meera_iyer": {
+        "filled": 157,
+        "type_correct": 103,
+        "value_correct": 103,
+        "fillable_reference": 241,
+        "fill_precision": 0.6560509554140127,
+        "coverage": 0.42738589211618255,
+        "value_correctness": 0.6560509554140127,
+        "value_right": 81,
+        "value_precision": 0.5159235668789809
+      },
+      "ravi_kumar": {
+        "filled": 161,
+        "type_correct": 114,
+        "value_correct": 117,
+        "fillable_reference": 241,
+        "fill_precision": 0.7080745341614907,
+        "coverage": 0.4730290456431535,
+        "value_correctness": 0.7267080745341615,
+        "value_right": 98,
+        "value_precision": 0.6086956521739131
+      }
+    },
+    "LLM confidence >= 0.90": {
+      "asha_verma": {
+        "filled": 163,
+        "type_correct": 111,
+        "value_correct": 112,
+        "fillable_reference": 241,
+        "fill_precision": 0.6809815950920245,
+        "coverage": 0.4605809128630705,
+        "value_correctness": 0.6871165644171779,
+        "value_right": 96,
+        "value_precision": 0.588957055214724
+      },
+      "meera_iyer": {
+        "filled": 132,
+        "type_correct": 88,
+        "value_correct": 88,
+        "fillable_reference": 241,
+        "fill_precision": 0.6666666666666666,
+        "coverage": 0.3651452282157676,
+        "value_correctness": 0.6666666666666666,
+        "value_right": 74,
+        "value_precision": 0.5606060606060606
+      },
+      "ravi_kumar": {
+        "filled": 135,
+        "type_correct": 99,
+        "value_correct": 101,
+        "fillable_reference": 241,
+        "fill_precision": 0.7333333333333333,
+        "coverage": 0.4107883817427386,
+        "value_correctness": 0.7481481481481481,
+        "value_right": 90,
+        "value_precision": 0.6666666666666666
+      }
+    },
+    "LLM confidence >= 0.95": {
+      "asha_verma": {
+        "filled": 135,
+        "type_correct": 102,
+        "value_correct": 102,
+        "fillable_reference": 241,
+        "fill_precision": 0.7555555555555555,
+        "coverage": 0.42323651452282157,
+        "value_correctness": 0.7555555555555555,
+        "value_right": 87,
+        "value_precision": 0.6444444444444445
+      },
+      "meera_iyer": {
+        "filled": 109,
+        "type_correct": 79,
+        "value_correct": 79,
+        "fillable_reference": 241,
+        "fill_precision": 0.7247706422018348,
+        "coverage": 0.3278008298755187,
+        "value_correctness": 0.7247706422018348,
+        "value_right": 66,
+        "value_precision": 0.6055045871559633
+      },
+      "ravi_kumar": {
+        "filled": 119,
+        "type_correct": 92,
+        "value_correct": 92,
+        "fillable_reference": 241,
+        "fill_precision": 0.773109243697479,
+        "coverage": 0.3817427385892116,
+        "value_correctness": 0.773109243697479,
+        "value_right": 81,
+        "value_precision": 0.680672268907563
+      }
+    },
+    "LLM confidence >= 0.99": {
+      "asha_verma": {
+        "filled": 99,
+        "type_correct": 79,
+        "value_correct": 79,
+        "fillable_reference": 241,
+        "fill_precision": 0.797979797979798,
+        "coverage": 0.3278008298755187,
+        "value_correctness": 0.797979797979798,
+        "value_right": 70,
+        "value_precision": 0.7070707070707071
+      },
+      "meera_iyer": {
+        "filled": 77,
+        "type_correct": 59,
+        "value_correct": 59,
+        "fillable_reference": 241,
+        "fill_precision": 0.7662337662337663,
+        "coverage": 0.24481327800829875,
+        "value_correctness": 0.7662337662337663,
+        "value_right": 50,
+        "value_precision": 0.6493506493506493
+      },
+      "ravi_kumar": {
+        "filled": 89,
+        "type_correct": 74,
+        "value_correct": 74,
+        "fillable_reference": 241,
+        "fill_precision": 0.8314606741573034,
+        "coverage": 0.3070539419087137,
+        "value_correctness": 0.8314606741573034,
+        "value_right": 66,
+        "value_precision": 0.7415730337078652
+      }
+    },
+    "rules only": {
+      "asha_verma": {
+        "filled": 73,
+        "type_correct": 54,
+        "value_correct": 54,
+        "fillable_reference": 241,
+        "fill_precision": 0.7397260273972602,
+        "coverage": 0.22406639004149378,
+        "value_correctness": 0.7397260273972602,
+        "value_right": 50,
+        "value_precision": 0.684931506849315
+      },
+      "meera_iyer": {
+        "filled": 55,
+        "type_correct": 38,
+        "value_correct": 38,
+        "fillable_reference": 241,
+        "fill_precision": 0.6909090909090909,
+        "coverage": 0.15767634854771784,
+        "value_correctness": 0.6909090909090909,
+        "value_right": 34,
+        "value_precision": 0.6181818181818182
+      },
+      "ravi_kumar": {
+        "filled": 64,
+        "type_correct": 50,
+        "value_correct": 50,
+        "fillable_reference": 241,
+        "fill_precision": 0.78125,
+        "coverage": 0.2074688796680498,
+        "value_correctness": 0.78125,
+        "value_right": 47,
+        "value_precision": 0.734375
+      }
+    },
+    "LLM confidence >= 0.90, once per form": {
+      "asha_verma": {
+        "filled": 130,
+        "type_correct": 91,
+        "value_correct": 92,
+        "fillable_reference": 241,
+        "fill_precision": 0.7,
+        "coverage": 0.3775933609958506,
+        "value_correctness": 0.7076923076923077,
+        "value_right": 84,
+        "value_precision": 0.6461538461538462
+      },
+      "meera_iyer": {
+        "filled": 99,
+        "type_correct": 68,
+        "value_correct": 68,
+        "fillable_reference": 241,
+        "fill_precision": 0.6868686868686869,
+        "coverage": 0.2821576763485477,
+        "value_correctness": 0.6868686868686869,
+        "value_right": 62,
+        "value_precision": 0.6262626262626263
+      },
+      "ravi_kumar": {
+        "filled": 102,
+        "type_correct": 79,
+        "value_correct": 81,
+        "fillable_reference": 241,
+        "fill_precision": 0.7745098039215687,
+        "coverage": 0.3278008298755187,
+        "value_correctness": 0.7941176470588235,
+        "value_right": 78,
+        "value_precision": 0.7647058823529411
+      }
+    },
+    "LLM confidence >= 0.95, once per form": {
+      "asha_verma": {
+        "filled": 105,
+        "type_correct": 83,
+        "value_correct": 83,
+        "fillable_reference": 241,
+        "fill_precision": 0.7904761904761904,
+        "coverage": 0.34439834024896265,
+        "value_correctness": 0.7904761904761904,
+        "value_right": 76,
+        "value_precision": 0.7238095238095238
+      },
+      "meera_iyer": {
+        "filled": 79,
+        "type_correct": 60,
+        "value_correct": 60,
+        "fillable_reference": 241,
+        "fill_precision": 0.759493670886076,
+        "coverage": 0.24896265560165975,
+        "value_correctness": 0.759493670886076,
+        "value_right": 55,
+        "value_precision": 0.6962025316455697
+      },
+      "ravi_kumar": {
+        "filled": 89,
+        "type_correct": 73,
+        "value_correct": 73,
+        "fillable_reference": 241,
+        "fill_precision": 0.8202247191011236,
+        "coverage": 0.3029045643153527,
+        "value_correctness": 0.8202247191011236,
+        "value_right": 70,
+        "value_precision": 0.7865168539325843
+      }
+    },
+    "LLM confidence >= 0.99, once per form": {
+      "asha_verma": {
+        "filled": 74,
+        "type_correct": 64,
+        "value_correct": 64,
+        "fillable_reference": 241,
+        "fill_precision": 0.8648648648648649,
+        "coverage": 0.26556016597510373,
+        "value_correctness": 0.8648648648648649,
+        "value_right": 61,
+        "value_precision": 0.8243243243243243
+      },
+      "meera_iyer": {
+        "filled": 52,
+        "type_correct": 44,
+        "value_correct": 44,
+        "fillable_reference": 241,
+        "fill_precision": 0.8461538461538461,
+        "coverage": 0.1825726141078838,
+        "value_correctness": 0.8461538461538461,
+        "value_right": 41,
+        "value_precision": 0.7884615384615384
+      },
+      "ravi_kumar": {
+        "filled": 64,
+        "type_correct": 59,
+        "value_correct": 59,
+        "fillable_reference": 241,
+        "fill_precision": 0.921875,
+        "coverage": 0.24481327800829875,
+        "value_correctness": 0.921875,
+        "value_right": 57,
+        "value_precision": 0.890625
+      }
+    },
+    "rules only, once per form": {
+      "asha_verma": {
+        "filled": 59,
+        "type_correct": 48,
+        "value_correct": 48,
+        "fillable_reference": 241,
+        "fill_precision": 0.8135593220338984,
+        "coverage": 0.1991701244813278,
+        "value_correctness": 0.8135593220338984,
+        "value_right": 45,
+        "value_precision": 0.7627118644067796
+      },
+      "meera_iyer": {
+        "filled": 41,
+        "type_correct": 32,
+        "value_correct": 32,
+        "fillable_reference": 241,
+        "fill_precision": 0.7804878048780488,
+        "coverage": 0.13278008298755187,
+        "value_correctness": 0.7804878048780488,
+        "value_right": 29,
+        "value_precision": 0.7073170731707317
+      },
+      "ravi_kumar": {
+        "filled": 50,
+        "type_correct": 44,
+        "value_correct": 44,
+        "fillable_reference": 241,
+        "fill_precision": 0.88,
+        "coverage": 0.1825726141078838,
+        "value_correctness": 0.88,
+        "value_right": 42,
+        "value_precision": 0.84
+      }
+    }
+  },
+  "questions_per_form": {
+    "asha_verma": {
+      "01_sbi_account_opening_form": {
+        "fields_needing_input": 215,
+        "questions": 40
+      },
+      "02_sbi_kyc_annexure_a": {
+        "fields_needing_input": 17,
+        "questions": 7
+      },
+      "03_sbi_kyc_annexure_b": {
+        "fields_needing_input": 50,
+        "questions": 11
+      },
+      "06_union_bank_nomination_form": {
+        "fields_needing_input": 25,
+        "questions": 5
+      },
+      "21_india_post_pmjjby_claim_form": {
+        "fields_needing_input": 40,
+        "questions": 21
+      },
+      "23_lic_claim_form_a_3783": {
+        "fields_needing_input": 44,
+        "questions": 21
+      },
+      "25_cdlsiet_btech_admission_form": {
+        "fields_needing_input": 84,
+        "questions": 16
+      },
+      "30_allahabad_univ_enrollment_form": {
+        "fields_needing_input": 24,
+        "questions": 12
+      },
+      "32_niftem_student_declaration_form": {
+        "fields_needing_input": 10,
+        "questions": 2
+      },
+      "39_cebs_joining_report": {
+        "fields_needing_input": 7,
+        "questions": 2
+      },
+      "41_india_post_pli_name_change_form": {
+        "fields_needing_input": 15,
+        "questions": 5
+      }
+    },
+    "empty profile": {
+      "01_sbi_account_opening_form": {
+        "fields_needing_input": 238,
+        "questions": 58
+      },
+      "02_sbi_kyc_annexure_a": {
+        "fields_needing_input": 28,
+        "questions": 17
+      },
+      "03_sbi_kyc_annexure_b": {
+        "fields_needing_input": 59,
+        "questions": 14
+      },
+      "06_union_bank_nomination_form": {
+        "fields_needing_input": 26,
+        "questions": 6
+      },
+      "21_india_post_pmjjby_claim_form": {
+        "fields_needing_input": 50,
+        "questions": 25
+      },
+      "23_lic_claim_form_a_3783": {
+        "fields_needing_input": 47,
+        "questions": 24
+      },
+      "25_cdlsiet_btech_admission_form": {
+        "fields_needing_input": 96,
+        "questions": 24
+      },
+      "30_allahabad_univ_enrollment_form": {
+        "fields_needing_input": 28,
+        "questions": 16
+      },
+      "32_niftem_student_declaration_form": {
+        "fields_needing_input": 13,
+        "questions": 5
+      },
+      "39_cebs_joining_report": {
+        "fields_needing_input": 7,
+        "questions": 2
+      },
+      "41_india_post_pli_name_change_form": {
+        "fields_needing_input": 16,
+        "questions": 6
+      }
+    }
+  }
+}

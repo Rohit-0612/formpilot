@@ -50,8 +50,9 @@ def test_rule_fills_are_scored_by_type_and_value(folders: tuple[Path, Path, Path
     s = fill_eval.score(result, PERSONA, FillPolicy(min_llm_confidence=None))
 
     # rules type email, bank_name, bank_branch, ifsc (the account box: wrong) -> 4 filled
-    assert s == FillScore(filled=4, type_correct=3, value_correct=3, fillable=4)
+    assert s == FillScore(filled=4, type_correct=3, value_correct=3, fillable=4, value_right=3)
     assert s.as_dict()["fill_precision"] == 0.75 and s.as_dict()["coverage"] == 0.75
+    assert s.as_dict()["value_precision"] == 0.75
 
 
 def test_a_persona_without_the_value_fills_nothing(folders: tuple[Path, Path, Path]) -> None:  # noqa: F811
