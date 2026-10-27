@@ -23,10 +23,11 @@ from app.ir.semantic_types import SemanticType as T
 from app.llm.fake import FakeProvider
 from app.llm.provider import LLMRequest, PrivacyError
 from app.passes import answers
-from app.passes.answers import Answer, holds_identifier, profile_changes
+from app.passes.answers import Answer, profile_changes
 from app.passes.context import PassContext
 from app.passes.match import FillPolicy
 from app.passes.questions import plan
+from app.services.masking import contains_identifier
 
 NOW = datetime(2026, 10, 27, 6, 0, tzinfo=UTC)
 POLICY = FillPolicy(min_llm_confidence=0.95)
@@ -169,8 +170,8 @@ def test_free_text_with_an_identifier_or_phone_is_never_sent(text: str) -> None:
 
 
 def test_identifier_detection_leaves_plain_addresses_alone() -> None:
-    assert not holds_identifier("Flat 12, Example Residency, Sample Nagar, Pune 411001")
-    assert holds_identifier("call +91-9000012345")
+    assert not contains_identifier("Flat 12, Example Residency, Sample Nagar, Pune 411001")
+    assert contains_identifier("call +91-9000012345")
 
 
 def test_free_text_is_refused_where_a_group_holds_a_sensitive_type() -> None:

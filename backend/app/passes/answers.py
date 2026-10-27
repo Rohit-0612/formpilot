@@ -17,7 +17,6 @@ trace without values; those fields stay NEEDS_INPUT and are asked again.
 """
 
 import json
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -34,7 +33,7 @@ from app.llm.provider import LLMError, LLMProvider, LLMRequest, PrivacyError
 from app.passes.context import PassContext
 from app.passes.match import resolve
 from app.passes.questions import InputKind, Question, QuestionPart
-from app.services.masking import SENSITIVE_PATTERNS
+from app.services.masking import contains_identifier
 from app.validators.dates import date_format_for, format_date, parse_date
 from app.validators.normalize import InvalidValueError, normalize
 
@@ -59,23 +58,7 @@ class ProfileChanges:
     opt_in: dict[str, bool] = field(default_factory=dict)
 
 
-# Text that holds an identifier or a phone number never goes to a model (CLAUDE.md §3). Words
-# are joined in runs of up to three ("2345 6789 0124") and matched whole; deliberately broad.
-_SPLIT = re.compile(r"[\s,;/()]+")
-_MOBILE = re.compile(r"(?:91|0)?[6-9][0-9]{9}")
 _TYPE_VALUES = frozenset(t.value for t in T)
-
-
-def holds_identifier(text: str) -> bool:
-    words = [w for w in _SPLIT.split(text) if w]
-    for i in range(len(words)):
-        for j in range(i + 1, min(i + 4, len(words) + 1)):
-            candidate = "".join(words[i:j]).replace("-", "").upper().removeprefix("+")
-            if _MOBILE.fullmatch(candidate) or any(
-                p.fullmatch(candidate) for p in SENSITIVE_PATTERNS.values()
-            ):
-                return True
-    return False
 
 
 # --- LLM free text ---------------------------------------------------------------------------
@@ -187,7 +170,7 @@ def run(
             if not question.free_text:
                 problem(question.id, "this question cannot be answered in one line")
                 continue
-            if holds_identifier(answer.free_text):
+            if contains_identifier(answer.free_text):
                 problem(question.id, "free text holds an identifier or phone; answer the parts")
                 continue
             if ctx.provider is None:

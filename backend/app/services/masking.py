@@ -86,3 +86,22 @@ def mask_ir_data(data: dict[str, Any]) -> dict[str, Any]:
             field["value"] = mask_value(field["value"])
         fields.append(field)
     return {**data, "fields": fields}
+
+
+# Words joined in runs of up to three ("2345 6789 0124") and matched whole. Deliberately broad:
+# used where too much is safe (sealing stored values, keeping free text away from a model).
+_WORD_SPLIT = re.compile(r"[\s,;/()]+")
+_MOBILE_COMPACT = re.compile(r"(?:91|0)?[6-9][0-9]{9}")
+
+
+def contains_identifier(text: str) -> bool:
+    """True if the text holds a D2 identifier or an Indian mobile number anywhere."""
+    words = [w for w in _WORD_SPLIT.split(text) if w]
+    for i in range(len(words)):
+        for j in range(i + 1, min(i + 4, len(words) + 1)):
+            candidate = "".join(words[i:j]).replace("-", "").upper().removeprefix("+")
+            if _MOBILE_COMPACT.fullmatch(candidate) or any(
+                p.fullmatch(candidate) for p in SENSITIVE_PATTERNS.values()
+            ):
+                return True
+    return False

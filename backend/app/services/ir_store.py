@@ -1,7 +1,7 @@
 """Stored Form IR versions (SPEC §7) with sensitive and phone values encrypted (decision P4-D5).
 
 Before an IR is stored, the value of every field whose semantic type is sensitive (D2) or a phone
-type, or whose value looks like a D2 identifier (the masking rule's defence in depth), is
+type, or whose value is or contains a D2 identifier or a mobile number (defence in depth), is
 replaced by `SEALED_PREFIX` + a Fernet token made with the vault key. The rest of the IR stays
 plain JSON and expires with the document (24 h). A value that happens to start with the prefix
 is sealed too, so every stored value with the prefix is a token.
@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import FormIRVersion
 from app.ir.models import FormIR
 from app.ir.semantic_types import PHONE_TYPES, SENSITIVE_TYPES, SemanticType
-from app.services.masking import looks_sensitive
+from app.services.masking import contains_identifier, looks_sensitive
 from app.vault.crypto import VaultCipher
 
 SEALED_PREFIX = "enc:fernet:"
@@ -31,6 +31,7 @@ def must_seal(value: str | None, semantic_type: SemanticType) -> bool:
     return (
         semantic_type in SEALED_TYPES
         or looks_sensitive(value, semantic_type)
+        or contains_identifier(value)
         or value.startswith(SEALED_PREFIX)
     )
 

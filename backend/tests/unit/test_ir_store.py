@@ -102,3 +102,15 @@ def test_a_changed_token_fails_loudly(cipher: VaultCipher) -> None:
 
     with pytest.raises(VaultError):
         unseal(stored, cipher)
+
+
+def test_a_value_containing_an_identifier_or_phone_is_encrypted(cipher: VaultCipher) -> None:
+    note = "Aadhaar 2345 6789 0124 on file"
+    call = "call 90000 12345 after 6"
+
+    stored = json.dumps(
+        seal(_ir((T.OTHER, note), (T.OTHER, call), (T.OTHER, "Pune 411001")), cipher)
+    )
+
+    assert "2345 6789 0124" not in stored and "90000 12345" not in stored
+    assert "Pune 411001" in stored  # a PIN code is not an identifier
