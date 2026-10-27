@@ -260,6 +260,8 @@ export interface components {
             status: components["schemas"]["FieldStatus"];
             /** No Fill Reason */
             no_fill_reason?: ("office_use" | "signature") | null;
+            /** Font Size */
+            font_size?: number | null;
         };
         /**
          * FieldKind
@@ -479,7 +481,7 @@ export interface components {
          * ValueSource
          * @enum {string}
          */
-        ValueSource: "profile" | "user_answer" | "llm_inferred" | "user_edit" | "none";
+        ValueSource: "profile" | "user_answer" | "llm_inferred" | "user_edit" | "derived" | "none";
     };
     responses: never;
     parameters: never;

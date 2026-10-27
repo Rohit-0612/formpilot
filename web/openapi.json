@@ -683,6 +683,18 @@
               }
             ],
             "title": "No Fill Reason"
+          },
+          "font_size": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font Size"
           }
         },
         "additionalProperties": false,
@@ -1267,6 +1279,7 @@
           "user_answer",
           "llm_inferred",
           "user_edit",
+          "derived",
           "none"
         ],
         "title": "ValueSource"
