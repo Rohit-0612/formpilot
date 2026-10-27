@@ -185,7 +185,8 @@ def test_free_text_is_refused_where_a_group_holds_a_sensitive_type() -> None:
 
 def test_the_privacy_guard_would_refuse_a_sensitive_type_anyway() -> None:
     with pytest.raises(PrivacyError):
-        answers._split("x", [T.CURRENT_CITY, T.PHONE_MOBILE], FakeProvider([], remote=True))
+        types = [T.CURRENT_CITY, T.PHONE_MOBILE]
+        answers.split_free_text("x", types, FakeProvider([], remote=True))
 
 
 def test_unreadable_llm_output_is_retried_once_then_reported() -> None:

@@ -1,0 +1,338 @@
+{
+ "written_by": "Claude Code (claude-opus-5-5), synthetic addresses with the expected split by the rules of prompt answers_v1.md; not checked by a human (like P4-D3). Frozen once written.",
+ "items": [
+  {
+   "id": "a01",
+   "text": "Flat 302, Shanti Niwas, 14th Cross Road, Malleshwaram, Bengaluru, Karnataka 560003",
+   "expected": {
+    "current_address_line1": "Flat 302, Shanti Niwas, 14th Cross Road",
+    "current_address_line2": "Malleshwaram",
+    "current_city": "Bengaluru",
+    "current_state": "Karnataka",
+    "current_pincode": "560003"
+   }
+  },
+  {
+   "id": "a02",
+   "text": "H.No. 45, Gali No. 3, Laxmi Nagar, Delhi 110092",
+   "expected": {
+    "current_address_line1": "H.No. 45, Gali No. 3",
+    "current_address_line2": "Laxmi Nagar",
+    "current_city": "Delhi",
+    "current_state": null,
+    "current_pincode": "110092"
+   }
+  },
+  {
+   "id": "a03",
+   "text": "12 Park Street, Kolkata, West Bengal - 700016",
+   "expected": {
+    "current_address_line1": "12 Park Street",
+    "current_address_line2": null,
+    "current_city": "Kolkata",
+    "current_state": "West Bengal",
+    "current_pincode": "700016"
+   }
+  },
+  {
+   "id": "a04",
+   "text": "Plot 7, Sector 21, Gandhinagar, Gujarat 382021",
+   "expected": {
+    "current_address_line1": "Plot 7",
+    "current_address_line2": "Sector 21",
+    "current_city": "Gandhinagar",
+    "current_state": "Gujarat",
+    "current_pincode": "382021"
+   }
+  },
+  {
+   "id": "a05",
+   "text": "Room 14, Jubilee Hostel, IIT Campus, Powai, Mumbai 400076, Maharashtra",
+   "expected": {
+    "current_address_line1": "Room 14, Jubilee Hostel",
+    "current_address_line2": "IIT Campus, Powai",
+    "current_city": "Mumbai",
+    "current_state": "Maharashtra",
+    "current_pincode": "400076"
+   }
+  },
+  {
+   "id": "a06",
+   "text": "Ward 5, Near Shiv Mandir, Rampur, District Varanasi, Uttar Pradesh 221104",
+   "expected": {
+    "current_address_line1": "Ward 5",
+    "current_address_line2": "Near Shiv Mandir",
+    "current_city": "Rampur",
+    "current_state": "Uttar Pradesh",
+    "current_pincode": "221104",
+    "current_district": "Varanasi"
+   }
+  },
+  {
+   "id": "a07",
+   "text": "B-204, Green Valley Apartments, Baner Road, Pune 411045",
+   "expected": {
+    "current_address_line1": "B-204, Green Valley Apartments, Baner Road",
+    "current_address_line2": null,
+    "current_city": "Pune",
+    "current_state": null,
+    "current_pincode": "411045"
+   }
+  },
+  {
+   "id": "a08",
+   "text": "No. 8, 2nd Main, Jayanagar 4th Block, Bangalore - 560011",
+   "expected": {
+    "current_address_line1": "No. 8, 2nd Main",
+    "current_address_line2": "Jayanagar 4th Block",
+    "current_city": "Bangalore",
+    "current_pincode": "560011"
+   }
+  },
+  {
+   "id": "a09",
+   "text": "17/3 Civil Lines, Prayagraj, UP 211001",
+   "expected": {
+    "current_address_line1": "17/3 Civil Lines",
+    "current_address_line2": null,
+    "current_city": "Prayagraj",
+    "current_state": "UP",
+    "current_pincode": "211001"
+   }
+  },
+  {
+   "id": "a10",
+   "text": "Quarter No. 112, Railway Colony, Itarsi, Madhya Pradesh 461111",
+   "expected": {
+    "current_address_line1": "Quarter No. 112",
+    "current_address_line2": "Railway Colony",
+    "current_city": "Itarsi",
+    "current_state": "Madhya Pradesh",
+    "current_pincode": "461111"
+   }
+  },
+  {
+   "id": "a11",
+   "text": "45 Anna Salai, Teynampet, Chennai, Tamil Nadu",
+   "expected": {
+    "current_address_line1": "45 Anna Salai",
+    "current_address_line2": "Teynampet",
+    "current_city": "Chennai",
+    "current_state": "Tamil Nadu",
+    "current_pincode": null
+   }
+  },
+  {
+   "id": "a12",
+   "text": "Flat 9, Rose Villa, Banjara Hills, Hyderabad",
+   "expected": {
+    "current_address_line1": "Flat 9, Rose Villa",
+    "current_address_line2": "Banjara Hills",
+    "current_city": "Hyderabad",
+    "current_state": null,
+    "current_pincode": null
+   }
+  },
+  {
+   "id": "a13",
+   "text": "22 Mount Road, Guindy, Chennai 600032, Tamil Nadu, India",
+   "expected": {
+    "current_address_line1": "22 Mount Road",
+    "current_address_line2": "Guindy",
+    "current_city": "Chennai",
+    "current_state": "Tamil Nadu",
+    "current_pincode": "600032",
+    "current_country": "India"
+   }
+  },
+  {
+   "id": "a14",
+   "text": "5 Lake View Road, Kochi, Kerala 682011",
+   "expected": {
+    "current_address_line1": "5 Lake View Road",
+    "current_address_line2": null,
+    "current_city": "Kochi",
+    "current_state": "Kerala",
+    "current_pincode": "682011",
+    "current_country": null
+   }
+  },
+  {
+   "id": "a15",
+   "text": "House No. 101, Mohalla Qazi, Bareilly, Uttar Pradesh 243001",
+   "expected": {
+    "permanent_address_line1": "House No. 101",
+    "permanent_address_line2": "Mohalla Qazi",
+    "permanent_city": "Bareilly",
+    "permanent_state": "Uttar Pradesh",
+    "permanent_pincode": "243001"
+   }
+  },
+  {
+   "id": "a16",
+   "text": "flat 4b sai residency kothrud pune maharashtra 411038",
+   "expected": {
+    "current_address_line1": "flat 4b sai residency",
+    "current_address_line2": "kothrud",
+    "current_city": "pune",
+    "current_state": "maharashtra",
+    "current_pincode": "411038"
+   }
+  },
+  {
+   "id": "a17",
+   "text": "Shop 3, Station Road, Opp. Bus Stand, Nashik 422001, Maharashtra",
+   "expected": {
+    "current_address_line1": "Shop 3, Station Road",
+    "current_address_line2": "Opp. Bus Stand",
+    "current_city": "Nashik",
+    "current_state": "Maharashtra",
+    "current_pincode": "422001"
+   }
+  },
+  {
+   "id": "a18",
+   "text": "Door 7-1-45, Ameerpet, Hyderabad, Telangana 500016",
+   "expected": {
+    "current_address_line1": "Door 7-1-45",
+    "current_address_line2": "Ameerpet",
+    "current_city": "Hyderabad",
+    "current_state": "Telangana",
+    "current_pincode": "500016"
+   }
+  },
+  {
+   "id": "a19",
+   "text": "88 MG Road, Camp, Pune 411 001",
+   "expected": {
+    "current_address_line1": "88 MG Road",
+    "current_address_line2": "Camp",
+    "current_city": "Pune",
+    "current_state": null,
+    "current_pincode": "411001"
+   }
+  },
+  {
+   "id": "a20",
+   "text": "House 14, Main Bazaar, Sundernagar, Dist. Mandi, Himachal Pradesh 175018",
+   "expected": {
+    "current_address_line1": "House 14, Main Bazaar",
+    "current_address_line2": null,
+    "current_city": "Sundernagar",
+    "current_state": "Himachal Pradesh",
+    "current_pincode": "175018",
+    "current_district": "Mandi"
+   }
+  },
+  {
+   "id": "a21",
+   "text": "27 Hazratganj, Lucknow, Uttar Pradesh 226001",
+   "expected": {
+    "current_address_line1": "27 Hazratganj",
+    "current_address_line2": null,
+    "current_city": "Lucknow",
+    "current_state": "Uttar Pradesh",
+    "current_pincode": "226001",
+    "current_district": null
+   }
+  },
+  {
+   "id": "a22",
+   "text": "Flat 1102, Tower B, Prestige Shantiniketan, Whitefield, Bengaluru 560048",
+   "expected": {
+    "current_address_line1": "Flat 1102, Tower B, Prestige Shantiniketan",
+    "current_address_line2": "Whitefield",
+    "current_city": "Bengaluru",
+    "current_pincode": "560048"
+   }
+  },
+  {
+   "id": "a23",
+   "text": "Hostel 4, Room 210, NIT Campus, Kurukshetra, Haryana 136119",
+   "expected": {
+    "current_address_line1": "Hostel 4, Room 210",
+    "current_address_line2": "NIT Campus",
+    "current_city": "Kurukshetra",
+    "current_state": "Haryana",
+    "current_pincode": "136119"
+   }
+  },
+  {
+   "id": "a24",
+   "text": "34, Gandhi Nagar, Jammu 180004, J&K",
+   "expected": {
+    "current_address_line1": "34",
+    "current_address_line2": "Gandhi Nagar",
+    "current_city": "Jammu",
+    "current_state": "J&K",
+    "current_pincode": "180004"
+   }
+  },
+  {
+   "id": "a25",
+   "text": "Near Clock Tower, Dehradun, Uttarakhand 248001",
+   "expected": {
+    "current_address_line1": "Near Clock Tower",
+    "current_address_line2": null,
+    "current_city": "Dehradun",
+    "current_state": "Uttarakhand",
+    "current_pincode": "248001"
+   }
+  },
+  {
+   "id": "a26",
+   "text": "Plot No. 56, Phase 2, Industrial Area, Chandigarh 160002",
+   "expected": {
+    "current_address_line1": "Plot No. 56",
+    "current_address_line2": "Phase 2, Industrial Area",
+    "current_city": "Chandigarh",
+    "current_state": null,
+    "current_pincode": "160002"
+   }
+  },
+  {
+   "id": "a27",
+   "text": "Bungalow 3, Cantonment, Secunderabad 500009, Telangana",
+   "expected": {
+    "permanent_address_line1": "Bungalow 3",
+    "permanent_address_line2": "Cantonment",
+    "permanent_city": "Secunderabad",
+    "permanent_state": "Telangana",
+    "permanent_pincode": "500009"
+   }
+  },
+  {
+   "id": "a28",
+   "text": "12/A, Shivaji Park, Dadar West, Mumbai 400028",
+   "expected": {
+    "current_address_line1": "12/A",
+    "current_address_line2": "Shivaji Park, Dadar West",
+    "current_city": "Mumbai",
+    "current_state": null,
+    "current_pincode": "400028"
+   }
+  },
+  {
+   "id": "a29",
+   "text": "Flat 6, Kaveri Apartments, Sector 9, Dwarka, New Delhi 110075",
+   "expected": {
+    "current_address_line1": "Flat 6, Kaveri Apartments",
+    "current_address_line2": "Sector 9, Dwarka",
+    "current_city": "New Delhi",
+    "current_state": null,
+    "current_pincode": "110075"
+   }
+  },
+  {
+   "id": "a30",
+   "text": "House 2, Patel Chowk, Anand, Gujarat 388001",
+   "expected": {
+    "permanent_address_line1": "House 2",
+    "permanent_address_line2": "Patel Chowk",
+    "permanent_city": "Anand",
+    "permanent_state": "Gujarat",
+    "permanent_pincode": "388001"
+   }
+  }
+ ]
+}

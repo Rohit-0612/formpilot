@@ -74,7 +74,8 @@ def _schema(types: Sequence[T]) -> dict[str, object]:
     }
 
 
-def _split(text: str, types: Sequence[T], provider: LLMProvider) -> dict[T, str] | None:
+def split_free_text(text: str, types: Sequence[T], provider: LLMProvider) -> dict[T, str] | None:
+    """The parts the LLM found in the text (None if it failed twice); see the module docstring."""
     request = LLMRequest(
         system=_system_prompt(),
         user=json.dumps({"text": text, "parts": [t.value for t in types]}, ensure_ascii=False),
@@ -173,7 +174,7 @@ def run(
             if ctx.provider is None:
                 problem(question.id, "no model to read free text; answer the parts")
                 continue
-            split = _split(answer.free_text, types, ctx.provider)
+            split = split_free_text(answer.free_text, types, ctx.provider)
             if split is None:
                 problem(question.id, "free text not understood; answer the parts")
                 continue
