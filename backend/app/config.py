@@ -7,6 +7,8 @@ from typing import Annotated, Literal
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from app.vault.crypto import check_vault_key
+
 # The repository root holds the single .env used by compose and by host-side tools.
 # Inside the container this path does not exist and only real env vars are used.
 _REPO_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
@@ -18,6 +20,8 @@ _SETTINGS_CONFIG = SettingsConfigDict(
     env_file=_REPO_ENV_FILE,
     env_file_encoding="utf-8",
     extra="ignore",
+    # A rejected secret (JWT_SECRET, VAULT_KEY) must not be echoed in the startup error.
+    hide_input_in_errors=True,
 )
 
 
@@ -54,6 +58,8 @@ class Settings(DatabaseSettings, QueueSettings, GroqSettings):
     # Auth
     jwt_secret: SecretStr
     jwt_ttl_minutes: int = Field(default=60, gt=0)
+    # Fernet key for the profile vault and the sensitive values in stored IR versions (P4-D5)
+    vault_key: SecretStr
     cookie_secure: bool = False
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
@@ -95,6 +101,12 @@ class Settings(DatabaseSettings, QueueSettings, GroqSettings):
                 f"JWT_SECRET must be at least {JWT_SECRET_MIN_LENGTH} characters; "
                 "generate one with `openssl rand -hex 32`"
             )
+        return value
+
+    @field_validator("vault_key")
+    @classmethod
+    def _vault_key_is_a_fernet_key(cls, value: SecretStr) -> SecretStr:
+        check_vault_key(value.get_secret_value())
         return value
 
     @field_validator("cors_origins", mode="before")

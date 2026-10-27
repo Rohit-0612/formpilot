@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval
+.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -11,9 +11,18 @@ BACKEND := cd backend &&
 	@sed -i.bak "s/^JWT_SECRET=$$/JWT_SECRET=$$(openssl rand -hex 32)/" .env && rm -f .env.bak
 	@echo "Created .env with a generated JWT_SECRET"
 
+## Give .env a generated VAULT_KEY (a Fernet key) if it has none; an existing key is never changed
+vault-key: .env
+	@if ! grep -q '^VAULT_KEY=.' .env; then \
+		key=$$(openssl rand -base64 32 | tr '+/' '-_'); \
+		if grep -q '^VAULT_KEY=' .env; then \
+			sed -i.bak "s|^VAULT_KEY=$$|VAULT_KEY=$$key|" .env && rm -f .env.bak; \
+		else [ -z "$$(tail -c 1 .env)" ] || echo >> .env; echo "VAULT_KEY=$$key" >> .env; fi; \
+		echo "Added a generated VAULT_KEY to .env"; fi
+
 ## Build and start everything and wait until healthy (the one-shot migrate service applies the
 ## migrations before api and worker start)
-up: .env
+up: .env vault-key
 	$(COMPOSE) up -d --build --wait
 
 ## Stop all containers (data volumes are kept)
@@ -38,7 +47,7 @@ types:
 	cd web && npm run --silent types
 
 ## Start only Postgres and Redis (for integration tests and host-side development)
-services: .env
+services: .env vault-key
 	$(COMPOSE) up -d --wait postgres redis
 
 ## Unit tests (no network, no database)

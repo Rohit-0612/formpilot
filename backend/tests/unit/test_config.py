@@ -8,6 +8,7 @@ from app.llm.factory import provider_from_settings
 from app.llm.fallback import FallbackProvider
 from app.llm.groq import GroqProvider
 from app.llm.ollama import OllamaProvider
+from tests.conftest import TEST_VAULT_KEY
 
 VALID_SECRET = "a" * 64
 
@@ -18,6 +19,7 @@ def base_env(clean_env: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     clean_env.setenv("REDIS_URL", "redis://redis:6379/0")
     clean_env.setenv("STORAGE_ROOT", "/data/storage")
     clean_env.setenv("JWT_SECRET", VALID_SECRET)
+    clean_env.setenv("VAULT_KEY", TEST_VAULT_KEY)
     return clean_env
 
 
@@ -144,3 +146,19 @@ def test_provider_none_runs_rules_only(base_env: pytest.MonkeyPatch) -> None:
     base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
 
     assert provider_from_settings(Settings(_env_file=None)) is None
+
+
+@pytest.mark.parametrize("key", ["", "not-a-fernet-key", "a" * 44])
+def test_vault_key_must_be_a_fernet_key(base_env: pytest.MonkeyPatch, key: str) -> None:
+    base_env.setenv("VAULT_KEY", key)
+
+    with pytest.raises(ValidationError, match="VAULT_KEY must be a Fernet key") as error:
+        Settings(_env_file=None)
+    assert not key or key not in str(error.value)  # the rejected key is not echoed back
+
+
+def test_missing_vault_key_fails(base_env: pytest.MonkeyPatch) -> None:
+    base_env.delenv("VAULT_KEY")
+
+    with pytest.raises(ValidationError, match="vault_key"):
+        Settings(_env_file=None)

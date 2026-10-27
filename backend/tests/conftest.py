@@ -8,6 +8,8 @@ TESTS_DIR = Path(__file__).parent
 
 # Obviously fake, but long enough to pass the JWT_SECRET length check.
 TEST_JWT_SECRET = "test-secret-" + "x" * 40
+# A fixed Fernet key for tests only (32 bytes "test-vault-key-0123456789abcdef!", URL-safe base64).
+TEST_VAULT_KEY = "dGVzdC12YXVsdC1rZXktMDEyMzQ1Njc4OWFiY2RlZiE="
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -36,6 +38,7 @@ def settings(tmp_path: Path) -> Settings:
         database_url="postgresql+psycopg://unit:unit@127.0.0.1:9/unit",
         redis_url="redis://127.0.0.1:9/0",
         jwt_secret=TEST_JWT_SECRET,
+        vault_key=TEST_VAULT_KEY,
         storage_root=tmp_path / "storage",
         cors_origins=["http://localhost:3000"],
         log_json=True,
