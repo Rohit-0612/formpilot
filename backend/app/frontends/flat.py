@@ -44,7 +44,7 @@ from app.ir.models import (
     TraceEvent,
     ValidationResult,
 )
-from app.ir.phrases import mentions_office_use
+from app.ir.phrases import asks_upper_case, instructs_upper_case, mentions_office_use
 
 STAGE = "frontend.flat"
 
@@ -167,6 +167,7 @@ class _Candidate:
     context: str | None = None
     validations: list[ValidationResult] = field(default_factory=list)
     no_fill_reason: Literal["office_use"] | None = None
+    case_hint: Literal["label", "page"] | None = None  # write the value upper-case
 
     @property
     def line_type(self) -> bool:
@@ -1219,6 +1220,27 @@ def _mark_office_use(
             cand.no_fill_reason = "office_use"
 
 
+_TEXT_KINDS = frozenset({FieldKind.TEXT, FieldKind.DATE, FieldKind.UNKNOWN})
+
+
+def instructs_upper_case_on(text: _PageText) -> bool:
+    """A line of the page tells the reader to write in capital letters."""
+    return any(instructs_upper_case(line.text) for line in text.lines)
+
+
+def _mark_upper_case(candidates: list[_Candidate], text: _PageText) -> None:
+    """Text fields whose own label asks for capital letters, or all of them when a page
+    instruction does. A heading is not used: it is often the previous field's label."""
+    page_wide = instructs_upper_case_on(text)
+    for cand in candidates:
+        if cand.kind not in _TEXT_KINDS:
+            continue
+        if asks_upper_case(cand.label):
+            cand.case_hint = "label"
+        elif page_wide:
+            cand.case_hint = "page"
+
+
 def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     text = _extract_text(page)
     drawings = _extract_drawings(page)
@@ -1234,6 +1256,7 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     kept, dropped = _resolve_overlaps(candidates)
     _assign_text(kept, text)
     _mark_office_use(kept, cells, text, page_area)
+    _mark_upper_case(kept, text)
     notes = [
         f"dropped {cand.source} overlapping {other.source}"
         if other is not None
@@ -1343,6 +1366,7 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     max_chars=cand.max_chars,
                     validations=cand.validations,
                     no_fill_reason=cand.no_fill_reason,
+                    uppercase=cand.case_hint is not None,
                 )
             )
             trace.append(
@@ -1356,6 +1380,15 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                         pass_name=STAGE,
                         field_id=field_id,
                         change="no_fill_reason office_use (inside an office-use box)",
+                        at=at,
+                    )
+                )
+            if cand.case_hint is not None:
+                trace.append(
+                    TraceEvent(
+                        pass_name=STAGE,
+                        field_id=field_id,
+                        change=f"uppercase ({cand.case_hint} hint)",
                         at=at,
                     )
                 )

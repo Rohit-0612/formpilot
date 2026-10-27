@@ -515,6 +515,32 @@ def flat_office_use_box() -> PdfFixture:
     )
 
 
+def flat_case_hints() -> PdfFixture:
+    """Capital-letter hints (Phase 5): page 1 has an instruction "Please fill in BLOCK letters
+    only" (every text field upper-case); page 2 only a negated note, so only the field whose own
+    label asks for capitals is upper-case."""
+    doc = _new_doc(A4, A4)
+    first, second = doc[0], doc[1]
+    _text(first, 72, 80, "Please fill in BLOCK letters only.")
+    fields = [
+        _labelled_leader(first, 0, 72, 120, "Full name:", "_" * 30),
+        _labelled_leader(first, 0, 72, 150, "City:", "_" * 30),
+    ]
+    _text(second, 72, 80, "Signatures should not be in capital letters.")
+    fields += [
+        _labelled_leader(second, 1, 72, 120, "Name (in capital letters):", "_" * 30),
+        _labelled_leader(second, 1, 72, 150, "Place:", "_" * 30),
+    ]
+    return PdfFixture(
+        "flat_case_hints",
+        "A page instruction to write in capitals, and a negated note with one labelled field",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK, TextLayer.OK),
+        tuple(fields),
+    )
+
+
 def flat_comb_gap_groups() -> PdfFixture:
     """Comb groups split by gaps narrower than a cell (amended D8, 2026-10-19): a date row
     DD | MM | YYYY with 8 pt gaps and a name row FIRST | LAST with a 10 pt gap, captions printed
@@ -1208,6 +1234,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_comb,
         flat_persona_form,
         flat_office_use_box,
+        flat_case_hints,
         flat_comb_gap_groups,
         flat_colon_blanks,
         flat_rounded_boxes,

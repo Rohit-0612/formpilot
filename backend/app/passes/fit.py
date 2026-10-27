@@ -5,7 +5,8 @@ at the default size (capped by the box height), shrink in 0.5 pt steps down to t
 the value still does not fit, or uses characters Helvetica cannot show (e.g. Devanagari), the
 result `fits_box` fails and the field needs review. On flat and scanned forms a box with
 `max_chars` is a comb row (decision D8) and is measured per character cell; an AcroForm /MaxLen
-does not say whether the widget is a comb, so there the whole text is measured.
+does not say whether the widget is a comb, so there the whole text is measured. A field the form
+asks to write in capitals (`Field.uppercase`) is measured as it will be printed, upper-case.
 """
 
 import pymupdf
@@ -43,6 +44,13 @@ def _showable(text: str) -> bool:
     return True
 
 
+def printed(field: Field) -> str | None:
+    """The value as the renderer writes it: upper-case where the form asks for capitals."""
+    if field.value is None:
+        return None
+    return field.value.upper() if field.uppercase else field.value
+
+
 def fit(
     field: Field, value: str, default: float, minimum: float, comb: bool
 ) -> tuple[float, str | None]:
@@ -72,7 +80,8 @@ def run(ir: FormIR, ctx: PassContext) -> FormIR:
             fields.append(field)
             continue
         comb = ir.source_kind is not SourceKind.FILLABLE
-        size, message = fit(field, field.value, ctx.fit_font_size, ctx.fit_min_font_size, comb)
+        value = printed(field) or ""
+        size, message = fit(field, value, ctx.fit_font_size, ctx.fit_min_font_size, comb)
         result = ValidationResult(validator=FIT_VALIDATOR, ok=message is None, message=message)
         kept = [r for r in field.validations if r.validator != FIT_VALIDATOR]
         update: dict[str, object] = {"font_size": size, "validations": [*kept, result]}

@@ -5,6 +5,13 @@ Shared by the flat frontend (the text of a field's enclosing box) and the unders
 when a legacy-font text layer has garbled the conjuncts ("कार्यालय" extracted as "कायाथलय"):
 word by word, each word of similar length and at least 75 % alike. English is not matched
 loosely: "our office uses" must not count.
+
+Format hints (Phase 5): `asks_upper_case` for a field's own label ("Name (Block Letters)"),
+`instructs_upper_case` for a page instruction ("Please fill up in BLOCK letters only"); a negated
+hint ("Signatures should not be in capital letters") never counts.
+
+`readable_english` decides whether a text may be shown as the main text of a question (decision
+P5-D6): Hindi and text garbled into other scripts or symbols never is.
 """
 
 import unicodedata
@@ -20,8 +27,25 @@ OFFICE_USE_PHRASES = (
     "कार्यालय उपयोग",
     "कार्यालय प्रयोग",
 )
+UPPER_CASE_PHRASES = (
+    "capital letters",
+    "capital letter",
+    "block letters",
+    "block capitals",
+    "in capitals",
+    "upper case",
+    "uppercase",
+    "बड़े अक्षरों",
+    "कैपिटल अक्षरों",
+)
+# A page instruction is a sentence telling the reader how to fill in the form. "ĥll": a text
+# layer that extracts the "fi" ligature as "Ĥ" (dev form #01).
+_INSTRUCTION_PREFIXES = ("fill", "ĥll", "writ", "complet", "entries", "भर", "लिख")
+_NEGATIONS = frozenset({"not", "never", "don't", "nahi", "नहीं", "मत"})
 WORD_SIMILARITY = 0.75
 MAX_LENGTH_GAP = 2
+# Besides printable ASCII, an English question may hold typographic quotes, dashes and ellipses.
+_TYPOGRAPHIC = frozenset("\u2018\u2019\u201c\u201d\u2013\u2014\u2026")
 
 
 def clean_text(text: str) -> str:
@@ -62,3 +86,27 @@ def mentions(text: str | None, phrases: tuple[str, ...]) -> bool:
 
 def mentions_office_use(text: str | None) -> bool:
     return mentions(text, OFFICE_USE_PHRASES)
+
+
+def asks_upper_case(text: str | None) -> bool:
+    """The text asks for capital letters and does not say "not"."""
+    if not mentions(text, UPPER_CASE_PHRASES):
+        return False
+    return not _NEGATIONS & set(clean_text(text or "").split())
+
+
+def instructs_upper_case(line: str | None) -> bool:
+    """A page instruction to write in capital letters (has a verb such as "fill" or "write")."""
+    words = clean_text(line or "").split()
+    return asks_upper_case(line) and any(w.startswith(_INSTRUCTION_PREFIXES) for w in words)
+
+
+def readable_english(text: str | None) -> bool:
+    """Printable ASCII (and typographic punctuation) with at least one word: no Devanagari, no
+    other script, no replacement or private-use characters. Scrambled English word order is not
+    detected."""
+    if text is None or not text.strip():
+        return False
+    if any(not (ch.isascii() and ch.isprintable()) and ch not in _TYPOGRAPHIC for ch in text):
+        return False
+    return any(ch.isalpha() for ch in text)

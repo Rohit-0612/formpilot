@@ -28,6 +28,7 @@ import pymupdf
 from app.frontends import flat
 from app.frontends.detect import Detection
 from app.ir.models import BBox, Field, FieldKind, FormIR, Option, TextLayer, TraceEvent
+from app.ir.phrases import asks_upper_case
 from app.ir.semantic_types import SemanticType
 
 STAGE = "frontend.acroform"
@@ -186,6 +187,9 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
     trace: list[TraceEvent] = []
     for page_no, (page, info) in enumerate(zip(doc, detection.pages, strict=True)):
         specs, skipped = _page_specs(page, page_no, info.text_layer is TextLayer.OK)
+        page_upper = info.text_layer is TextLayer.OK and flat.instructs_upper_case_on(
+            flat.page_text(page)
+        )
         for index, (bbox, spec) in enumerate(flat.reading_order([(s.bbox, s) for s in specs])):
             field_id = f"p{page_no}_f{index:03d}"
             fields.append(
@@ -199,6 +203,9 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     max_chars=spec.max_chars,
                     options=spec.options,
                     **_SIGNATURE if spec.signature else {},
+                    uppercase=spec.kind is FieldKind.TEXT
+                    and not spec.signature
+                    and (page_upper or asks_upper_case(spec.label)),
                 )
             )
             trace.append(
