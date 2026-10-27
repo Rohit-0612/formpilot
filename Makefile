@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval eval-fill eval-validators
+.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval eval-fill eval-validators eval-questions
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -118,3 +118,9 @@ eval-fill:
 ## Validator eval (Phase 4): catch rate on eval/invalid_inputs.json, false rejects on the personas
 eval-validators:
 	$(EVAL_PY) eval.validator_eval
+
+## Questions eval (Phase 5): suggestions per floor, questions per form before / after, readability;
+## replays the recorded understanding answers (default Groq, P4-D1). SAMPLE=1 writes the frozen
+## faithfulness sample once (eval/readability/sample-dev.json)
+eval-questions:
+	$(EVAL_PY) eval.questions_eval $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),) $(if $(TAG),--tag $(TAG),) $(if $(SAMPLE),--write-sample,)

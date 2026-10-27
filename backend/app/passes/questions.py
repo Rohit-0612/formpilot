@@ -239,7 +239,9 @@ def _sections(questions: list[Question], fields: dict[str, Field]) -> list[Quest
     return out
 
 
-def plan(ir: FormIR, policy: FillPolicy) -> list[Question]:
+def plan(ir: FormIR, policy: FillPolicy, *, sections: bool = True) -> list[Question]:
+    """The questions for the fields needing input; `sections=False` asks untyped fields one by
+    one (the M2 plan, kept for the questions-per-form eval)."""
     # `other` and `unknown` say nothing about what to ask: those fields get label questions.
     typed = typed_field_ids(ir, policy) - {
         f.id for f in ir.fields if f.semantic_type in (T.OTHER, T.UNKNOWN)
@@ -309,4 +311,4 @@ def plan(ir: FormIR, policy: FillPolicy) -> list[Question]:
         question.free_text = question.group in _FREE_TEXT_GROUPS and not any(
             p.semantic_type in _NEVER_FREE_TEXT for p in question.parts
         )
-    return _sections(questions, {f.id: f for f in ir.fields})
+    return _sections(questions, {f.id: f for f in ir.fields}) if sections else questions
