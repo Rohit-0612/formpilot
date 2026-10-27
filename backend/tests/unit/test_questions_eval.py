@@ -30,11 +30,23 @@ def _model(request: LLMRequest) -> str:
 
 
 def _result(folders: tuple[Path, Path, Path]) -> run_eval.EvalResult:  # noqa: F811
+    """The eval run, with the model's English question on its fields (as the understanding pass
+    stores it, P5-D6), so these tests do not depend on the prompt version."""
     dataset, labels, references = folders
-    return run_eval.evaluate(
+    result = run_eval.evaluate(
         dataset, labels, references, "dev", "hybrid", FakeProvider(_model), {FORM: "all"},
         "flat@test",
     )  # fmt: skip
+    for form in result.forms:
+        if form.understood is not None:
+            fields = [
+                f.model_copy(update={"question_text": "Any remarks?"})
+                if f.semantic_method == "llm"
+                else f
+                for f in form.understood.fields
+            ]
+            form.understood = form.understood.model_copy(update={"fields": fields})
+    return result
 
 
 def test_suggestions_per_floor(folders: tuple[Path, Path, Path]) -> None:  # noqa: F811
