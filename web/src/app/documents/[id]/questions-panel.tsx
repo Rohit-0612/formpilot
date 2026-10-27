@@ -105,6 +105,11 @@ function QuestionCard({
   return (
     <fieldset className="rounded-lg border border-slate-200 bg-white p-4">
       <legend className="px-1 text-sm font-medium">{question.prompt}</legend>
+      {question.form_text ? (
+        <p className="mb-2 text-xs text-slate-500" lang="und">
+          On the form: {question.form_text}
+        </p>
+      ) : null}
       {question.free_text ? (
         <label className="mb-3 flex items-center gap-2 text-xs text-slate-600">
           <input
@@ -143,6 +148,11 @@ function QuestionCard({
             return (
               <label key={key} className="text-xs text-slate-600">
                 {part.label}
+                {part.form_label ? (
+                  <span className="block text-[11px] text-slate-400" lang="und">
+                    On the form: {part.form_label}
+                  </span>
+                ) : null}
                 <PartInput
                   id={`${question.id}-${key}`}
                   part={part}

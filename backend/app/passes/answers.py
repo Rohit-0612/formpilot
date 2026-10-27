@@ -46,7 +46,7 @@ _FLAT_CHECKBOX_ON = "Yes"  # a flat checkbox has no export value; the renderer d
 class Answer(BaseModel):
     question_id: str
     value: str | None = None  # a single-part question
-    parts: dict[str, str] = {}  # a group question: semantic type -> text
+    parts: dict[str, str] = {}  # a group question: part key (semantic type, or field id) -> text
     free_text: str | None = None  # a free-text group, split by the LLM
     save_to_profile: bool = False
     sensitive_opt_in: list[str] = []  # profile keys whose sensitive value may be saved
@@ -56,9 +56,6 @@ class Answer(BaseModel):
 class ProfileChanges:
     values: dict[str, str] = field(default_factory=dict)  # profile key -> canonical value
     opt_in: dict[str, bool] = field(default_factory=dict)
-
-
-_TYPE_VALUES = frozenset(t.value for t in T)
 
 
 # --- LLM free text ---------------------------------------------------------------------------
@@ -163,7 +160,7 @@ def run(
         if question is None:
             problem(answer.question_id, "no such question (already answered?)")
             continue
-        texts: dict[T | None, str] = {}
+        texts: dict[str, str] = {}  # part key -> text
         source = ValueSource.USER_ANSWER
         if answer.free_text is not None and answer.free_text.strip():
             types = [p.semantic_type for p in question.parts if p.semantic_type is not None]
@@ -180,15 +177,16 @@ def run(
             if split is None:
                 problem(question.id, "free text not understood; answer the parts")
                 continue
-            texts.update(split)
+            texts.update({t.value: v for t, v in split.items()})
             source = ValueSource.LLM_INFERRED
         elif len(question.parts) == 1 and answer.value is not None:
-            texts[question.parts[0].semantic_type] = answer.value
+            texts[question.parts[0].key] = answer.value
         else:
-            texts.update({T(k): v for k, v in answer.parts.items() if k in _TYPE_VALUES})
+            keys = {part.key for part in question.parts}
+            texts.update({k: v for k, v in answer.parts.items() if k in keys})
         answered = False
         for part in question.parts:
-            raw = texts.get(part.semantic_type)
+            raw = texts.get(part.key)
             if raw is None or not raw.strip():
                 continue
             answered = True

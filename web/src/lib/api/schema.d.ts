@@ -258,8 +258,9 @@ export interface components {
         };
         /**
          * AnswersRequest
-         * @description Answers to the current questions (SPEC §6.5). `parts` keys are semantic types; a
-         *     sensitive value is saved to the profile only if its key is in `sensitive_opt_in`.
+         * @description Answers to the current questions (SPEC §6.5). `parts` keys are the parts' semantic types,
+         *     or field ids for untyped parts (a section card); a sensitive value is saved to the profile
+         *     only if its key is in `sensitive_opt_in`.
          */
         AnswersRequest: {
             /** Answers */
@@ -556,6 +557,8 @@ export interface components {
             id: string;
             /** Prompt */
             prompt: string;
+            /** Form Text */
+            form_text?: string | null;
             /** Group */
             group: string | null;
             /** Parts */
@@ -578,6 +581,8 @@ export interface components {
             semantic_type: components["schemas"]["SemanticType"] | null;
             /** Label */
             label: string;
+            /** Form Label */
+            form_label?: string | null;
             input: components["schemas"]["InputKind"];
             /**
              * Choices

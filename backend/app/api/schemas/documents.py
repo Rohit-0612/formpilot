@@ -52,8 +52,9 @@ class QuestionsResponse(BaseModel):
 
 
 class AnswersRequest(BaseModel):
-    """Answers to the current questions (SPEC §6.5). `parts` keys are semantic types; a
-    sensitive value is saved to the profile only if its key is in `sensitive_opt_in`."""
+    """Answers to the current questions (SPEC §6.5). `parts` keys are the parts' semantic types,
+    or field ids for untyped parts (a section card); a sensitive value is saved to the profile
+    only if its key is in `sensitive_opt_in`."""
 
     answers: list[Answer] = Field(min_length=1, max_length=200)
 
