@@ -294,7 +294,20 @@ Deliverables
   after v1.)
 - Audit events for every user action (no values).
 - Expiry cron job (24 h) for files.
-- Playwright happy path: upload → answer → review → confirm → download.
+- Playwright happy path: upload → answer → review → confirm → download (inside the Compose smoke
+  job, P5-D3).
+- Added in the M3 plan (human decisions, 2026-10-27, `docs/decisions/phase-5.md`):
+  - suggested values (P5-D1): a fillable type with a profile value and LLM confidence ≥ 0.95
+    but below the fill threshold is prefilled as `suggested`, unconfirmed, rendered only after
+    an explicit confirm; suggestions report on dev;
+  - readable questions (P5-D6): an English question per field from the understanding call
+    (prompt `understand_v3.md`), the form's label below it; readability check on dev;
+  - question grouping by section or person; questions per form before and after;
+  - format hints such as "(Capital letters)" → `Field.uppercase`, upper-cased when rendered;
+  - free-text address parsing eval (record / replay);
+  - UX metric: actions to complete a dev form with the full persona, before and after;
+  - Devanagari rendering, time-boxed (P5-D5); otherwise review and question say the field will
+    not be printed.
 
 Acceptance
 - [ ] Human opens 10 rendered PDFs from dev forms in a normal PDF reader: values correct and in place.
