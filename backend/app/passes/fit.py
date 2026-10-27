@@ -21,6 +21,7 @@ from app.ir.models import (
     ValidationResult,
 )
 from app.passes.context import PassContext
+from app.passes.validate import USER_DECIDES
 
 STAGE = "fit"
 FIT_VALIDATOR = "fits_box"
@@ -85,7 +86,7 @@ def run(ir: FormIR, ctx: PassContext) -> FormIR:
         result = ValidationResult(validator=FIT_VALIDATOR, ok=message is None, message=message)
         kept = [r for r in field.validations if r.validator != FIT_VALIDATOR]
         update: dict[str, object] = {"font_size": size, "validations": [*kept, result]}
-        if message is not None and field.status is not FieldStatus.SUGGESTED:
+        if message is not None and field.status not in USER_DECIDES:
             update["status"] = FieldStatus.NEEDS_REVIEW
         if message is not None:
             trace.append(
