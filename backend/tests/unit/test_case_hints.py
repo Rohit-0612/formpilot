@@ -9,7 +9,7 @@ import pytest
 from app.frontends import flat
 from app.frontends.detect import detect
 from app.ir.models import BBox, Field, FieldKind, FormIR, PageInfo, SourceKind, TextLayer
-from app.ir.phrases import asks_upper_case, instructs_upper_case
+from app.ir.phrases import asks_upper_case, instructs_upper_case, is_instruction
 from app.passes import fit
 from app.passes.context import PassContext
 from tests.fixtures import pdfs
@@ -99,3 +99,22 @@ def test_the_fit_pass_measures_the_upper_case_value() -> None:
         return fit.run(ir, PassContext(clock=lambda: NOW)).fields[0].font_size
 
     assert size(uppercase=True) < size(uppercase=False)  # type: ignore[operator]
+
+
+@pytest.mark.parametrize(
+    ("line", "instruction"),
+    [
+        ("Please fill in CAPITAL LETTERS only.", True),
+        ("Kindly attach a self-attested copy", True),
+        ("Note: all fields are mandatory", True),
+        ("Fill the form in BLOCK LETTERS", True),
+        ("The applicant must sign in the presence of a witness.", True),  # a sentence
+        ("12. Previous Education", False),
+        ("PERSONAL DETAILS", False),
+        ("PART A - DETAILS OF THE APPLICANT.", False),  # an all-capitals title ending in "."
+        ("Declaration.", False),  # too short to be a sentence
+    ],
+)
+def test_instruction_lines(line: str, instruction: bool) -> None:
+    """P5-D8: a line of directions is not a section heading."""
+    assert is_instruction(line) is instruction

@@ -37,14 +37,21 @@ import pymupdf
 from app.frontends.detect import Detection
 from app.ir.models import (
     BBox,
+    DatePart,
     Field,
+    FieldGroup,
     FieldKind,
     FormIR,
     TextLayer,
     TraceEvent,
     ValidationResult,
 )
-from app.ir.phrases import asks_upper_case, instructs_upper_case, mentions_office_use
+from app.ir.phrases import (
+    asks_upper_case,
+    instructs_upper_case,
+    is_instruction,
+    mentions_office_use,
+)
 
 STAGE = "frontend.flat"
 
@@ -81,6 +88,11 @@ COMB_CELL_MAX = (30.0, 25.0)  # width, height
 # larger than min(cell width, max(MIN_SPLIT_GAP, SPLIT_GAP_FACTOR x the median gap of that row)).
 MIN_SPLIT_GAP = 3.0
 SPLIT_GAP_FACTOR = 2.0
+# A hinted word after one empty cell that completes the word before it ("FIRST _ NAME", "ACCOUNT _
+# NO"): the two are one part (Phase 5, P5-D8).
+COMPLETING_HINTS = frozenset({"NAME", "NO", "NUMBER", "CODE"})
+# Hints of a date part: one letter repeated ("DD", "MM", "YYYY", "YY").
+DATE_HINT_PARTS: dict[str, DatePart] = {"D": "day", "M": "month", "Y": "year"}
 # Labelling rule 1: grey hints printed inside entry cells ("D D M M Y Y Y Y", "F I R S T N A M E")
 # are not labels. Text whose luminance is in this band is a hint: label text on the dev forms is
 # black, dark blue or blue (luminance <= 0.27), hints are grey (0.58); white text sits on a dark
@@ -168,6 +180,11 @@ class _Candidate:
     validations: list[ValidationResult] = field(default_factory=list)
     no_fill_reason: Literal["office_use"] | None = None
     case_hint: Literal["label", "page"] | None = None  # write the value upper-case
+    hint: str | None = None  # the grey hint printed in a comb part ("FIRST NAME", "DD")
+    date_part: DatePart | None = None
+    # P5-D8: ("choices" | "table_row" | "line_row", number, row); a line row is a table_row
+    answer_group: tuple[str, int, int] | None = None
+    answer_group_label: str | None = None
 
     @property
     def line_type(self) -> bool:
@@ -650,7 +667,9 @@ def _box_candidates(
         if not any(other != rect and _contains(rect, other) for other, _ in boxes)
     ]
 
-    combs, singles = _group_combs([rect for rect, _ in boxes], text.tokens, text.hints)
+    combs, singles, single_hints = _group_combs(
+        [rect for rect, _ in boxes], text.tokens, text.hints
+    )
     source_of = dict(boxes)
     candidates = combs
     for rect in singles:
@@ -663,14 +682,19 @@ def _box_candidates(
             candidates.append(_Candidate(rect, FieldKind.CHECKBOX, "checkbox", "checkbox"))
         else:
             source = source_of.get(rect, "comb cell")  # a one-cell hinted part, trimmed
-            candidates.append(_Candidate(rect, FieldKind.TEXT, "box", source))
+            cand = _Candidate(rect, FieldKind.TEXT, "box", source)
+            cand.hint = single_hints.get(rect)
+            candidates.append(cand)
     return candidates
 
 
 def _group_combs(
     rects: list[Rect], tokens: Sequence[_Token], hints: Sequence[_Token] = ()
-) -> tuple[list[_Candidate], list[Rect]]:
-    """Merge rows of small adjacent cells into comb fields (decision D8, labelling rule 1)."""
+) -> tuple[list[_Candidate], list[Rect], dict[Rect, str]]:
+    """Merge rows of small adjacent cells into comb fields (decision D8, labelling rule 1).
+
+    Returns the combs, the cells left single, and the hint printed in a single cell that is a
+    hinted part of its own ("DD" in one wide cell)."""
     small = [
         r for r in rects if r[2] - r[0] <= COMB_CELL_MAX[0] and r[3] - r[1] <= COMB_CELL_MAX[1]
     ]
@@ -689,6 +713,7 @@ def _group_combs(
 
     combs: list[_Candidate] = []
     singles: list[Rect] = list(rest)
+    single_hints: dict[Rect, str] = {}
     for row in rows:
         row.sort(key=lambda r: r[0])
         gaps = [b[0] - a[2] for a, b in pairwise(row)]
@@ -700,12 +725,49 @@ def _group_combs(
             else:
                 runs.append([cell])
         for run in runs:
-            for start, end in _hinted_parts([_hint_in(cell, hints) for cell in run]):
+            run_hints = [_hint_in(cell, hints) for cell in run]
+            for start, end in _hinted_parts(run_hints):
                 # Parts cut from one run share a cell edge; drawn edges can overlap by a
                 # fraction of a point, so a part starts where the previous cell ends.
                 left = run[start - 1][2] if start else None
-                _close_comb(run[start:end], combs, singles, left)
-    return combs, singles
+                hint = _hint_text(run_hints[start:end])
+                cand = _close_comb(run[start:end], combs, singles, left)
+                if cand is not None:
+                    cand.hint = hint
+                elif hint is not None:
+                    single_hints[singles[-1]] = hint
+    return combs, singles, single_hints
+
+
+def _hint_text(hints: Sequence[str]) -> str | None:
+    """The hint of a part as words: cells hinted F I R S T _ N A M E -> "FIRST NAME"."""
+    words: list[str] = []
+    word = ""
+    for hint in hints:
+        if hint:
+            word += hint
+        elif word:
+            words.append(word)
+            word = ""
+    if word:
+        words.append(word)
+    return " ".join(_spaced(w) for w in words) or None
+
+
+def _spaced(word: str) -> str:
+    """ "FIRSTNAME" -> "FIRST NAME": a hint printed without the space before its last word."""
+    for last in sorted(COMPLETING_HINTS, key=len, reverse=True):
+        if word.upper().endswith(last) and len(word) > len(last) + 1:
+            return f"{word[: -len(last)]} {word[-len(last) :]}"
+    return word
+
+
+def _date_part(hint: str | None) -> DatePart | None:
+    """ "DD" -> day, "MM" -> month, "YYYY" / "YY" -> year; any other hint is not a date part."""
+    letters = (hint or "").replace(" ", "").upper()
+    if len(letters) < 2 or len(set(letters)) != 1:
+        return None
+    return DATE_HINT_PARTS.get(letters[0])
 
 
 def _hint_in(cell: Rect, hints: Sequence[_Token]) -> str:
@@ -736,7 +798,18 @@ def _hinted_parts(hints: Sequence[str]) -> list[tuple[int, int]]:
             hinted[-1] = (hinted[-1][0], i + 1)
         else:
             hinted.append((i, i + 1))
-    parts = [part for start, end in hinted for part in _date_groups(hints, start, end)]
+    joined: list[tuple[int, int]] = []
+    for start, end in hinted:
+        if (
+            joined
+            and start == joined[-1][1] + 1
+            and "".join(hints[start:end]).upper() in COMPLETING_HINTS
+            and all(len(h) == 1 for h in hints[joined[-1][0] : end] if h)
+        ):
+            joined[-1] = (joined[-1][0], end)  # "FIRST _ NAME": one part
+        else:
+            joined.append((start, end))
+    parts = [part for start, end in joined for part in _date_groups(hints, start, end)]
     if not parts:
         return [(0, len(hints))]
     cuts = [end + (next_start - end + 1) // 2 for (_, end), (next_start, _) in pairwise(parts)]
@@ -782,22 +855,23 @@ def _continues_comb(prev: Rect, cell: Rect, tokens: Sequence[_Token], split_gap:
 
 def _close_comb(
     run: list[Rect], combs: list[_Candidate], singles: list[Rect], left: float | None = None
-) -> None:
+) -> _Candidate | None:
+    """Adds the comb (returned) or, for one cell, the single cell (None)."""
     if len(run) == 1:
         cell = run[0]
         singles.append(cell if left is None else (max(cell[0], left), *cell[1:]))
-        return
+        return None
     x0 = run[0][0] if left is None else max(run[0][0], left)
     union = (x0, min(r[1] for r in run), run[-1][2], max(r[3] for r in run))
-    combs.append(
-        _Candidate(
-            union,
-            FieldKind.TEXT,
-            "comb",
-            f"comb row ({len(run)} cells)",
-            max_chars=len(run),
-        )
+    comb = _Candidate(
+        union,
+        FieldKind.TEXT,
+        "comb",
+        f"comb row ({len(run)} cells)",
+        max_chars=len(run),
     )
+    combs.append(comb)
+    return comb
 
 
 def _inside_candidates(
@@ -1146,8 +1220,8 @@ def _label_above(cand: _Candidate, tokens: list[_Token], median_size: float) -> 
 
 def _is_heading(line: _TextLine, median_size: float) -> bool:
     letters = sum(1 for ch in line.text if ch.isalpha())
-    if letters < 3:
-        return False
+    if letters < 3 or is_instruction(line.text):
+        return False  # "Please fill in CAPITAL LETTERS only." is not a section
     all_caps = line.text.upper() == line.text and len(line.text.split()) >= 2
     return line.bold or line.size >= HEADING_SIZE_FACTOR * median_size or all_caps
 
@@ -1189,6 +1263,339 @@ def _assign_text(candidates: list[_Candidate], text: _PageText) -> None:
                     message=f"entry box is lower than {MIN_BOX_HEIGHT:g} pt",
                 )
             )
+
+
+# --- tables, hinted parts and tick-box rows (Phase 5, decision P5-D8) ---------------------
+
+
+@dataclass(frozen=True)
+class _Table:
+    """A full grid of drawn cells: rows x columns, no merged cells."""
+
+    number: int
+    rows: int
+    cols: int
+    rects: dict[tuple[int, int], Rect]
+    texts: dict[tuple[int, int], str | None]  # None: an empty cell
+
+    @property
+    def header(self) -> bool:
+        """The top row names the columns: text in each of its cells, an empty cell below."""
+        named = all(self.texts[(0, c)] for c in range(self.cols))
+        return named and any(
+            self.texts[(r, c)] is None for r in range(1, self.rows) for c in range(self.cols)
+        )
+
+    def entries(self) -> dict[tuple[int, int], Rect]:
+        start = 1 if self.header else 0
+        return {
+            (r, c): rect
+            for (r, c), rect in self.rects.items()
+            if r >= start and self.texts[(r, c)] is None
+        }
+
+    @property
+    def repeated_rows(self) -> bool:
+        """Columns named by the header with an entry in two or more of them: each row is one
+        instance (a class, a nominee). A header over one entry column is a label table."""
+        return self.header and len({c for _, c in self.entries()}) >= 2
+
+    def row_label(self, row: int) -> str | None:
+        return self.texts[(row, 0)]
+
+
+def _bands(spans: Iterable[tuple[float, float]]) -> list[tuple[float, float]]:
+    bands: list[tuple[float, float]] = []
+    for lo, hi in sorted(spans):
+        if not any(abs(lo - b[0]) <= SNAP and abs(hi - b[1]) <= SNAP for b in bands):
+            bands.append((lo, hi))
+    return bands
+
+
+def _band_of(lo: float, hi: float, bands: list[tuple[float, float]]) -> int | None:
+    for i, (b0, b1) in enumerate(bands):
+        if abs(lo - b0) <= SNAP and abs(hi - b1) <= SNAP:
+            return i
+    return None
+
+
+def _cell_text(cell: Rect, tokens: Sequence[_Token]) -> str | None:
+    inside = [t for t in tokens if _in_cell(cell, t)]
+    return _clean_label(t for row in _text_rows(inside) for t in row) if inside else None
+
+
+def _adjacent(a: Rect, b: Rect) -> bool:
+    """Two cells share an edge: side by side on a row, or one above the other in a column."""
+    side = (abs(a[2] - b[0]) <= SNAP or abs(b[2] - a[0]) <= SNAP) and _rows_overlap(a, b)
+    width = min(a[2] - a[0], b[2] - b[0])
+    overlap = min(a[2], b[2]) - max(a[0], b[0])
+    stacked = (abs(a[3] - b[1]) <= SNAP or abs(b[3] - a[1]) <= SNAP) and overlap >= 0.5 * width
+    return side or stacked
+
+
+def _tables(cells: Sequence[Rect], text: _PageText) -> list[_Table]:
+    """Drawn cells that form full grids of at least 2 x 2 (comb cells and tick boxes aside); a
+    row of one cell across the whole table (a note) is left out."""
+    unique: list[Rect] = []
+    for cell in cells:
+        width, height = cell[2] - cell[0], cell[3] - cell[1]
+        if min(width, height) < MIN_CELL_SIZE:
+            continue
+        if width <= COMB_CELL_MAX[0] and height <= COMB_CELL_MAX[1]:
+            continue
+        if not any(_iou(cell, kept) > 0.9 for kept in unique):
+            unique.append(cell)
+    unique = [c for c in unique if not any(o is not c and _contains(c, o) for o in unique)]
+
+    parent = list(range(len(unique)))
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i, a in enumerate(unique):
+        for j in range(i + 1, len(unique)):
+            if _adjacent(a, unique[j]):
+                parent[root(i)] = root(j)
+    members: dict[int, list[Rect]] = {}
+    for i, cell in enumerate(unique):
+        members.setdefault(root(i), []).append(cell)
+
+    tables: list[_Table] = []
+    for found in sorted(members.values(), key=lambda g: min((c[1], c[0]) for c in g)):
+        # A row of one cell across the whole table is a note between the rows, not a row.
+        left, right = min(c[0] for c in found), max(c[2] for c in found)
+        group = [c for c in found if abs(c[0] - left) > SNAP or abs(c[2] - right) > SNAP]
+        rows = _bands((c[1], c[3]) for c in group)
+        cols = _bands((c[0], c[2]) for c in group)
+        if len(rows) < 2 or len(cols) < 2 or len(group) != len(rows) * len(cols):
+            continue
+        rects: dict[tuple[int, int], Rect] = {}
+        for cell in group:
+            r, c = _band_of(cell[1], cell[3], rows), _band_of(cell[0], cell[2], cols)
+            if r is not None and c is not None:
+                rects[(r, c)] = cell
+        if len(rects) != len(group):
+            continue
+        texts = {key: _cell_text(rect, text.tokens) for key, rect in rects.items()}
+        tables.append(_Table(len(tables), len(rows), len(cols), rects, texts))
+    return tables
+
+
+def _in_table_header(cand: _Candidate, tables: Sequence[_Table]) -> bool:
+    """A blank found inside a cell of a table's header row ("% / CGPA"): a column name."""
+    return any(
+        _contains(table.rects[(0, c)], cand.rect)
+        for table in tables
+        if table.repeated_rows
+        for c in range(table.cols)
+    )
+
+
+def _label_tables(candidates: list[_Candidate], tables: Sequence[_Table], text: _PageText) -> None:
+    """Entry cells of a table whose header names the columns get the column's name as label
+    and the heading above the table as context. With two or more rows of entries, each row is
+    a group (`table_row`, P5-D8) labelled by its first cell."""
+    for table in tables:
+        if not table.repeated_rows:
+            continue
+        entries = table.entries()
+        found = {
+            key: cand
+            for cand in candidates
+            for key, rect in entries.items()
+            if _iou(cand.rect, rect) > 0.9
+        }
+        rows = {r for r, _ in found}
+        top = table.rects[(0, 0)]
+        context = _context(_Candidate(top, FieldKind.TEXT, "box", "table"), text)
+        for (r, c), cand in found.items():
+            cand.label = table.texts[(0, c)]
+            cand.context = context
+            if len(rows) >= 2:
+                cand.answer_group = ("table_row", table.number, r)
+                cand.answer_group_label = table.row_label(r)
+
+
+def _row_lead(first: _Candidate, tokens: Sequence[_Token]) -> str | None:
+    """The text a row starts with, before its first entry's own label: "(a) High School" in
+    "(a) High School    Year ...... Roll No. ......"."""
+    left = [t for t in tokens if _same_row(first, t) and t.rect[2] <= first.rect[0] + 0.5]
+    label = _phrase(left, leftwards=True)
+    rest = [t for t in left if t not in label]
+    return _clean_label(_phrase(rest, leftwards=True)) if rest else None
+
+
+def _group_repeated_rows(candidates: list[_Candidate], text: _PageText) -> None:
+    """Rows in a row of the page with the same labelled entries in the same columns ("Year
+    ...... Roll No. ...... Division ......" for each examination): each row is one instance, a
+    `table_row` group (P5-D8) named by the text it starts with. Two such rows are enough; when
+    the first entry's label differs per row (it is the row's own text: "(a) High School ......
+    Roll No. ......"), three. Tables of drawn cells are grouped by `_label_tables`."""
+    entries = sorted(
+        (
+            c
+            for c in candidates
+            if c.kind in _TEXT_KINDS and c.answer_group is None and c.label is not None
+        ),
+        key=lambda c: (c.rect[1], c.rect[0]),
+    )
+    rows: list[list[_Candidate]] = []
+    for cand in entries:
+        for row in rows:
+            if _rows_overlap(row[0].rect, cand.rect):
+                row.append(cand)
+                break
+        else:
+            rows.append([cand])
+    rows = [sorted(row, key=lambda c: c.rect[0]) for row in rows]
+
+    def aligned(upper: list[_Candidate], lower: list[_Candidate]) -> bool:
+        height = upper[0].rect[3] - upper[0].rect[1]
+        return (
+            len(upper) == len(lower) >= 2
+            and all(
+                min(a.rect[2], b.rect[2]) > max(a.rect[0], b.rect[0])
+                for a, b in zip(upper, lower, strict=True)
+            )
+            and lower[0].rect[1] - upper[0].rect[3] <= 3 * height
+        )
+
+    def labels(row: list[_Candidate], skip: int) -> list[str | None]:
+        return [c.label for c in row[skip:]]
+
+    # skip = 0: every label repeats. skip = 1: the first entry's label is the row's own text
+    # ("(a) High School ......"), the others repeat; then three rows or more.
+    number = 0
+    for skip, min_rows in ((0, 2), (1, 3)):
+        runs: list[list[list[_Candidate]]] = []
+        for row in rows:
+            if any(c.answer_group is not None for c in row) or len(row) < 2 + skip:
+                runs.append([])
+                continue
+            if (
+                runs
+                and runs[-1]
+                and aligned(runs[-1][-1], row)
+                and (labels(runs[-1][-1], skip) == labels(row, skip))
+            ):
+                runs[-1].append(row)
+            else:
+                runs.append([row])
+        for run in runs:
+            if len(run) < min_rows:
+                continue
+            for row in run:
+                lead = _row_lead(row[0], text.tokens) if skip == 0 else row[0].label
+                for cand in row:
+                    cand.answer_group = ("line_row", number, 0)
+                    cand.answer_group_label = lead
+                number += 1
+
+
+def _part_before(
+    cand: _Candidate, done: Sequence[_Candidate], entry: dict[int, str | None]
+) -> _Candidate | None:
+    """The hinted part this one continues: the nearest one just left of it on its row, else the
+    one directly above it starting at the same x (a name written over two rows)."""
+    height = cand.rect[3] - cand.rect[1]
+    left = [
+        d
+        for d in done
+        if id(d) in entry
+        and _rows_overlap(d.rect, cand.rect)
+        and 0 <= cand.rect[0] - d.rect[2] <= 2 * height
+    ]
+    if left:
+        return max(left, key=lambda d: d.rect[2])
+    above = [
+        d
+        for d in done
+        if id(d) in entry
+        and abs(d.rect[0] - cand.rect[0]) <= 2 * SNAP
+        and 0 <= cand.rect[1] - d.rect[3] <= 1.5 * height
+    ]
+    return max(above, key=lambda d: d.rect[3]) if above else None
+
+
+def _label_hinted_parts(candidates: list[_Candidate]) -> None:
+    """Hinted comb parts (labelling rule 1). A date part ("DD", "MM", "YYYY") gets the date's
+    label and its `date_part`. A part hinted with words gets the hint as label, and the entry's
+    label as context, when the hints tell parts apart ("FIRST NAME", "MIDDLE", "LAST NAME") or
+    it has no label of its own; a lone part with its own label keeps it (a hint such as "PINXXX"
+    shows the format). A part with no label of its own continues the part before it; one with
+    its own label starts an entry."""
+    hinted = sorted((c for c in candidates if c.hint), key=lambda c: (c.rect[1], c.rect[0]))
+    entry: dict[int, str | None] = {}
+    before: dict[int, _Candidate | None] = {}
+    for cand in hinted:  # a part with a label of its own starts an entry
+        before[id(cand)] = None if cand.label else _part_before(cand, hinted, entry)
+        entry[id(cand)] = cand.label  # placeholder, so later parts see this one
+    entry.clear()
+    continued = {id(b) for b in before.values() if b is not None}
+    for cand in hinted:
+        own = cand.label
+        prev = before[id(cand)]
+        if own is None and prev is not None:
+            own = entry[id(prev)]
+        entry[id(cand)] = own
+        part = _date_part(cand.hint)
+        if part is not None:
+            cand.date_part = part
+            cand.label = own
+        elif cand.label is None or prev is not None or id(cand) in continued:
+            cand.label = cand.hint
+            cand.context = own or cand.context
+
+
+def _group_choice_rows(candidates: list[_Candidate], text: _PageText) -> None:
+    """Tick boxes side by side after one label ("5. Gender: [ ] Male [ ] Female [ ] Other") are
+    one `choices` group (P5-D8), labelled by that text. A row splits where other text or another
+    entry sits between two boxes."""
+    boxes = sorted(
+        (c for c in candidates if c.kind is FieldKind.CHECKBOX),
+        key=lambda c: (c.rect[1], c.rect[0]),
+    )
+    rows: list[list[_Candidate]] = []
+    for box in boxes:
+        for row in rows:
+            if _rows_overlap(row[0].rect, box.rect):
+                row.append(box)
+                break
+        else:
+            rows.append([box])
+    number = 0
+    for row in rows:
+        row.sort(key=lambda c: c.rect[0])
+        runs = [[row[0]]]
+        for prev, box in pairwise(row):
+            between = any(
+                c.kind is not FieldKind.CHECKBOX
+                and c.rect[0] >= prev.rect[2] - SNAP
+                and c.rect[2] <= box.rect[0] + SNAP
+                and _rows_overlap(c.rect, box.rect)
+                for c in candidates
+            )
+            if between or _label_left(box, candidates, text.tokens) != prev.label:
+                runs.append([box])
+            else:
+                runs[-1].append(box)
+        for run in runs:
+            label = _label_left(run[0], candidates, text.tokens)
+            if len(run) < 2 or label is None or any(b.label is None for b in run):
+                continue
+            for box in run:
+                box.answer_group = ("choices", number, 0)
+                box.answer_group_label = label
+            number += 1
+
+
+def _on_page(cand: _Candidate, page_rect: pymupdf.Rect) -> bool:
+    """The entry's centre is on the visible page (a drawing outside it is never seen)."""
+    cx, cy = (cand.rect[0] + cand.rect[2]) / 2, (cand.rect[1] + cand.rect[3]) / 2
+    return page_rect.x0 <= cx <= page_rect.x1 and page_rect.y0 <= cy <= page_rect.y1
 
 
 # --- page and document --------------------------------------------------------------------
@@ -1253,16 +1660,27 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     candidates += _box_candidates(drawings, grid, text, page_area)
     candidates += _inside_candidates(text, cells, candidates)
     candidates += _colon_candidates(text, drawings, cells, candidates)
-    kept, dropped = _resolve_overlaps(candidates)
-    _assign_text(kept, text)
-    _mark_office_use(kept, cells, text, page_area)
-    _mark_upper_case(kept, text)
+    tables = _tables(cells, text)
     notes = [
+        f"dropped {c.source} in a table header" for c in candidates if _in_table_header(c, tables)
+    ]
+    candidates = [c for c in candidates if not _in_table_header(c, tables)]
+    kept, dropped = _resolve_overlaps(candidates)
+    notes += [
         f"dropped {cand.source} overlapping {other.source}"
         if other is not None
         else f"dropped {cand.source}: too low after trimming"
         for cand, other in dropped
     ]
+    notes += [f"dropped {c.source} outside the page" for c in kept if not _on_page(c, unrotated)]
+    kept = [c for c in kept if _on_page(c, unrotated)]
+    _assign_text(kept, text)
+    _label_tables(kept, tables, text)
+    _group_repeated_rows(kept, text)
+    _label_hinted_parts(kept)
+    _group_choice_rows(kept, text)
+    _mark_office_use(kept, cells, text, page_area)
+    _mark_upper_case(kept, text)
     return kept, notes
 
 
@@ -1337,6 +1755,7 @@ def reading_order[T](boxes: list[tuple[BBox, T]]) -> list[tuple[BBox, T]]:
 def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: datetime) -> FormIR:
     """Build a FormIR with the entry areas of every OK page. Reads the document only."""
     fields: list[Field] = []
+    groups: list[FieldGroup] = []
     trace: list[TraceEvent] = []
 
     for page_no, (page, info) in enumerate(zip(doc, detection.pages, strict=True)):
@@ -1353,8 +1772,22 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
             continue
         candidates, notes = _page_candidates(page)
         boxes = [(_displayed(c.rect, page, page_no), c) for c in candidates]
+        group_ids: dict[tuple[str, int, int], str] = {}
         for index, (bbox, cand) in enumerate(_reading_order(boxes)):
             field_id = f"p{page_no}_f{index:03d}"
+            group_id = None
+            if cand.answer_group is not None:
+                if cand.answer_group not in group_ids:
+                    group_ids[cand.answer_group] = f"p{page_no}_g{len(group_ids):03d}"
+                    kind = "choices" if cand.answer_group[0] == "choices" else "table_row"
+                    groups.append(
+                        FieldGroup(
+                            id=group_ids[cand.answer_group],
+                            kind=kind,
+                            label=cand.answer_group_label,
+                        )
+                    )
+                group_id = group_ids[cand.answer_group]
             fields.append(
                 Field(
                     id=field_id,
@@ -1367,6 +1800,8 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     validations=cand.validations,
                     no_fill_reason=cand.no_fill_reason,
                     uppercase=cand.case_hint is not None,
+                    date_part=cand.date_part,
+                    group_id=group_id,
                 )
             )
             trace.append(
@@ -1402,5 +1837,6 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
         source_kind=detection.source_kind,
         pages=detection.pages,
         fields=fields,
+        groups=groups,
         trace=trace,
     )

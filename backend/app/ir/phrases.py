@@ -101,6 +101,23 @@ def instructs_upper_case(line: str | None) -> bool:
     return asks_upper_case(line) and any(w.startswith(_INSTRUCTION_PREFIXES) for w in words)
 
 
+# How a line telling the reader what to do starts (Phase 5): such a line is not a heading.
+_DIRECTIVE_STARTS = ("please ", "kindly ", "note:", "note ", "n.b.", "nb:", "important:")
+MIN_SENTENCE_WORDS = 4
+
+
+def is_instruction(line: str | None) -> bool:
+    """A line of directions, not a title (decision P5-D8): it starts like a request ("Please fill
+    in CAPITAL LETTERS only."), asks for capital letters, or is a sentence of several words in
+    mixed case ending with a full stop. An all-capitals line ending in "." stays a title."""
+    text = " ".join((line or "").split())
+    lowered = text.casefold()
+    if lowered.startswith(_DIRECTIVE_STARTS) or instructs_upper_case(text):
+        return True
+    sentence = text.endswith((".", "!")) and len(text.split()) >= MIN_SENTENCE_WORDS
+    return sentence and text != text.upper()
+
+
 def readable_english(text: str | None) -> bool:
     """Printable ASCII (and typographic punctuation) with at least one word: no Devanagari, no
     other script, no replacement or private-use characters. Scrambled English word order is not

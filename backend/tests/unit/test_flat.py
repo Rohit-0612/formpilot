@@ -62,7 +62,9 @@ def _line(page: pymupdf.Page, x0: float, y: float, x1: float) -> None:
 @pytest.mark.parametrize("name", FLAT_FIXTURES)
 def test_detected_fields_match_ground_truth(name: str) -> None:
     fixture = pdfs.get(name)
-    fields = list(_run_fixture(name).fields)
+    ir = _run_fixture(name)
+    groups = {g.id: g for g in ir.groups}
+    fields = list(ir.fields)
 
     unmatched = list(fields)
     for expected in fixture.fields:
@@ -79,6 +81,10 @@ def test_detected_fields_match_ground_truth(name: str) -> None:
             assert best.label_text == expected.label
         if expected.context is not None:
             assert best.context_text == expected.context
+        if expected.date_part is not None:
+            assert best.date_part == expected.date_part
+        if expected.group is not None:
+            assert best.group_id is not None and groups[best.group_id].label == expected.group
     assert unmatched == [], f"extra fields: {[(f.id, f.kind.value, f.bbox) for f in unmatched]}"
 
 
@@ -357,6 +363,8 @@ def test_hint_is_grey_text(color: int, hint: bool) -> None:
         (".DDMMYY.", [(0, 3), (3, 5), (5, 8)]),
         ("DMYY", [(0, 4)]),  # a single D or M is not a date group
         ("YYYY", [(0, 4)]),
+        ("FIRST.NAME..MIDDLE", [(0, 11), (11, 18)]),  # "FIRST _ NAME" is one part (P5-D8)
+        ("AB.CD..EF", [(0, 3), (3, 6), (6, 9)]),  # one empty cell before another word splits
     ],
 )
 def test_hinted_parts(hints: str, parts: list[tuple[int, int]]) -> None:
@@ -632,3 +640,93 @@ def test_table_rule_drawn_with_dashes_is_not_an_entry() -> None:
         _text(page, 72, 148, "+" + "-" * 12 + "+" + "-" * 12 + "+")
 
     assert _run(_pdf(draw)).fields == []
+
+
+# --- Phase 5 (decision P5-D8) ------------------------------------------------------------------
+
+
+def test_an_instruction_line_is_no_section_heading() -> None:
+    ir = _run_fixture("flat_registration")
+
+    texts = {f.context_text for f in ir.fields} | {f.label_text for f in ir.fields}
+    assert "Please fill in CAPITAL LETTERS only." not in texts
+    assert all(f.uppercase for f in ir.fields if f.kind is FieldKind.TEXT)  # still a page hint
+
+
+def test_fields_below_the_page_edge_are_dropped_and_traced() -> None:
+    ir = _run_fixture("flat_registration")
+
+    notes = [e.change for e in ir.trace if "outside the page" in e.change]
+    assert notes == ["page 0: dropped drawn line outside the page"] * 2
+    assert all(f.bbox.y1 <= ir.pages[0].height for f in ir.fields)
+
+
+def test_groups_are_numbered_per_page_in_reading_order() -> None:
+    ir = _run_fixture("flat_registration")
+
+    assert [(g.id, g.kind, g.label) for g in ir.groups] == [
+        ("p0_g000", "choices", "5. Gender"),
+        ("p0_g001", "table_row", "Class X"),
+        ("p0_g002", "table_row", "Class XII"),
+        ("p0_g003", "table_row", "Graduation"),
+        ("p0_g004", "choices", "13. Hostel Required?"),
+    ]
+
+
+def _grid(page: pymupdf.Page, xs: tuple[float, ...], ys: tuple[float, ...]) -> None:
+    for y in ys:
+        _line(page, xs[0], y, xs[-1])
+    for x in xs:
+        page.draw_line((x, ys[0]), (x, ys[-1]), color=(0, 0, 0), width=0.5)
+
+
+def test_a_label_table_with_one_entry_column_keeps_its_labels() -> None:
+    """ "Particulars | Details" with a label per row: the rows are different fields, not repeated
+    instances, so no column-header label and no group."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _grid(page, (72, 200, 400), (100, 120, 140, 160))
+        _text(page, 76, 114, "Particulars")
+        _text(page, 204, 114, "Details")
+        _text(page, 76, 134, "Name")
+        _text(page, 76, 154, "Place")
+
+    ir = _run(_pdf(draw))
+
+    rows = [f for f in ir.fields if f.bbox.y0 >= 120]  # the header cell's blank is as before
+    assert [f.label_text for f in rows] == ["Name", "Place"]
+    assert ir.groups == [] and all(f.group_id is None for f in ir.fields)
+
+
+def test_a_table_with_one_row_of_entries_has_column_labels_but_no_group() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _grid(page, (72, 200, 330, 460), (100, 120, 140))
+        for x, column in ((76, "Name"), (204, "Relation"), (334, "Age")):
+            _text(page, x, 114, column)
+
+    ir = _run(_pdf(draw))
+
+    assert [f.label_text for f in ir.fields] == ["Name", "Relation", "Age"]
+    assert ir.groups == []
+
+
+def test_tick_boxes_split_where_another_question_starts() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 130, "Hostel?")
+        _text(page, 260, 130, "Transport?")
+        for x, option in ((120, "Yes"), (170, "No"), (320, "Yes"), (370, "No")):
+            page.draw_rect(pymupdf.Rect(x, 122, x + 9, 131), color=(0, 0, 0), width=0.5)
+            _text(page, x + 13, 130, option)
+
+    ir = _run(_pdf(draw))
+
+    assert [g.label for g in ir.groups] == ["Hostel?", "Transport?"]
+    assert [f.group_id for f in ir.fields] == ["p0_g000", "p0_g000", "p0_g001", "p0_g001"]
+
+
+def test_a_lone_tick_box_is_no_group() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        page.draw_rect(pymupdf.Rect(72, 122, 81, 131), color=(0, 0, 0), width=0.5)
+        _text(page, 86, 130, "I agree to the terms.")
+
+    assert _run(_pdf(draw)).groups == []

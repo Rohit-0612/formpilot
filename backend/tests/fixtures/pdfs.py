@@ -71,6 +71,8 @@ class ExpectedField:
     max_chars: int | None = None
     native_name: str | None = None
     options: tuple[ExpectedOption, ...] = ()
+    date_part: str | None = None  # None: not asserted
+    group: str | None = None  # the label of the field's group (P5-D8); None: not asserted
 
 
 @dataclass(frozen=True)
@@ -395,7 +397,7 @@ def flat_checkboxes() -> PdfFixture:
         box = (x, 122.0, x + CHECKBOX_SIZE, 122.0 + CHECKBOX_SIZE)
         _rect(page, box)
         _text(page, x + 13, 130, option)
-        fields.append(ExpectedField(0, box, FieldKind.CHECKBOX, option))
+        fields.append(ExpectedField(0, box, FieldKind.CHECKBOX, option, group="Gender"))
 
     declaration = "I hereby declare that the information given is true."
     box = (72.0, 160.0, 72.0 + CHECKBOX_SIZE, 160.0 + CHECKBOX_SIZE)
@@ -800,24 +802,118 @@ def flat_hinted_comb() -> PdfFixture:
     _text(page, 72, 134, "Name")
     name = _hinted_row(page, 160, 120, "..FIRSTNAME..MIDDLENAME..")  # 2 + 9 + 2 + 10 + 2
     first, middle = name[:12], name[12:]  # the two blank cells between the hints are split 1 + 1
+    # Hints that tell the parts apart are their labels; the entry's label is the context (P5-D8).
     fields += [
-        ExpectedField(0, _union(first), FieldKind.TEXT, "Name", max_chars=len(first)),
-        ExpectedField(0, _union(middle), FieldKind.TEXT, None, max_chars=len(middle)),
+        ExpectedField(0, _union(first), FieldKind.TEXT, "FIRST NAME", "Name", len(first)),
+        ExpectedField(0, _union(middle), FieldKind.TEXT, "MIDDLE NAME", "Name", len(middle)),
     ]
 
+    # A lone part keeps its own label.
     _text(page, 72, 174, "Surname")
     surname = _hinted_row(page, 160, 160, "...LASTNAME...")
     fields.append(ExpectedField(0, _union(surname), FieldKind.TEXT, "Surname", max_chars=14))
 
-    # A hinted date row follows D8: DD / MM / YYYY.
+    # A hinted date row follows D8: DD / MM / YYYY; each part is labelled by the date.
     _text(page, 72, 214, "Date of birth")
     date = _hinted_row(page, 160, 200, "DDMMYYYY")
-    for cells, label in ((date[:2], "Date of birth"), (date[2:4], None), (date[4:], None)):
-        fields.append(ExpectedField(0, _union(cells), FieldKind.TEXT, label, max_chars=len(cells)))
+    for cells, part in ((date[:2], "day"), (date[2:4], "month"), (date[4:], "year")):
+        fields.append(
+            ExpectedField(
+                0,
+                _union(cells),
+                FieldKind.TEXT,
+                "Date of birth",
+                max_chars=len(cells),
+                date_part=part,
+            )
+        )
 
     return PdfFixture(
         "flat_hinted_comb",
         "Rule 1: comb rows with grey hints; one field per hinted part; hinted date as D8",
+        _bytes(doc),
+        SourceKind.FLAT_TEXT,
+        (TextLayer.OK,),
+        tuple(fields),
+    )
+
+
+def flat_registration() -> PdfFixture:
+    """A registration form in the style of an Indian institute's (Phase 5, P5-D8): a bold
+    instruction that is no section, a name in hinted comb parts over two rows ("FIRST _ NAME",
+    "MIDDLE", "LAST _ NAME"), a date in DD / MM / YYYY parts, rows of tick boxes after a label,
+    a table whose header names the columns and whose rows are classes, and lines drawn below the
+    page's edge (never seen, so no fields)."""
+    doc = _new_doc(A4)
+    page = doc[0]
+    fields: list[ExpectedField] = []
+    _text(page, 150, 50, "TEST INSTITUTE OF TECHNOLOGY", font=BOLD_FONT, size=14)
+    _text(page, 40, 90, "Please fill in CAPITAL LETTERS only.", font=BOLD_FONT)
+
+    name = "1. Name of Student"
+    _text(page, 40, 120, name)
+    first = _hinted_row(page, 40, 128, "FIRST.NAME..")
+    middle = _hinted_row(page, 228, 128, "MIDDLE....")
+    last = _hinted_row(page, 40, 152, "LAST.NAME...")
+    for cells, hint in ((first, "FIRST NAME"), (middle, "MIDDLE"), (last, "LAST NAME")):
+        fields.append(ExpectedField(0, _union(cells), FieldKind.TEXT, hint, name, len(cells)))
+
+    fields.append(_labelled_leader(page, 0, 40, 196, "2. Father's Name:", "_" * 40))
+
+    dob = "4. Date of Birth"
+    _text(page, 40, 224, dob)
+    x = 150.0
+    for hint, part in (("DD", "day"), ("MM", "month"), ("YYYY", "year")):
+        cells = _hinted_row(page, x, 212, hint)
+        fields.append(
+            ExpectedField(
+                0, _union(cells), FieldKind.TEXT, dob, max_chars=len(cells), date_part=part
+            )
+        )
+        x = cells[-1][2] + 3
+        _text(page, x, 224, "/")
+        x += 8
+
+    def tick_row(baseline: float, label: str, options: tuple[tuple[float, str], ...]) -> None:
+        _text(page, 40, baseline, label)
+        for left, option in options:
+            box = (left, baseline - 8, left + CHECKBOX_SIZE, baseline - 8 + CHECKBOX_SIZE)
+            _rect(page, box)
+            _text(page, left + 13, baseline, option)
+            group = label.rstrip(":")
+            fields.append(ExpectedField(0, box, FieldKind.CHECKBOX, option, group=group))
+
+    tick_row(262, "5. Gender:", ((120.0, "Male"), (180.0, "Female"), (250.0, "Other")))
+
+    heading = "12. Previous Education"
+    _text(page, 40, 300, heading, font=BOLD_FONT)
+    xs, ys = (40.0, 160.0, 320.0, 440.0, 555.0), (310.0, 328.0, 346.0, 364.0, 382.0)
+    for y in ys:
+        _line(page, xs[0], y, xs[-1], y)
+    for x in xs:
+        _line(page, x, ys[0], x, ys[-1])
+    columns = ("Examination", "Board/University", "Year of Passing", "% / CGPA")
+    for x, column in zip(xs, columns, strict=False):
+        _text(page, x + 4, ys[0] + 12, column, font=BOLD_FONT, size=8)
+    for (top, bottom), row in zip(
+        pairwise(ys[1:]), ("Class X", "Class XII", "Graduation"), strict=True
+    ):
+        _text(page, xs[0] + 4, top + 12, row, size=8)
+        for (left, right), column in zip(pairwise(xs[1:]), columns[1:], strict=True):
+            fields.append(
+                ExpectedField(
+                    0, (left, top, right, bottom), FieldKind.TEXT, column, heading, group=row
+                )
+            )
+
+    tick_row(410, "13. Hostel Required?", ((150.0, "Yes"), (200.0, "No")))
+
+    _line(page, 40, 866, 200, 866)  # below the page's edge
+    _line(page, 380, 866, 560, 866)
+    return PdfFixture(
+        "flat_registration",
+        "Registration form: instruction line, hinted name and date parts, tick-box rows, a table "
+        "of classes, lines below the page",
         _bytes(doc),
         SourceKind.FLAT_TEXT,
         (TextLayer.OK,),
@@ -1241,6 +1337,7 @@ BUILDERS: dict[str, Callable[[], PdfFixture]] = {
         flat_hyphen_leaders,
         flat_multiline,
         flat_hinted_comb,
+        flat_registration,
         flat_wide_cells,
         flat_label_inside,
         flat_rotated,
