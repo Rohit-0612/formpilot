@@ -178,7 +178,7 @@ Teach-back
 
 ---
 
-## Phase 3 — Field understanding + eval harness  ← CURRENT
+## Phase 3 — Field understanding + eval harness
 
 Goal: every field gets a semantic type, and we can measure how well.
 
@@ -234,7 +234,7 @@ Teach-back
 
 ---
 
-## Phase 4 — Vault, matching, questions, answers, validation, fit
+## Phase 4 — Vault, matching, questions, answers, validation, fit  ← CURRENT
 
 Goal: known values fill themselves; unknown ones become a few questions; everything is validated.
 
