@@ -89,6 +89,8 @@ class Compared:
     predicted: SemanticType
     method: str
     no_fill_reason: str | None
+    predicted_id: str = ""  # the detected field's id (Phase 4: the fill eval)
+    confidence: float = 0.0  # the semantic confidence (rule 0.95, or the model's own)
 
     @property
     def correct(self) -> bool:
@@ -102,6 +104,7 @@ class FormResult:
     compared: list[Compared] = field(default_factory=list)
     not_detected: int = 0  # reference fields with no matching detected field
     llm_trouble: list[str] = field(default_factory=list)  # failed or retried batches
+    understood: FormIR | None = None  # the scored pages' fields after understanding
 
 
 class _Counting(LLMProvider):
@@ -155,7 +158,9 @@ def evaluate_form(
     ir = ir.model_copy(update={"fields": [f for f in ir.fields if f.bbox.page in scored]})
     understood = understand_form(ir, mode, provider)
 
-    result = FormResult(form=label.form, from_scratch=label.prefilled_from is None)
+    result = FormResult(
+        form=label.form, from_scratch=label.prefilled_from is None, understood=understood
+    )
     result.llm_trouble = [
         e.change
         for e in understood.trace
@@ -189,6 +194,8 @@ def evaluate_form(
                     got.semantic_type,
                     got.semantic_method,
                     got.no_fill_reason,
+                    got.id,
+                    got.semantic_confidence,
                 )
             )
     return result

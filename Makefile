@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval
+.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval eval-fill
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -109,3 +109,8 @@ eval-detect:
 ## GROQ_API_KEY from .env
 eval:
 	$(EVAL_PY) eval.run_eval --split dev --mode $(or $(MODE),hybrid) $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),) --cache $(if $(RECORD),record,$(if $(LIVE),off,replay)) $(if $(TAG),--tag $(TAG),) $(if $(BASELINE),--write-baseline,)
+
+## Fill eval on the dev split (Phase 4): candidate fill policies x personas, replaying the
+## recorded understanding answers; PROVIDER/MODEL as for eval (default Groq gpt-oss-120b, P4-D1)
+eval-fill:
+	$(EVAL_PY) eval.fill_eval $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),) $(if $(TAG),--tag $(TAG),) $(if $(BASELINE),--write-baseline,)

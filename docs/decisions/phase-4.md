@@ -42,6 +42,22 @@ Not yet (in progress).
 - **Config:** `VAULT_KEY`, `FILL_MIN_CONFIDENCE`, `FIT_FONT_SIZE` (10), `FIT_MIN_FONT_SIZE` (6),
   `GROQ_MODEL`.
 
+### Fill-policy tuning session: fixed before the run (P4-D2)
+
+Written and committed before the first fill eval run, so the choice cannot follow the numbers.
+- **Data:** dev split, Groq `openai/gpt-oss-120b` recordings (P4-D1), hybrid mode, replayed;
+  the qwen3:8b recordings are scored the same way for comparison only.
+- **Personas** (`eval/personas/`, P4-D3): `asha_verma` (every profile field; the policy is chosen
+  on this one), `ravi_kumar` and `meera_iyer` (partial).
+- **Candidates** (`eval/fill_eval.py`, `CANDIDATES`): no policy (every predicted type); LLM
+  confidence ≥ 0.90, ≥ 0.95, ≥ 0.99; rules only; and each of the last four with "a person or date
+  type at most once per form".
+- **Rule:** the highest coverage among candidates with fill precision ≥ 85 % (ties: higher
+  precision); if none reaches 85 %, the highest fill precision among candidates with coverage
+  ≥ 20 % (ties: higher coverage), and the report says the target was missed.
+- One session: if no candidate is good enough, the result is reported as it is; no new
+  candidates are added after the run.
+
 ## Known limitations
 
 Not yet (in progress).
