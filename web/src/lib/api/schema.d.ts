@@ -174,6 +174,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile */
+        get: operations["get_profile_api_v1_profile_get"];
+        /** Put Profile */
+        put: operations["put_profile_api_v1_profile_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -392,6 +410,48 @@ export interface components {
             /** Height */
             height: number;
             text_layer: components["schemas"]["TextLayer"];
+        };
+        /** ProfileFieldInfo */
+        ProfileFieldInfo: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Sensitive */
+            sensitive: boolean;
+        };
+        /**
+         * ProfileResponse
+         * @description Sensitive values are masked (SPEC §8); dates are ISO (YYYY-MM-DD).
+         */
+        ProfileResponse: {
+            /** Values */
+            values: {
+                [key: string]: string;
+            };
+            /** Sensitive Opt In */
+            sensitive_opt_in: string[];
+            /** Fields */
+            fields: components["schemas"]["ProfileFieldInfo"][];
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /**
+         * ProfileUpdate
+         * @description Values to set (null deletes) and per-field opt-ins for sensitive values. A sensitive value
+         *     is saved only with its opt-in (in this request or earlier); opting out deletes it.
+         */
+        ProfileUpdate: {
+            /** Values */
+            values?: {
+                [key: string]: string | null;
+            };
+            /** Sensitive Opt In */
+            sensitive_opt_in?: {
+                [key: string]: boolean;
+            };
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -851,6 +911,57 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_profile_api_v1_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+        };
+    };
+    put_profile_api_v1_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            /** @description Unknown keys, invalid values or a sensitive value without opt-in */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

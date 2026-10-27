@@ -6,60 +6,29 @@ The API and the worker commit through their own engines, so these tests clean up
 
 import json
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 import pytest
-from httpx import ASGITransport, AsyncClient, Response
+from httpx import AsyncClient, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.api.deps import get_queue
 from app.config import Settings
 from app.db.models import Document, FormIRVersion
 from app.db.session import make_sessionmaker
 from app.ir.semantic_types import SemanticType
-from app.main import create_app
 from app.services import ir_store
 from app.storage import make_storage
 from app.vault.crypto import VaultCipher
 from tests.fixtures import pdfs
+from tests.integration.conftest import PASSWORD, ClientFactory
 from tests.integration.workers import make_worker
 
 pytestmark = pytest.mark.usefixtures("truncate_all")
 
 DOCS = "/api/v1/documents"
-PASSWORD = "correct-horse-7"
 # A file name that must never reach a log line.
 SECRET_NAME = "asha-verma-aadhaar-234567890124.pdf"
-
-ClientFactory = Callable[..., Awaitable[AsyncClient]]
-
-
-@pytest.fixture
-async def client_for(live_settings: Settings) -> AsyncIterator[ClientFactory]:
-    """Logged-in clients on one app (lifespan running), one per user; settings overridable."""
-    stack: list[Any] = []
-
-    async def make(
-        email: str = "asha@example.com", settings: Settings | None = None, **overrides: Any
-    ) -> AsyncClient:
-        app = create_app(settings or live_settings)
-        for dependency, override in overrides.items():
-            app.dependency_overrides[{"get_queue": get_queue}[dependency]] = override
-        lifespan = app.router.lifespan_context(app)
-        await lifespan.__aenter__()
-        client = AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver")
-        stack.append((client, lifespan))
-        credentials = {"email": email, "password": PASSWORD}
-        await client.post("/api/v1/auth/register", json=credentials)
-        assert (await client.post("/api/v1/auth/login", json=credentials)).status_code == 200
-        return client
-
-    yield make
-    for client, lifespan in reversed(stack):
-        await client.aclose()
-        await lifespan.__aexit__(None, None, None)
 
 
 async def _upload(client: AsyncClient, data: bytes, name: str = SECRET_NAME) -> Response:

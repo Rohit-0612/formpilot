@@ -435,6 +435,69 @@
           }
         }
       }
+    },
+    "/api/v1/profile": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Get Profile",
+        "operationId": "get_profile_api_v1_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Put Profile",
+        "operationId": "put_profile_api_v1_profile_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown keys, invalid values or a sensitive value without opt-in"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1027,6 +1090,108 @@
           "text_layer"
         ],
         "title": "PageInfo"
+      },
+      "ProfileFieldInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "sensitive": {
+            "type": "boolean",
+            "title": "Sensitive"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "group",
+          "sensitive"
+        ],
+        "title": "ProfileFieldInfo"
+      },
+      "ProfileResponse": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "sensitive_opt_in": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sensitive Opt In"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileFieldInfo"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "values",
+          "sensitive_opt_in",
+          "fields",
+          "updated_at"
+        ],
+        "title": "ProfileResponse",
+        "description": "Sensitive values are masked (SPEC §8); dates are ISO (YYYY-MM-DD)."
+      },
+      "ProfileUpdate": {
+        "properties": {
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "sensitive_opt_in": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Sensitive Opt In"
+          }
+        },
+        "type": "object",
+        "title": "ProfileUpdate",
+        "description": "Values to set (null deletes) and per-field opt-ins for sensitive values. A sensitive value\nis saved only with its opt-in (in this request or earlier); opting out deletes it."
       },
       "RegisterRequest": {
         "properties": {
