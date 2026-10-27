@@ -1,11 +1,41 @@
 # Phase 4 — Vault, matching, questions, answers, validation, fit: decision record
 
-> Status: **in progress** (milestone M2, branch `phase-4-fill`, from `main` after PR #4). The
-> milestone plan was approved by the human on 2026-10-27 with the decisions below.
+> Status: **close-out drafted 2026-10-27** (milestone M2, branch `phase-4-fill`, from `main`
+> after PR #4). The milestone plan was approved by the human on 2026-10-27 with the decisions
+> below. Gate 4 is the human's.
 
 ## What was built
 
-Not yet (in progress).
+| Deliverable (PLAN Phase 4) | Where |
+|---|---|
+| Understanding: Groq `openai/gpt-oss-120b` when `GROQ_API_KEY` is set, local Ollama as the fallback (P4-D1) | `backend/app/llm/factory.py`, `backend/app/llm/fallback.py` |
+| Vault key and Fernet cipher; settings never echo a rejected secret | `backend/app/vault/crypto.py`, `backend/app/config.py`, `make vault-key` |
+| Profile vault: one encrypted blob per user, normalised values, per-field opt-in for sensitive values, audit events without values; `GET` / `PUT /profile` | `backend/app/vault/service.py`, `vault/fields.py`, `api/routes/profile.py` |
+| Profile audit events without a document, job type `answers` | migration `0003` |
+| Field-level encryption of sensitive and phone values (and values containing one) in stored IR versions (P4-D5) | `backend/app/services/ir_store.py` |
+| Validators (SPEC §6.6) incl. Verhoeff; value normalisation | `backend/app/validators/` |
+| Passes: match with the precision-first fill policy (P4-D2), validate, fit, questions, answers (code + LLM free text) | `backend/app/passes/{match,validate,fit,questions,answers}.py`, prompt `llm/prompts/answers_v1.md` |
+| IR: `Field.font_size`, `ValueSource.DERIVED` | `backend/app/ir/models.py`, SPEC §4 |
+| Analyze job fills from the owner's profile (IR version 3); `GET /questions`, `POST /answers` → answers job | `backend/app/services/filling.py`, `analysis.py`, `api/routes/documents.py`, `jobs/tasks.py` |
+| Web: questions on the document page, profile page | `web/src/app/documents/[id]/questions-panel.tsx`, `web/src/app/profile/` |
+| Eval: personas, fill eval (fill precision, coverage, value correctness, questions per form), validator eval | `eval/personas/`, `eval/fill_eval.py`, `eval/validator_eval.py`, `eval/invalid_inputs.json`, `eval/reports/phase4-*` |
+
+**Measured on dev** (reference labels Claude-written, P3-D6; personas Claude-drafted, not
+checked by a human, P4-D3):
+
+| Metric | Result |
+|---|---|
+| **Fill precision** (key metric), chosen policy, Groq, full persona | **86.5 % (64/74)**, target 85 % met |
+| Fill coverage (right fills / 241 fillable reference fields) | 26.6 % (64/241) |
+| Value correctness of the filled fields | 86.5 % |
+| Fill precision, other personas | `ravi_kumar` 92.2 %, `meera_iyer` 84.6 % |
+| Fill precision with qwen3:8b (fallback) under the chosen policy | 74.2 % (66/89) |
+| Validator catch rate (`eval/invalid_inputs.json`) | 89.2 % (33/37); the 4 misses are errors format rules cannot see |
+| False-reject rate on persona values | 0 % (0/21) |
+| Questions per form, scored dev pages, full persona | 531 questions for 532 fields needing input |
+| Questions per form, empty profile | 586 questions for 609 fields needing input |
+
+Test split: not measured (release measurement, M4). Latency: not measured yet.
 
 ## Key decisions and alternatives considered
 
@@ -88,17 +118,74 @@ human (P4-D3).
   profile value (`place`, `signature`) and unmatched options are not filled.
 - The baseline (`eval/baseline.json`, `fill`) holds the chosen policy's Groq numbers.
 
+### Other decisions during the build
+
+| Decision | Alternatives | Why this one |
+|---|---|---|
+| Answers are stored encrypted (vault key) in file storage under the document, keyed by a pre-generated job id; the job reads and deletes them | answers as job arguments; a database table | Job arguments are ids only (arq logs them); no migration; deleting the document deletes them |
+| Sealing also covers values that *contain* an identifier or a phone number (a note with an Aadhaar in it) | whole values only, like masking | Encryption has no cost when too broad; a plain Aadhaar in a note would defeat P4-D5 |
+| Free text holding an identifier or a phone number is never sent to the LLM; the user answers the parts instead | send it and trust the prompt | The privacy rule is about values, wherever they appear |
+| `other` / `unknown` and untyped fields get the form's own label as the question; their answers are never saved to the profile | ask by the predicted type | A wrong type would ask the wrong question and save a value under the wrong key |
+| Today's date in India's time zone (`PassContext.today`) | UTC | A form signed in India at 01:00 IST must not get yesterday's date |
+| Fit measures per character cell only on flat comb rows; AcroForm `/MaxLen` fields are measured as one text | per cell everywhere | `/MaxLen` does not say whether the widget is a comb |
+| `OLLAMA_MODEL` / `GROQ_MODEL` replace `LLM_MODEL` | one model setting for both | With a fallback, each provider needs its own model |
+
 ## Known limitations
 
-Not yet (in progress).
+- **Coverage is low by design:** the chosen policy fills 26.6 % of the fillable reference fields
+  on dev; the rest are asked. Questions per form stay close to the number of fields needing
+  input (531 for 532 with a full profile): most remaining fields are other people's details,
+  table cells or untyped boxes, each asked with its own label.
+- **The fallback is less precise:** qwen3:8b reaches 74.2 % fill precision under the chosen
+  policy (no candidate reaches 85 % with it). Without a Groq key, fills are less reliable.
+- **Agreement, not truth:** fill precision is measured against Claude-written reference labels
+  (P3-D6) and Claude-drafted personas (P4-D3); no human checked either.
+- **Format checks only:** a PAN's holder-type letter, a PIN code's existence, an email domain's
+  deliverability and a plausible age are not checked (the validator eval's 4 misses).
+- **API masking matches whole values:** an identifier inside a longer value (e.g. a note) is
+  shown to its owner unmasked; it is encrypted in the database (P4-D5).
+- **Devanagari values** cannot be written with the PDF's Helvetica font; the fit pass flags them
+  for review (a Unicode font is for the renderer, M3).
+- **Answer parsing by the LLM** is checked with a fake provider in tests and one live call on
+  synthetic addresses; it is not part of a measured eval.
+- **Hand-made fixture for the acceptance test:** dev PDFs are not in the repository, so CI checks
+  the "asks only what the persona lacks" rule on a synthetic fixture form (P4-D4).
 
 ## Open issues
 
-Not yet (in progress).
+### Acceptance checks
+All five Phase 4 acceptance checks are verified in this milestone (PLAN.md):
+- validators: published Verhoeff vectors and known vectors (`test_validators.py`), the invalid
+  inputs at the expected rate and zero persona false rejects (`test_validator_eval.py`);
+- the persona rule on a fixture form (`test_fill_api.py`, P4-D4);
+- no plain sensitive or phone value in stored IR rows (`test_documents_api.py`,
+  `test_fill_api.py`);
+- no sensitive or phone value in captured logs (`test_fill_api.py`);
+- eval reports added; the understanding baseline is unchanged and the fill baseline is new.
+
+### For the human
+- **Gate 4.**
+- **Rotate the Groq key** (an incident during this milestone printed part of it in the local
+  session transcript; it was never committed or pushed).
+- **"In my own words" checkpoint** (optional, about 10 minutes):
+  1. Why is validation deterministic code and not the LLM?
+  2. What does the vault encryption protect against, and what does it not?
+  3. Why did the fill policy choose a 0.99 confidence floor and "once per form", and what did it
+     cost in coverage?
 
 ## Notes for the next phase
 
-Not yet (in progress).
+- **M3 (Phase 5: review UI, overlay rendering, download, expiry, Playwright)** starts with one
+  plan for approval.
+- **Read the latest IR version** through `services/ir_store.py` (values decrypted); never store
+  an IR any other way, or sensitive values are written in plain text.
+- **Render only confirmed fields** (invariant 7); `font_size` from the fit pass, `fits_box`
+  results for the review list. `LLM_INFERRED` values (free-text addresses) deserve a visible
+  badge.
+- **A Unicode font** (Devanagari) for the overlay renderer would remove one fit limitation.
+- **Questions:** fields answered with "no" have status FILLED and no value; the renderer draws
+  nothing for them.
+- **CI eval gate (M4):** `eval/baseline.json` now has a `fill` block (Groq, chosen policy).
 
 ## In my own words
 

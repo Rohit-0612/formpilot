@@ -263,15 +263,15 @@ Deliverables
   + false-reject rate, questions per form.
 
 Acceptance
-- [ ] Verhoeff and all validators pass published/known test vectors; invalid inputs file is
+- [x] Verhoeff and all validators pass published/known test vectors; invalid inputs file is
       rejected at the expected rate; zero false rejects on persona values.
-- [ ] With a full persona in the vault, a form asks only for fields the persona lacks or the
+- [x] With a full persona in the vault, a form asks only for fields the persona lacks or the
       fill policy is not confident about (integration test on a synthetic fixture form; dev
       forms in the questions-per-form eval; human decision, 2026-10-27, P4-D4).
-- [ ] Stored IR versions hold no plain value of a sensitive or phone type (a test reads the
+- [x] Stored IR versions hold no plain value of a sensitive or phone type (a test reads the
       database row).
-- [ ] Sensitive values never appear in logs (a test asserts this on captured logs).
-- [ ] Eval report updated; baseline updated only if metrics did not drop.
+- [x] Sensitive values never appear in logs (a test asserts this on captured logs).
+- [x] Eval report updated; baseline updated only if metrics did not drop.
 
 Teach-back
 1. Why is validation deterministic code and not the LLM?
