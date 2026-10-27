@@ -5,6 +5,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import URL, CheckConstraint, create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
 
 from app.db.base import Base
@@ -107,5 +108,42 @@ def test_check_constraints_match_models(migrated_db_url: URL) -> None:
             }
             in_db = {check["name"] for check in inspector.get_check_constraints(table.name)}
             assert in_db == in_models, table.name
+    finally:
+        engine.dispose()
+
+
+def test_0003_allows_profile_events_and_answers_jobs_and_downgrades(scratch_db_url: URL) -> None:
+    config = alembic_config(scratch_db_url)
+    command.upgrade(config, "0003")
+    engine = create_engine(scratch_db_url, poolclass=NullPool)
+    user = "INSERT INTO users (id, email, password_hash) VALUES (gen_random_uuid(), 'a@b.c', 'x')"
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(user))
+            conn.execute(
+                text(
+                    "INSERT INTO audit_events (id, user_id, event, actor)"
+                    " SELECT gen_random_uuid(), id, 'profile_updated', 'user' FROM users"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO jobs (id, type, status)"
+                    " VALUES (gen_random_uuid(), 'answers', 'queued')"
+                )
+            )
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO audit_events (id, event, actor)"
+                    " VALUES (gen_random_uuid(), 'orphan', 'system')"
+                )
+            )
+
+        command.downgrade(config, "0002")
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT count(*) FROM audit_events")).scalar_one() == 0
+            assert conn.execute(text("SELECT count(*) FROM jobs")).scalar_one() == 0
+        command.upgrade(config, "head")
     finally:
         engine.dispose()

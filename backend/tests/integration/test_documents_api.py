@@ -4,58 +4,31 @@ The API and the worker commit through their own engines, so these tests clean up
 (truncate_all) and a flushed Redis test database (redis_url) [A1]. Synthetic data only.
 """
 
+import json
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 import pytest
-from httpx import ASGITransport, AsyncClient, Response
+from httpx import AsyncClient, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.api.deps import get_queue
 from app.config import Settings
 from app.db.models import Document, FormIRVersion
 from app.db.session import make_sessionmaker
-from app.main import create_app
+from app.ir.semantic_types import SemanticType
+from app.services import ir_store
 from app.storage import make_storage
+from app.vault.crypto import VaultCipher
 from tests.fixtures import pdfs
+from tests.integration.conftest import PASSWORD, ClientFactory
 from tests.integration.workers import make_worker
 
 pytestmark = pytest.mark.usefixtures("truncate_all")
 
 DOCS = "/api/v1/documents"
-PASSWORD = "correct-horse-7"
 # A file name that must never reach a log line.
 SECRET_NAME = "asha-verma-aadhaar-234567890124.pdf"
-
-ClientFactory = Callable[..., Awaitable[AsyncClient]]
-
-
-@pytest.fixture
-async def client_for(live_settings: Settings) -> AsyncIterator[ClientFactory]:
-    """Logged-in clients on one app (lifespan running), one per user; settings overridable."""
-    stack: list[Any] = []
-
-    async def make(
-        email: str = "asha@example.com", settings: Settings | None = None, **overrides: Any
-    ) -> AsyncClient:
-        app = create_app(settings or live_settings)
-        for dependency, override in overrides.items():
-            app.dependency_overrides[{"get_queue": get_queue}[dependency]] = override
-        lifespan = app.router.lifespan_context(app)
-        await lifespan.__aenter__()
-        client = AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver")
-        stack.append((client, lifespan))
-        credentials = {"email": email, "password": PASSWORD}
-        await client.post("/api/v1/auth/register", json=credentials)
-        assert (await client.post("/api/v1/auth/login", json=credentials)).status_code == 200
-        return client
-
-    yield make
-    for client, lifespan in reversed(stack):
-        await client.aclose()
-        await lifespan.__aexit__(None, None, None)
 
 
 async def _upload(client: AsyncClient, data: bytes, name: str = SECRET_NAME) -> Response:
@@ -99,7 +72,12 @@ async def test_upload_analyze_and_read_back(
         None,
         None,
     )
-    assert before["job"] == {"id": job_id, "status": "queued", "error_message": None}
+    assert before["job"] == {
+        "id": job_id,
+        "type": "analyze",
+        "status": "queued",
+        "error_message": None,
+    }
     assert before["original_filename"] == SECRET_NAME
     not_yet = await client.get(f"{DOCS}/{document_id}/ir")
     assert not_yet.status_code == 404
@@ -112,7 +90,12 @@ async def test_upload_analyze_and_read_back(
         "flat_text",
         1,
     )
-    assert document["job"] == {"id": job_id, "status": "done", "error_message": None}
+    assert document["job"] == {
+        "id": job_id,
+        "type": "analyze",
+        "status": "done",
+        "error_message": None,
+    }
 
     ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
     assert ir["document_id"] == document_id
@@ -124,7 +107,8 @@ async def test_upload_analyze_and_read_back(
         versions = await session.scalars(
             select(FormIRVersion.version).where(FormIRVersion.document_id == uuid.UUID(document_id))
         )
-        assert sorted(versions) == [1, 2]
+        # 1 detection, 2 understanding, 3 filling (Phase 4)
+        assert sorted(versions) == [1, 2, 3]
 
     page = await client.get(f"{DOCS}/{document_id}/pages/0.png")
     assert page.status_code == 200
@@ -280,33 +264,52 @@ async def test_other_users_get_404_and_anonymous_users_401(
 # --- masking -------------------------------------------------------------------------------
 
 
-async def test_ir_values_are_masked_in_the_response_but_not_in_the_database(
+async def test_ir_values_are_masked_in_the_response_and_encrypted_in_the_database(
     client_for: ClientFactory, live_settings: Settings, engine: AsyncEngine
 ) -> None:
-    """IRs have no values before Phase 4, so a later IR version with values is written directly
-    (the worker writes versions 1 and 2: detection, then understanding)."""
+    """Masked in the response (SPEC §8); in the stored row, sensitive and phone values are
+    encrypted and the rest is plain (decision P4-D5, PLAN Phase 4 acceptance). A version with
+    values is added through the IR store, as the Phase 4 passes do."""
     client = await client_for()
     document_id = uuid.UUID(
         (await _upload(client, pdfs.get("flat_boxes").data)).json()["document_id"]
     )
     await _run_worker(live_settings)
+    cipher = VaultCipher(live_settings.vault_key)
     async with make_sessionmaker(engine)() as session:
-        version_1 = await session.scalar(
-            select(FormIRVersion.ir_json).where(FormIRVersion.version == 1)
-        )
-        assert version_1 is not None
-        fields = version_1["fields"]
-        fields[0] |= {"semantic_type": "aadhaar", "value": "2345 6789 0124"}
-        fields[1] |= {"semantic_type": "other", "value": "ABCDE1234F"}  # defence in depth
-        fields[2] |= {"semantic_type": "full_name", "value": "Asha Verma"}
-        session.add(FormIRVersion(document_id=document_id, version=3, ir_json=version_1))
+        ir = await ir_store.latest(session, document_id, cipher)
+        assert ir is not None
+        values = [
+            ("aadhaar", "2345 6789 0124"),
+            ("other", "ABCDE1234F"),  # defence in depth
+            ("phone_mobile", "9876543210"),
+            ("full_name", "Asha Verma"),
+        ]
+        fields = [
+            f.model_copy(update={"semantic_type": SemanticType(t), "value": v})
+            for f, (t, v) in zip(ir.fields, values, strict=False)
+        ]
+        ir = ir.model_copy(update={"fields": fields + ir.fields[len(fields) :]})
+        version = await ir_store.add_version(session, document_id, ir, cipher)
         await session.commit()
 
-    ir = (await client.get(f"{DOCS}/{document_id}/ir")).json()
+    response = (await client.get(f"{DOCS}/{document_id}/ir")).json()
 
-    assert [f["value"] for f in ir["fields"][:3]] == ["XXXX0124", "XXXX234F", "Asha Verma"]
+    assert [f["value"] for f in response["fields"][:4]] == [
+        "XXXX0124",
+        "XXXX234F",
+        "9876543210",  # the phone exception: the user's own number is shown
+        "Asha Verma",
+    ]
     async with make_sessionmaker(engine)() as session:
-        stored = await session.scalar(
-            select(FormIRVersion.ir_json).where(FormIRVersion.version == 3)
+        row = await session.scalar(
+            select(FormIRVersion.ir_json).where(
+                FormIRVersion.document_id == document_id, FormIRVersion.version == version
+            )
         )
-    assert stored is not None and stored["fields"][0]["value"] == "2345 6789 0124"
+    assert row is not None
+    text = json.dumps(row)
+    for secret in ("2345 6789 0124", "ABCDE1234F", "9876543210"):
+        assert secret not in text
+    assert row["fields"][3]["value"] == "Asha Verma"
+    assert all(f["value"].startswith(ir_store.SEALED_PREFIX) for f in row["fields"][:3])

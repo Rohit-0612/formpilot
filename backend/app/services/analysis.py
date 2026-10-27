@@ -1,5 +1,5 @@
 """The analyze job: uploaded PDF -> Form IR version 1 + page images, then the understanding pass
--> Form IR version 2 (worker only, SPEC §11).
+-> Form IR version 2, then filling from the owner's profile -> version 3 (worker only, SPEC §11).
 
 Version 1 (detection) is stored and the document is `ready` before understanding starts, so a
 slow or failing LLM never loses the detected fields. Understanding gets a deadline inside the
@@ -22,7 +22,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
-from app.db.models import Document, DocumentStatus, FormIRVersion, Job
+from app.db.models import Document, DocumentStatus, Job
 from app.frontends import acroform, flat
 from app.frontends.detect import detect
 from app.frontends.page_images import render_pages
@@ -31,7 +31,9 @@ from app.llm.factory import provider_from_settings
 from app.logging import get_logger
 from app.passes import understand
 from app.passes.context import PassContext
+from app.services import filling, ir_store
 from app.storage.base import Storage
+from app.vault.crypto import VaultCipher
 
 log = get_logger(__name__)
 
@@ -127,6 +129,7 @@ async def analyze_document(
         raise DocumentNotAnalyzableError
 
     doc_log = log.bind(document_id=str(document_id), job_id=str(job_id))
+    cipher = VaultCipher(settings.vault_key)
     job_started = datetime.now(UTC)
     began = time.perf_counter()
     try:
@@ -142,11 +145,7 @@ async def analyze_document(
         for page, image in enumerate(result.page_images):
             await storage.put(page_key(document_id, page), image)
         async with sessionmaker() as session:
-            session.add(
-                FormIRVersion(
-                    document_id=document_id, version=1, ir_json=result.ir.model_dump(mode="json")
-                )
-            )
+            await ir_store.add_version(session, document_id, result.ir, cipher)
             await session.execute(
                 update(Document)
                 .where(Document.id == document_id)
@@ -173,11 +172,7 @@ async def analyze_document(
     began = time.perf_counter()
     understood = await asyncio.to_thread(_understand, result.ir, settings, deadline)
     async with sessionmaker() as session:
-        session.add(
-            FormIRVersion(
-                document_id=document_id, version=2, ir_json=understood.model_dump(mode="json")
-            )
-        )
+        await ir_store.add_version(session, document_id, understood, cipher)
         await session.commit()
     doc_log.info(
         "document_understood",
@@ -186,6 +181,15 @@ async def analyze_document(
         never_fill=sum(1 for f in understood.fields if f.no_fill_reason is not None),
         duration_ms=round((time.perf_counter() - began) * 1000, 1),
     )
+
+    # Phase 4: fill from the owner's profile, validate, fit -> version 3.
+    async with sessionmaker() as session:
+        document = await session.get(Document, document_id)
+        if document is None:  # deleted while the job ran
+            raise DocumentNotAnalyzableError
+        filled = await filling.fill_document(session, document, understood, settings)
+        await session.commit()
+    doc_log.info("document_filled", **filling.counts(filled))
 
 
 def _understand(ir: FormIR, settings: Settings, deadline: datetime) -> FormIR:

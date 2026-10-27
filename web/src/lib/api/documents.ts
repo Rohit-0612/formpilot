@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { api } from "./client";
 import { ApiError, detailMessage } from "./errors";
+import { isAnalysing } from "./analysis-state";
 import type { components } from "./schema";
 
 export type DocumentInfo = components["schemas"]["DocumentResponse"];
@@ -34,10 +35,7 @@ export function documentQueryKey(documentId: string) {
   return ["documents", documentId] as const;
 }
 
-/** Still waiting for the worker: keep polling. */
-export function isAnalysing(document: DocumentInfo | null | undefined): boolean {
-  return document?.status === "uploaded" || document?.status === "analyzing";
-}
+export { analysisStep, isAnalysing } from "./analysis-state";
 
 export function useUpload() {
   return useMutation({
@@ -97,7 +95,8 @@ export function useMaskedIr(documentId: string, enabled: boolean) {
       return data;
     },
     enabled,
-    staleTime: Infinity, // version 1 never changes in Phase 2
+    // A new version arrives after answers; useAnswersJob invalidates this query then.
+    staleTime: Infinity,
     retry: false,
   });
 }

@@ -50,6 +50,7 @@ class ValueSource(StrEnum):
     USER_ANSWER = "user_answer"
     LLM_INFERRED = "llm_inferred"
     USER_EDIT = "user_edit"
+    DERIVED = "derived"  # computed in code from the profile or the date (Phase 4, match pass)
     NONE = "none"
 
 
@@ -125,6 +126,8 @@ class Field(_IRModel):
     # Set for fields FormPilot never fills: not asked, not matched, not rendered (decision P3-D1,
     # docs/decisions/phase-3.md). None for every other field, and in IRs stored before Phase 3.
     no_fill_reason: Literal["office_use", "signature"] | None = None
+    # Font size in points chosen by the fit pass (SPEC §6.7); None until the field has a value.
+    font_size: float | None = pydantic.Field(default=None, gt=0)
 
 
 class TraceEvent(_IRModel):

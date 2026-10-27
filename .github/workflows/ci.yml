@@ -49,8 +49,10 @@ jobs:
           version: "0.12.2"
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
-      - name: Generate a throwaway JWT secret for this run
-        run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - name: Generate a throwaway JWT secret and vault key for this run
+        run: |
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "VAULT_KEY=$(openssl rand -base64 32 | tr '+/' '-_')" >> "$GITHUB_ENV"
       - run: uv sync --frozen
       - run: uv run ruff check . ../eval
       - run: uv run ruff format --check . ../eval
@@ -84,6 +86,8 @@ jobs:
       - run: npm run lint
         working-directory: web
       - run: npm run typecheck
+        working-directory: web
+      - run: npm test
         working-directory: web
       - run: npm run build
         working-directory: web

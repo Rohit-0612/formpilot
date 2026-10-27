@@ -15,6 +15,7 @@ from app.config import Settings, get_settings
 from app.db.session import make_engine, make_sessionmaker
 from app.logging import configure_logging, get_logger
 from app.services.analysis import analyze_document
+from app.services.filling import answer_document
 from app.services.jobs import JobStore
 from app.storage import make_storage
 
@@ -72,7 +73,21 @@ async def analyze(ctx: dict[str, Any], job_id: str) -> str:
     return await run_tracked(ctx, job_id, work)
 
 
-FUNCTIONS = [ping, analyze]
+async def answers(ctx: dict[str, Any], job_id: str) -> str:
+    """Stored answers -> the next Form IR version, profile saves (app/services/filling.py)."""
+
+    async def work() -> None:
+        await answer_document(
+            uuid.UUID(job_id),
+            sessionmaker=ctx["sessionmaker"],
+            storage=ctx["storage"],
+            settings=ctx["settings"],
+        )
+
+    return await run_tracked(ctx, job_id, work)
+
+
+FUNCTIONS = [ping, analyze, answers]
 
 
 async def startup(ctx: dict[str, Any]) -> None:

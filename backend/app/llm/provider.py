@@ -12,13 +12,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.ir.semantic_types import SENSITIVE_TYPES, SemanticType
+from app.ir.semantic_types import PHONE_TYPES, SENSITIVE_TYPES, SemanticType
 
 # Never sent to a remote provider (human decision, 2026-10-26).
-NEVER_REMOTE: frozenset[SemanticType] = SENSITIVE_TYPES | {
-    SemanticType.PHONE_MOBILE,
-    SemanticType.PHONE_ALTERNATE,
-}
+NEVER_REMOTE: frozenset[SemanticType] = SENSITIVE_TYPES | PHONE_TYPES
 
 
 class LLMError(Exception):

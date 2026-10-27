@@ -5,7 +5,10 @@ from pydantic import ValidationError
 
 from app.config import DatabaseSettings, Settings
 from app.llm.factory import provider_from_settings
+from app.llm.fallback import FallbackProvider
 from app.llm.groq import GroqProvider
+from app.llm.ollama import OllamaProvider
+from tests.conftest import TEST_VAULT_KEY
 
 VALID_SECRET = "a" * 64
 
@@ -16,6 +19,7 @@ def base_env(clean_env: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     clean_env.setenv("REDIS_URL", "redis://redis:6379/0")
     clean_env.setenv("STORAGE_ROOT", "/data/storage")
     clean_env.setenv("JWT_SECRET", VALID_SECRET)
+    clean_env.setenv("VAULT_KEY", TEST_VAULT_KEY)
     return clean_env
 
 
@@ -97,16 +101,64 @@ def test_groq_provider_takes_its_key_from_the_environment_and_hides_it(
     base_env: pytest.MonkeyPatch,
 ) -> None:
     base_env.setenv("LLM_PROVIDER", "groq")
-    base_env.setenv("LLM_MODEL", "openai/gpt-oss-120b")
+    base_env.setenv("GROQ_MODEL", "openai/gpt-oss-20b")
     base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
 
     settings = Settings(_env_file=None)
     provider = provider_from_settings(settings)
 
     assert isinstance(provider, GroqProvider) and provider.is_remote
-    assert provider.model == "openai/gpt-oss-120b"
+    assert provider.model == "openai/gpt-oss-20b"
     assert "gsk_test_not_a_real_key" not in repr(settings)
 
 
 def test_groq_key_is_optional(base_env: pytest.MonkeyPatch) -> None:
     assert Settings(_env_file=None).groq_api_key is None
+
+
+@pytest.mark.parametrize("key", [None, ""])
+def test_auto_without_a_groq_key_uses_local_ollama(
+    base_env: pytest.MonkeyPatch, key: str | None
+) -> None:
+    if key is not None:
+        base_env.setenv("GROQ_API_KEY", key)
+
+    provider = provider_from_settings(Settings(_env_file=None))
+
+    assert isinstance(provider, OllamaProvider) and not provider.is_remote
+    assert provider.model == "qwen3:8b"
+
+
+def test_auto_with_a_groq_key_uses_groq_then_ollama(base_env: pytest.MonkeyPatch) -> None:
+    """Decision P4-D1: Groq gpt-oss-120b by default, local Ollama as the fallback."""
+    base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
+
+    provider = provider_from_settings(Settings(_env_file=None))
+
+    assert isinstance(provider, FallbackProvider)
+    assert isinstance(provider.primary, GroqProvider)
+    assert provider.primary.model == "openai/gpt-oss-120b"
+    assert isinstance(provider.fallback, OllamaProvider)
+
+
+def test_provider_none_runs_rules_only(base_env: pytest.MonkeyPatch) -> None:
+    base_env.setenv("LLM_PROVIDER", "none")
+    base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
+
+    assert provider_from_settings(Settings(_env_file=None)) is None
+
+
+@pytest.mark.parametrize("key", ["", "not-a-fernet-key", "a" * 44])
+def test_vault_key_must_be_a_fernet_key(base_env: pytest.MonkeyPatch, key: str) -> None:
+    base_env.setenv("VAULT_KEY", key)
+
+    with pytest.raises(ValidationError, match="VAULT_KEY must be a Fernet key") as error:
+        Settings(_env_file=None)
+    assert not key or key not in str(error.value)  # the rejected key is not echoed back
+
+
+def test_missing_vault_key_fails(base_env: pytest.MonkeyPatch) -> None:
+    base_env.delenv("VAULT_KEY")
+
+    with pytest.raises(ValidationError, match="vault_key"):
+        Settings(_env_file=None)

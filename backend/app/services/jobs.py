@@ -51,8 +51,14 @@ class JobService:
         self._session = session
         self._queue = queue
 
-    async def create_job(self, job_type: JobType, document_id: uuid.UUID | None = None) -> Job:
-        job = Job(type=job_type.value, document_id=document_id)
+    async def create_job(
+        self,
+        job_type: JobType,
+        document_id: uuid.UUID | None = None,
+        job_id: uuid.UUID | None = None,
+    ) -> Job:
+        """job_id: set when the job's input must be stored under its id before it is enqueued."""
+        job = Job(id=job_id or uuid.uuid4(), type=job_type.value, document_id=document_id)
         self._session.add(job)
         # Commit before enqueueing, so the worker always finds the row.
         await self._session.commit()

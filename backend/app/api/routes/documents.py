@@ -5,12 +5,25 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, 
 
 from app.api import API_PREFIX
 from app.api.deps import CurrentUser, get_app_settings, get_document_service, get_queue
-from app.api.schemas.documents import DocumentResponse, JobSummary, UploadResponse
+from app.api.schemas.documents import (
+    AnswersRequest,
+    DocumentResponse,
+    JobAccepted,
+    JobSummary,
+    QuestionsResponse,
+    UploadResponse,
+)
 from app.api.schemas.ir import MaskedFormIR
 from app.api.uploads import InvalidUploadError, UploadTooLargeError, read_upload
 from app.config import Settings
 from app.db.models import Document
-from app.services.documents import DocumentService, job_error_message, looks_like_pdf
+from app.services import filling
+from app.services.documents import (
+    DocumentService,
+    UnknownQuestionsError,
+    job_error_message,
+    looks_like_pdf,
+)
 from app.services.jobs import JobEnqueueError, JobQueue
 
 router = APIRouter(prefix=f"{API_PREFIX}/documents", tags=["documents"])
@@ -109,6 +122,7 @@ async def get_document(
             else JobSummary.model_validate(
                 {
                     "id": job.id,
+                    "type": job.type,
                     "status": job.status,
                     "error_message": job_error_message(job.error, max_pages=settings.max_pages),
                 }
@@ -128,6 +142,62 @@ async def get_ir(document_id: DocumentId, user: CurrentUser, documents: Document
     if ir_json is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="The document is not analysed yet")
     return MaskedFormIR.model_validate(ir_json)  # sensitive values masked (SPEC §8)
+
+
+@router.get(
+    "/{document_id}/questions",
+    response_model=QuestionsResponse,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found or not analysed yet"}},
+)
+async def get_questions(
+    document_id: DocumentId, user: CurrentUser, documents: Documents, settings: AppSettings
+) -> QuestionsResponse:
+    document = await _owned(documents, document_id, user)
+    ir = await documents.latest_form(document.id)
+    if ir is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="The document is not analysed yet")
+    return QuestionsResponse(
+        questions=filling.questions_for(ir, settings),
+        fields_needing_input=filling.counts(ir)["needs_input"],
+    )
+
+
+@router.post(
+    "/{document_id}/answers",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobAccepted,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Not found or not analysed yet"},
+        status.HTTP_409_CONFLICT: {"description": "Answers for questions that are not asked now"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "The job could not be queued"},
+    },
+)
+async def post_answers(
+    document_id: DocumentId,
+    body: AnswersRequest,
+    user: CurrentUser,
+    documents: Documents,
+    settings: AppSettings,
+    queue: Queue,
+) -> JobAccepted:
+    document = await _owned(documents, document_id, user)
+    ir = await documents.latest_form(document.id)
+    if ir is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="The document is not analysed yet")
+    try:
+        job = await documents.submit_answers(
+            document, body.answers, filling.questions_for(ir, settings), queue
+        )
+    except UnknownQuestionsError as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=f"These questions are not asked now: {', '.join(exc.question_ids)}",
+        ) from None
+    except JobEnqueueError:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, detail="The answers could not be queued"
+        ) from None
+    return JobAccepted(job_id=job.id)
 
 
 @router.get(

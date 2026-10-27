@@ -19,6 +19,8 @@ from app.services.health import HealthService, ping_database, ping_redis
 from app.services.jobs import JobQueue, create_queue
 from app.services.users import UserService
 from app.storage.base import Storage
+from app.vault.crypto import VaultCipher
+from app.vault.service import ProfileService
 
 SESSION_COOKIE = "fp_session"
 
@@ -77,7 +79,16 @@ def get_document_service(
     storage: Annotated[Storage, Depends(get_storage)],
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> DocumentService:
-    return DocumentService(session, storage, settings.file_ttl_hours)
+    return DocumentService(
+        session, storage, settings.file_ttl_hours, VaultCipher(settings.vault_key)
+    )
+
+
+def get_profile_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> ProfileService:
+    return ProfileService(session, VaultCipher(settings.vault_key))
 
 
 def _unauthorized() -> HTTPException:

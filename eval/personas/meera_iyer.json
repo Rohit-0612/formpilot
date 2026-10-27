@@ -1,0 +1,32 @@
+{
+  "persona": "meera_iyer",
+  "synthetic": true,
+  "drafted_by": "Claude Code; not checked by a human (decision P4-D3)",
+  "note": "Student persona: identity, contact, current address and education only. All values are invented; identifiers are format-valid fakes.",
+  "profile": {
+    "category": "General",
+    "course": "B.Sc Physics",
+    "current_address_line1": "4 Demo Street",
+    "current_city": "Chennai",
+    "current_country": "India",
+    "current_district": "Chennai",
+    "current_pincode": "600001",
+    "current_state": "Tamil Nadu",
+    "date_of_birth": "2005-07-14",
+    "email": "meera.iyer@example.com",
+    "enrollment_number": "SU2023PHY042",
+    "father_name": "Krishnan Iyer",
+    "first_name": "Meera",
+    "full_name": "Meera Iyer",
+    "gender": "Female",
+    "guardian_name": "Krishnan Iyer",
+    "institution_name": "Sample University",
+    "last_name": "Iyer",
+    "mother_name": "Lakshmi Iyer",
+    "nationality": "Indian",
+    "passing_year": "2026",
+    "percentage_or_cgpa": "78.5",
+    "phone_mobile": "9000098765",
+    "year_of_study": "3"
+  }
+}

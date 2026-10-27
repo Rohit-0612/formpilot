@@ -14,6 +14,7 @@ from pydantic import SecretStr
 from app.ir.semantic_types import SENSITIVE_TYPES, SemanticType
 from app.llm.cache import CachedProvider, cache_key
 from app.llm.fake import FakeProvider
+from app.llm.fallback import FallbackProvider
 from app.llm.groq import GroqProvider, strict_schema
 from app.llm.ollama import OllamaProvider, is_cloud_model
 from app.llm.provider import NEVER_REMOTE, LLMError, LLMRequest, PrivacyError
@@ -254,6 +255,33 @@ def test_groq_failures_are_llm_errors_that_never_show_the_key(response: httpx.Re
     # no chained httpx exception (it would carry the request and its headers)
     assert error.value.__cause__ is None
     assert error.value.__context__ is None or error.value.__suppress_context__
+
+
+# --- fallback (P4-D1) ---------------------------------------------------------------------
+
+
+def test_fallback_answers_from_the_primary_when_it_works() -> None:
+    primary, fallback = FakeProvider(['{"ok":1}'], remote=True), FakeProvider(["unused"])
+
+    assert FallbackProvider(primary, fallback).complete_json(_request()) == '{"ok":1}'
+    assert fallback.requests == []
+
+
+def test_fallback_asks_the_second_provider_when_the_primary_fails() -> None:
+    primary, fallback = FakeProvider([], remote=True), FakeProvider(['{"ok":2}'])
+
+    assert FallbackProvider(primary, fallback).complete_json(_request()) == '{"ok":2}'
+    assert len(fallback.requests) == 1
+
+
+def test_fallback_with_a_remote_primary_refuses_phone_values_before_either_sees_them() -> None:
+    primary, fallback = FakeProvider(['{"ok":1}'], remote=True), FakeProvider(['{"ok":2}'])
+    provider = FallbackProvider(primary, fallback)
+
+    assert provider.is_remote
+    with pytest.raises(PrivacyError):
+        provider.complete_json(_request(carries=frozenset({SemanticType.PHONE_ALTERNATE})))
+    assert primary.requests == [] and fallback.requests == []
 
 
 # --- fake provider ----------------------------------------------------------------------------

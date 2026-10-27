@@ -53,7 +53,8 @@ human (about 10 minutes). The final teach-back comes before the README is writte
   `passport_number`, `voter_id`) and of phone types (`phone_mobile`, `phone_alternate`) are never
   sent to a remote LLM provider. Free-text answer parsing may send non-sensitive free text (such
   as an address); the README's privacy section says so. `GroqProvider` is used only if Groq's
-  free tier needs no card or payment; Ollama stays the local default.
+  free tier needs no card or payment (it needed none, P3-D7). Since M2, understanding uses Groq
+  when `GROQ_API_KEY` is set and local Ollama otherwise (human decision, 2026-10-27, P4-D1).
 - **Live demo:**
   - synthetic forms only, with a visible banner saying so;
   - the 24 h expiry applies to everything in the demo;
@@ -239,27 +240,38 @@ Teach-back
 Goal: known values fill themselves; unknown ones become a few questions; everything is validated.
 
 Human tasks
-- [ ] Check 3 synthetic personas in `eval/personas/` (format-valid fake IDs), drafted by Claude
-      Code.
+- Waived (human decision, 2026-10-27, P4-D3): the 3 synthetic personas in `eval/personas/`
+  (format-valid fake IDs) are drafted by Claude Code and not checked by the human.
 
 Deliverables
 - `vault/`: Fernet encryption, profile read/update service, masking, sensitive opt-in.
+- Values of the sensitive and phone types are encrypted field by field (Fernet, the vault key)
+  in stored IR versions; the rest of the IR stays plain (human decision, 2026-10-27, P4-D5).
 - Decide how audit events without a document (profile changes) are stored; add a migration if needed.
-- `passes/match.py` including derived values (full name, age, today's date).
+- `passes/match.py` including derived values (full name, age, today's date), with a
+  precision-first fill policy: only confident fillable types are filled, the rest stay empty and
+  are asked (P4-D2).
+- Understanding defaults to Groq `openai/gpt-oss-120b` when `GROQ_API_KEY` is set, with Ollama
+  `qwen3:8b` as the fallback (human decision, 2026-10-27, P4-D1).
 - `validators/` per SPEC §6.6 including `verhoeff.py`; `passes/validate.py`; `passes/fit.py`.
 - `passes/questions.py` (groups + templates) and `passes/answers.py` (code parsing +
   LLM parsing of free-text groups with schema validation).
 - Endpoints: `/questions`, `/answers`, `/profile`.
 - Web: questions screen; profile page with masked sensitive fields and per-field opt-in.
-- Eval: fill correctness with personas, validator catch rate + false-reject rate, questions per form.
+- Eval: fill precision (key metric: of the fields filled, the share with the right type; target
+  ≥ 85 % on dev, P4-D2) with fill coverage, fill correctness with personas, validator catch rate
+  + false-reject rate, questions per form.
 
 Acceptance
-- [ ] Verhoeff and all validators pass published/known test vectors; invalid inputs file is
+- [x] Verhoeff and all validators pass published/known test vectors; invalid inputs file is
       rejected at the expected rate; zero false rejects on persona values.
-- [ ] With a full persona in the vault, a dev form needs only questions for fields the persona
-      lacks (checked in an integration test).
-- [ ] Sensitive values never appear in logs (a test asserts this on captured logs).
-- [ ] Eval report updated; baseline updated only if metrics did not drop.
+- [x] With a full persona in the vault, a form asks only for fields the persona lacks or the
+      fill policy is not confident about (integration test on a synthetic fixture form; dev
+      forms in the questions-per-form eval; human decision, 2026-10-27, P4-D4).
+- [x] Stored IR versions hold no plain value of a sensitive or phone type (a test reads the
+      database row).
+- [x] Sensitive values never appear in logs (a test asserts this on captured logs).
+- [x] Eval report updated; baseline updated only if metrics did not drop.
 
 Teach-back
 1. Why is validation deterministic code and not the LLM?
