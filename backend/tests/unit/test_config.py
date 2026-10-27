@@ -5,7 +5,9 @@ from pydantic import ValidationError
 
 from app.config import DatabaseSettings, Settings
 from app.llm.factory import provider_from_settings
+from app.llm.fallback import FallbackProvider
 from app.llm.groq import GroqProvider
+from app.llm.ollama import OllamaProvider
 
 VALID_SECRET = "a" * 64
 
@@ -97,16 +99,48 @@ def test_groq_provider_takes_its_key_from_the_environment_and_hides_it(
     base_env: pytest.MonkeyPatch,
 ) -> None:
     base_env.setenv("LLM_PROVIDER", "groq")
-    base_env.setenv("LLM_MODEL", "openai/gpt-oss-120b")
+    base_env.setenv("GROQ_MODEL", "openai/gpt-oss-20b")
     base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
 
     settings = Settings(_env_file=None)
     provider = provider_from_settings(settings)
 
     assert isinstance(provider, GroqProvider) and provider.is_remote
-    assert provider.model == "openai/gpt-oss-120b"
+    assert provider.model == "openai/gpt-oss-20b"
     assert "gsk_test_not_a_real_key" not in repr(settings)
 
 
 def test_groq_key_is_optional(base_env: pytest.MonkeyPatch) -> None:
     assert Settings(_env_file=None).groq_api_key is None
+
+
+@pytest.mark.parametrize("key", [None, ""])
+def test_auto_without_a_groq_key_uses_local_ollama(
+    base_env: pytest.MonkeyPatch, key: str | None
+) -> None:
+    if key is not None:
+        base_env.setenv("GROQ_API_KEY", key)
+
+    provider = provider_from_settings(Settings(_env_file=None))
+
+    assert isinstance(provider, OllamaProvider) and not provider.is_remote
+    assert provider.model == "qwen3:8b"
+
+
+def test_auto_with_a_groq_key_uses_groq_then_ollama(base_env: pytest.MonkeyPatch) -> None:
+    """Decision P4-D1: Groq gpt-oss-120b by default, local Ollama as the fallback."""
+    base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
+
+    provider = provider_from_settings(Settings(_env_file=None))
+
+    assert isinstance(provider, FallbackProvider)
+    assert isinstance(provider.primary, GroqProvider)
+    assert provider.primary.model == "openai/gpt-oss-120b"
+    assert isinstance(provider.fallback, OllamaProvider)
+
+
+def test_provider_none_runs_rules_only(base_env: pytest.MonkeyPatch) -> None:
+    base_env.setenv("LLM_PROVIDER", "none")
+    base_env.setenv("GROQ_API_KEY", "gsk_test_not_a_real_key")
+
+    assert provider_from_settings(Settings(_env_file=None)) is None

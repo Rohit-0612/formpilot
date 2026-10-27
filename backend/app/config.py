@@ -76,11 +76,13 @@ class Settings(DatabaseSettings, QueueSettings, GroqSettings):
     # Background jobs
     job_timeout_seconds: int = Field(default=300, gt=0)
 
-    # Field understanding (Phase 3): "none" runs the rule matcher only
-    llm_provider: Literal["none", "ollama", "groq"] = "none"
+    # Field understanding: "auto" uses Groq when GROQ_API_KEY is set, with Ollama as the fallback,
+    # else Ollama (decision P4-D1); "none" runs the rule matcher only
+    llm_provider: Literal["auto", "none", "ollama", "groq"] = "auto"
     ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen3:8b"
     groq_base_url: str = "https://api.groq.com/openai/v1"
-    llm_model: str = "qwen3:8b"
+    groq_model: str = "openai/gpt-oss-120b"
     llm_timeout_seconds: float = Field(default=300.0, gt=0)
     # Fields whose semantic confidence is below this get status NEEDS_REVIEW (SPEC §6.2)
     understand_review_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
