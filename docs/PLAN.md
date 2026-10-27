@@ -235,7 +235,7 @@ Teach-back
 
 ---
 
-## Phase 4 — Vault, matching, questions, answers, validation, fit  ← CURRENT
+## Phase 4 — Vault, matching, questions, answers, validation, fit
 
 Goal: known values fill themselves; unknown ones become a few questions; everything is validated.
 
@@ -277,11 +277,11 @@ Teach-back
 1. Why is validation deterministic code and not the LLM?
 2. What does the vault encryption protect against, and what does it not?
 
-**Gate 4:** — [ ] passed
+**Gate 4:** — [x] passed (the human's decision, 2026-10-27)
 
 ---
 
-## Phase 5 — Review UI and rendering
+## Phase 5 — Review UI and rendering  ← CURRENT
 
 Goal: the full user journey for flat (text-layer) PDFs.
 
