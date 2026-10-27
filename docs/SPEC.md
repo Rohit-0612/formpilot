@@ -139,6 +139,8 @@ class ValueSource(str, Enum):
 class FieldStatus(str, Enum):
     DETECTED = "detected"; FILLED = "filled"; NEEDS_INPUT = "needs_input"
     NEEDS_REVIEW = "needs_review"; CONFIRMED = "confirmed"; SKIPPED = "skipped"
+    SUGGESTED = "suggested"       # prefilled, not trusted by the fill policy: rendered only
+                                  # after an explicit confirm (Phase 5, P5-D1)
 
 class ValidationResult(BaseModel):
     validator: str                # e.g. "pan_format", "fits_box"
@@ -163,6 +165,8 @@ class Field(BaseModel):
     status: FieldStatus = FieldStatus.DETECTED
     no_fill_reason: Literal["office_use", "signature"] | None = None  # never filled (P3-D1)
     font_size: float | None = None  # set by the fit pass (§6.7), used by the renderer
+    uppercase: bool = False       # "(in capital letters)" hint: written upper-case (Phase 5)
+    question_text: str | None = None  # English question from the understanding call (P5-D6)
 
 class TraceEvent(BaseModel):
     pass_name: str; field_id: str | None; change: str; at: datetime

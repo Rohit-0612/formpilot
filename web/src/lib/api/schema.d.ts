@@ -356,6 +356,13 @@ export interface components {
             no_fill_reason?: ("office_use" | "signature") | null;
             /** Font Size */
             font_size?: number | null;
+            /**
+             * Uppercase
+             * @default false
+             */
+            uppercase: boolean;
+            /** Question Text */
+            question_text?: string | null;
         };
         /**
          * FieldKind
@@ -366,7 +373,7 @@ export interface components {
          * FieldStatus
          * @enum {string}
          */
-        FieldStatus: "detected" | "filled" | "needs_input" | "needs_review" | "confirmed" | "skipped";
+        FieldStatus: "detected" | "filled" | "needs_input" | "needs_review" | "confirmed" | "skipped" | "suggested";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */

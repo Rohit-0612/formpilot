@@ -969,6 +969,24 @@
               }
             ],
             "title": "Font Size"
+          },
+          "uppercase": {
+            "type": "boolean",
+            "title": "Uppercase",
+            "default": false
+          },
+          "question_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Text"
           }
         },
         "additionalProperties": false,
@@ -1004,7 +1022,8 @@
           "needs_input",
           "needs_review",
           "confirmed",
-          "skipped"
+          "skipped",
+          "suggested"
         ],
         "title": "FieldStatus"
       },

@@ -116,6 +116,8 @@ def test_field_defaults() -> None:
     assert field.options == []
     assert field.validations == []
     assert field.no_fill_reason is None
+    assert field.uppercase is False
+    assert field.question_text is None
 
 
 def test_native_label_and_context_are_required_but_nullable() -> None:
@@ -177,6 +179,9 @@ def test_text_layer_values() -> None:
         {"semantic_type": "shoe_size"},
         {"no_fill_reason": "too_hard"},
         {"id": ""},
+        {"question_text": ""},
+        {"question_text": "x" * 201},
+        {"status": "maybe"},
     ],
 )
 def test_field_rejects_invalid_values(overrides: dict[str, Any]) -> None:
@@ -201,6 +206,28 @@ def test_ir_stored_before_no_fill_reason_still_loads() -> None:
 
     assert restored.schema_version == 1
     assert all(field.no_fill_reason is None for field in restored.fields)
+
+
+def test_phase_5_additions_round_trip() -> None:
+    field = _field(
+        status=FieldStatus.SUGGESTED, uppercase=True, question_text="What is your father's name?"
+    )
+    restored = FormIR.model_validate_json(_ir(fields=[field]).model_dump_json()).fields[0]
+
+    assert restored.status is FieldStatus.SUGGESTED
+    assert restored.uppercase is True
+    assert restored.question_text == "What is your father's name?"
+
+
+def test_ir_stored_before_phase_5_still_loads() -> None:
+    """The Phase 5 additions keep schema_version 1: older stored IRs load with the defaults."""
+    data = _full_ir().model_dump(mode="json")
+    for field in data["fields"]:
+        del field["uppercase"], field["question_text"]
+
+    restored = FormIR.model_validate(data)
+
+    assert all(not f.uppercase and f.question_text is None for f in restored.fields)
 
 
 def test_trace_event_requires_timezone() -> None:

@@ -61,6 +61,9 @@ class FieldStatus(StrEnum):
     NEEDS_REVIEW = "needs_review"
     CONFIRMED = "confirmed"
     SKIPPED = "skipped"
+    # Prefilled from the profile although the fill policy is not confident about the type
+    # (decision P5-D1): highlighted, never confirmed in bulk, rendered only after a confirm.
+    SUGGESTED = "suggested"
 
 
 class BBox(_IRModel):
@@ -128,6 +131,13 @@ class Field(_IRModel):
     no_fill_reason: Literal["office_use", "signature"] | None = None
     # Font size in points chosen by the fit pass (SPEC §6.7); None until the field has a value.
     font_size: float | None = pydantic.Field(default=None, gt=0)
+    # A format hint such as "(in capital letters)" on the field or its page: the value is
+    # written upper-case (fit pass and renderer). Set by the frontend (Phase 5).
+    uppercase: bool = False
+    # A short English question for the field from the understanding call, translated from Hindi
+    # and repaired where the text layer is garbled (decision P5-D6). Printed form text only,
+    # never a value; None for rule-typed fields and without a model.
+    question_text: str | None = pydantic.Field(default=None, min_length=1, max_length=200)
 
 
 class TraceEvent(_IRModel):
