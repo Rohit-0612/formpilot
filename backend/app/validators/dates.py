@@ -25,7 +25,14 @@ _INPUT_FORMATS = (
 
 
 def date_format_for(field: Field) -> str:
-    """The strftime format the field asks for, from the hint in its label or context."""
+    """The strftime format the field asks for: its part of the date for a DD | MM | YYYY box
+    (decision P5-D8), else from the hint in its label or context."""
+    if field.date_part == "day":
+        return "%d"
+    if field.date_part == "month":
+        return "%m"
+    if field.date_part == "year":
+        return "%y" if field.max_chars == 2 else "%Y"
     for text in (field.label_text, field.context_text):
         if not text:
             continue

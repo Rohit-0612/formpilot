@@ -5,7 +5,10 @@ A field is filled only if (decision P4-D2):
 - its semantic type is confident under the policy: matched by a rule, or by the LLM with a
   confidence of at least `min_llm_confidence` (None: the LLM's types never fill);
 - a type in `once_per_form` has not been filled earlier on the form (reading order): a second
-  name or date on a form is often another person's or another date;
+  name or date on a form is often another person's or another date; the day, month and year
+  boxes of one date (`date_part`) count once each;
+- it is in no group (decision P5-D8): a row of a table with several rows is one instance of
+  many (a profile holds one value per type), and a row of tick boxes is asked as one choice;
 - the profile gives a value: stored (`PROFILE`) or computed in code (`DERIVED`: full name from
   its parts, age from the date of birth, today's date).
 
@@ -108,19 +111,23 @@ def policy_for(ctx: PassContext) -> FillPolicy:
     )
 
 
+def _once_key(f: Field) -> tuple[T, str | None]:
+    return f.semantic_type, f.date_part
+
+
 def typed_field_ids(ir: FormIR, policy: FillPolicy) -> set[str]:
-    """The fields whose semantic type the policy trusts: confident, and for a once-per-form type
-    the first such field in reading order. Only these are filled from, or saved to, the profile;
-    the others are asked with the form's own label."""
-    seen: set[T] = set()
+    """The fields whose semantic type the policy trusts: confident, in no group, and for a
+    once-per-form type the first such field (or date part) in reading order. Only these are
+    filled from, or saved to, the profile; the others are asked with the form's own label."""
+    seen: set[tuple[T, str | None]] = set()
     typed: set[str] = set()
     for f in ir.fields:
-        if f.no_fill_reason is not None or not policy.confident(f):
+        if f.no_fill_reason is not None or f.group_id is not None or not policy.confident(f):
             continue
         if f.semantic_type in policy.once_per_form:
-            if f.semantic_type in seen:
+            if _once_key(f) in seen:
                 continue
-            seen.add(f.semantic_type)
+            seen.add(_once_key(f))
         typed.add(f.id)
     return typed
 
@@ -134,17 +141,19 @@ def suggested_field_ids(
     if floor is None:
         return set()
     typed = typed_field_ids(ir, policy) if typed is None else typed
-    seen = {f.semantic_type for f in ir.fields if f.id in typed}
+    seen = {_once_key(f) for f in ir.fields if f.id in typed}
     suggested: set[str] = set()
     for f in ir.fields:
         if f.id in typed or f.no_fill_reason is not None or f.semantic_method != "llm":
             continue
+        if f.group_id is not None:
+            continue
         if f.semantic_confidence < floor or f.semantic_type in (T.OTHER, T.UNKNOWN):
             continue
         if f.semantic_type in policy.once_per_form:
-            if f.semantic_type in seen:
+            if _once_key(f) in seen:
                 continue
-            seen.add(f.semantic_type)
+            seen.add(_once_key(f))
         suggested.add(f.id)
     return suggested
 

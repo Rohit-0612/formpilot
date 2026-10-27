@@ -10,7 +10,9 @@
   sensitive and phone types), and text that contains an identifier or a phone number is never
   sent: the user is asked to answer the parts one by one instead.
 - Answers to untyped (label) questions are written as typed, a date reformatted to the form's
-  format. They are never saved to the profile.
+  format (a DD | MM | YYYY box gets its part). They are never saved to the profile.
+- A row of tick boxes asked as one choice (decision P5-D8): the chosen box is ticked, the others
+  are answered "no".
 
 Problems (an unknown question, a missing value, an unreadable free text) are recorded in the
 trace without values; those fields stay NEEDS_INPUT and are asked again.
@@ -135,6 +137,11 @@ def _label_value(f: Field, part: QuestionPart, raw: str) -> str:
     return text
 
 
+def _ticks_one(part: QuestionPart) -> bool:
+    """A choice between the tick boxes of one row: each choice is a box's field id."""
+    return part.input is InputKind.CHOICE and {c.value for c in part.choices} == set(part.field_ids)
+
+
 def _yes_no_value(f: Field, raw: str) -> str | None:
     if raw.strip().casefold() != YES:
         return None
@@ -193,7 +200,10 @@ def run(
             answered = True
             for field_id in part.field_ids:
                 f = ir_fields[field_id]
-                if part.input is InputKind.YES_NO:
+                if _ticks_one(part):
+                    ticked = field_id == raw.strip()
+                    values[field_id] = (_yes_no_value(f, YES) if ticked else None, source)
+                elif part.input is InputKind.YES_NO:
                     values[field_id] = (_yes_no_value(f, raw), source)
                 elif part.semantic_type is None:
                     values[field_id] = (_label_value(f, part, raw), source)

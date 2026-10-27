@@ -12,6 +12,11 @@ Deterministic. Only fields with status NEEDS_INPUT are asked, in reading order:
   under the same section heading of a page are asked together in one card (`group` "section",
   at most MAX_SECTION_PARTS parts): sections are also how a form groups one person's details.
 - Checkbox, radio and choice fields become multiple-choice or yes/no questions.
+- Grouped fields (decision P5-D8, `FormIR.groups`): the tick boxes of one row are one choice
+  question (`group` "choices"; a choice's value is the id of the box to tick); the entries of
+  one row of a table are one card (`group` "table_row") titled by the table's heading and the
+  row, one part per column. They are never typed questions: a row is one instance of many, so
+  its answers are not saved to the profile.
 
 Readable questions (decision P5-D6): the main text of a question about the form's own text is
 the English question from the understanding call (`Field.question_text`); without it, a
@@ -26,7 +31,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from app.ir.models import Field, FieldKind, FieldStatus, FormIR
+from app.ir.models import Field, FieldGroup, FieldKind, FieldStatus, FormIR
 from app.ir.phrases import readable_english
 from app.ir.semantic_types import PHONE_TYPES, SEMANTIC_TYPES, SENSITIVE_TYPES
 from app.ir.semantic_types import SemanticType as T
@@ -42,7 +47,7 @@ class InputKind(StrEnum):
 
 
 class Choice(BaseModel):
-    value: str  # written into the PDF
+    value: str  # written into the PDF; in a row of tick boxes, the id of the box to tick
     label: str
 
 
@@ -65,7 +70,7 @@ class Question(BaseModel):
     id: str
     prompt: str  # English, never Hindi or garbled text (P5-D6)
     form_text: str | None = None  # the form's own text behind the prompt, if not in it
-    group: str | None  # e.g. "current_address", "section"; None for a single question
+    group: str | None  # e.g. "current_address", "section", "choices", "table_row"; None: single
     parts: list[QuestionPart]
     free_text: bool = False  # the group may be answered in one line (parsed by the LLM)
     can_save: bool = False  # answers may be saved to the profile
@@ -115,6 +120,9 @@ _TYPE_ORDER = {t: i for i, t in enumerate(T)}
 MAX_SECTION_PARTS = 8
 HEADING_MAX_LENGTH = 80  # a longer "heading" is an instruction, not a section title
 SECTION = "section"
+CHOICES = "choices"
+TABLE_ROW = "table_row"
+DASH = " \u2013 "
 
 
 def _group_of(t: T) -> tuple[str, str] | None:
@@ -201,6 +209,62 @@ def _typed_prompt(t: T, f: Field, kind: InputKind) -> str:
     return _about(f, kind)
 
 
+def _title(text: str | None) -> str | None:
+    """Text fit to be a card's title: readable English, not too long."""
+    if text is None or not readable_english(text) or len(text) > HEADING_MAX_LENGTH:
+        return None
+    return text.strip()
+
+
+def _choice_question(group: FieldGroup, f: Field) -> Question:
+    """The tick boxes of one row as one choice (P5-D8): ticking one leaves the others empty."""
+    label = _title(group.label)
+    if f.question_text:
+        prompt = f.question_text
+    elif label:
+        prompt = f"Which applies to you for “{label}”?"
+    else:
+        prompt = f"Which box do you tick in the row of {_place(f)}?"
+    part = QuestionPart(
+        field_ids=[], semantic_type=None, label=label or "Choose one",
+        form_label=_not_in(group.label, label or ""), input=InputKind.CHOICE,
+    )  # fmt: skip
+    return Question(
+        id=f"q_grp_{f.id}", prompt=prompt, form_text=_not_in(group.label, prompt),
+        group=CHOICES, parts=[part],
+    )  # fmt: skip
+
+
+def _row_question(group: FieldGroup, f: Field) -> Question:
+    """The entries of one table row as one card (P5-D8): "12. Previous Education - Class X",
+    joined by an en dash."""
+    heading, row = _title(f.context_text), _title(group.label)
+    if heading and row:
+        prompt = f"{heading}{DASH}{row}"
+    else:
+        prompt = row or heading or f"One row of the table on page {f.bbox.page + 1}"
+    printed = DASH.join(t for t in (f.context_text, group.label) if t)
+    return Question(
+        id=f"q_row_{f.id}", prompt=prompt, form_text=_not_in(printed or None, prompt),
+        group=TABLE_ROW, parts=[],
+    )  # fmt: skip
+
+
+def _add_member(question: Question, f: Field) -> None:
+    if question.group == CHOICES:
+        part = question.parts[0]
+        part.field_ids.append(f.id)
+        part.choices.append(Choice(value=f.id, label=f.label_text or _place(f).capitalize()))
+        return
+    kind, _ = _input(f, f.semantic_type if f.semantic_type in _DATE_TYPES else None)
+    label = _english(f)
+    part = QuestionPart(
+        field_ids=[f.id], semantic_type=None, label=label,
+        form_label=_not_in(_printed(f), label), input=kind,
+    )  # fmt: skip
+    question.parts.append(part)
+
+
 def _sections(questions: list[Question], fields: dict[str, Field]) -> list[Question]:
     """Untyped single-field questions under the same heading of a page become one card each
     MAX_SECTION_PARTS parts, in the place of the first one (P5-D6, "section")."""
@@ -249,10 +313,19 @@ def plan(ir: FormIR, policy: FillPolicy, *, sections: bool = True) -> list[Quest
     asked = [
         f for f in ir.fields if f.status is FieldStatus.NEEDS_INPUT and f.no_fill_reason is None
     ]
+    field_groups = {g.id: g for g in ir.groups}
     groups: dict[str, Question] = {}
     by_type: dict[T, QuestionPart] = {}
     questions: list[Question] = []
     for f in asked:
+        group = field_groups.get(f.group_id) if f.group_id is not None else None
+        if group is not None:
+            if group.id not in groups:
+                make = _choice_question if group.kind == CHOICES else _row_question
+                groups[group.id] = make(group, f)
+                questions.append(groups[group.id])
+            _add_member(groups[group.id], f)
+            continue
         if f.id not in typed:
             kind, choices = _input(f, f.semantic_type if f.semantic_type in _DATE_TYPES else None)
             prompt, label = _about(f, kind), _english(f)
@@ -307,6 +380,8 @@ def plan(ir: FormIR, policy: FillPolicy, *, sections: bool = True) -> list[Quest
             questions.append(groups[name])
         groups[name].parts.append(part)
     for question in groups.values():
+        if question.group in (CHOICES, TABLE_ROW):
+            continue
         question.parts.sort(key=lambda p: _TYPE_ORDER[p.semantic_type])  # type: ignore[index]
         question.free_text = question.group in _FREE_TEXT_GROUPS and not any(
             p.semantic_type in _NEVER_FREE_TEXT for p in question.parts

@@ -7,6 +7,7 @@ from typing import Literal
 from app.ir.models import (
     BBox,
     Field,
+    FieldGroup,
     FieldKind,
     FieldStatus,
     FormIR,
@@ -168,3 +169,35 @@ def test_the_default_policy_is_the_one_chosen_on_dev() -> None:
     out = match.run(_ir(*fields), ctx)
 
     assert [f.value for f in out.fields] == ["Asha Verma", None, None, "ABCDE1234F"]
+
+
+def test_once_per_form_counts_each_part_of_a_date_once() -> None:
+    """P5-D8: DD | MM | YYYY of the first date of birth are filled, a second date is not."""
+    policy = FillPolicy(once_per_form=frozenset({T.DATE_OF_BIRTH}))
+    parts = [
+        _f(i, T.DATE_OF_BIRTH, date_part=part, max_chars=width)
+        for i, (part, width) in enumerate(
+            [("day", 2), ("month", 2), ("year", 4), ("day", 2), ("month", 2), ("year", 4)]
+        )
+    ]
+
+    out = match.run(_ir(*parts), CTX, policy)
+
+    assert [f.value for f in out.fields] == ["05", "03", "1999", None, None, None]
+
+
+def test_grouped_fields_are_never_filled_or_suggested() -> None:
+    """P5-D8: a table row is one instance of many; a row of tick boxes is asked as a choice."""
+    ir = FormIR(
+        document_id=uuid.uuid4(),
+        source_kind=SourceKind.FLAT_TEXT,
+        pages=[PageInfo(width=595, height=842, text_layer=TextLayer.OK)],
+        fields=[_f(0, T.FULL_NAME, group_id="p0_g000"), _f(1, T.FULL_NAME, "llm", 0.97)],
+        groups=[FieldGroup(id="p0_g000", kind="table_row", label="Class X")],
+    )
+    ctx = PassContext(clock=lambda: NOW, profile=PROFILE, suggest_min_confidence=0.95)
+
+    out = match.run(ir, ctx, FillPolicy())
+
+    assert out.fields[0].value is None and out.fields[0].status is FieldStatus.NEEDS_INPUT
+    assert out.fields[1].status is FieldStatus.SUGGESTED  # the same type outside a group
