@@ -335,7 +335,7 @@ export interface components {
          * JobType
          * @enum {string}
          */
-        JobType: "analyze" | "render" | "ping";
+        JobType: "analyze" | "render" | "ping" | "answers";
         /** LoginRequest */
         LoginRequest: {
             /**

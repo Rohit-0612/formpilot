@@ -881,7 +881,8 @@
         "enum": [
           "analyze",
           "render",
-          "ping"
+          "ping",
+          "answers"
         ],
         "title": "JobType"
       },
