@@ -31,7 +31,10 @@ PROFILE = {
     "gender": "Female",
     "pan": "ABCDE1234F",
 }
-CTX = PassContext(clock=lambda: NOW, profile=PROFILE)
+# A looser policy than the default, so each test isolates one rule.
+CTX = PassContext(
+    clock=lambda: NOW, profile=PROFILE, fill_min_confidence=0.95, fill_once_per_form=False
+)
 
 
 def _f(
@@ -150,3 +153,18 @@ def test_never_fill_fields_and_existing_values_are_left_alone() -> None:
     out = match.run(_ir(signature, answered), CTX)
 
     assert out.fields == [signature, answered]
+
+
+def test_the_default_policy_is_the_one_chosen_on_dev() -> None:
+    """LLM confidence >= 0.99, person and date types once per form (P4-D2 tuning session)."""
+    ctx = PassContext(clock=lambda: NOW, profile=PROFILE)
+    fields = [
+        _f(0, T.FULL_NAME, "llm", 0.99),
+        _f(1, T.FULL_NAME, "llm", 1.0),  # a second name on the form: asked
+        _f(2, T.PHONE_MOBILE, "llm", 0.98),  # not sure enough
+        _f(3, T.PAN, "llm", 0.99),
+    ]
+
+    out = match.run(_ir(*fields), ctx)
+
+    assert [f.value for f in out.fields] == ["Asha Verma", None, None, "ABCDE1234F"]

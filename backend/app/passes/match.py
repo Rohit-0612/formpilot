@@ -36,7 +36,7 @@ _OPTION_KINDS = frozenset({FieldKind.CHECKBOX, FieldKind.RADIO, FieldKind.CHOICE
 
 @dataclass(frozen=True)
 class FillPolicy:
-    min_llm_confidence: float | None = 0.95
+    min_llm_confidence: float | None = 0.99
     once_per_form: frozenset[T] = field(default_factory=frozenset)
 
     def confident(self, f: Field) -> bool:
@@ -96,7 +96,10 @@ def resolve(f: Field, profile: Mapping[str, str], today: date) -> tuple[str, Val
 
 
 def run(ir: FormIR, ctx: PassContext, policy: FillPolicy | None = None) -> FormIR:
-    policy = policy or FillPolicy(min_llm_confidence=ctx.fill_min_confidence)
+    policy = policy or FillPolicy(
+        min_llm_confidence=ctx.fill_min_confidence,
+        once_per_form=PERSON_AND_DATE_TYPES if ctx.fill_once_per_form else frozenset(),
+    )
     today = ctx.today()
     filled_types: set[T] = set()
     trace: list[TraceEvent] = []

@@ -93,6 +93,15 @@ class Settings(DatabaseSettings, QueueSettings, GroqSettings):
     # Fields whose semantic confidence is below this get status NEEDS_REVIEW (SPEC §6.2)
     understand_review_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
 
+    # Fill policy (decision P4-D2, chosen on dev in the Phase 4 tuning session): an LLM-typed
+    # field is filled from the profile only at this confidence; person and date types at most
+    # once per form
+    fill_min_confidence: float = Field(default=0.99, ge=0.0, le=1.0)
+    fill_once_per_form: bool = True
+    # Fit pass (SPEC §6.7), points
+    fit_font_size: float = Field(default=10.0, gt=0)
+    fit_min_font_size: float = Field(default=6.0, gt=0)
+
     @field_validator("jwt_secret")
     @classmethod
     def _jwt_secret_strong_enough(cls, value: SecretStr) -> SecretStr:

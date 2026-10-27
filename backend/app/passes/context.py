@@ -25,8 +25,9 @@ class PassContext:
     deadline: datetime | None = None
     # Phase 4: the user's profile (profile key -> value, decrypted), read by the match pass.
     profile: Mapping[str, str] = field(default_factory=dict)
-    # The fill policy's LLM confidence floor (decision P4-D2).
-    fill_min_confidence: float = 0.95
+    # The fill policy (decision P4-D2): LLM confidence floor, person and date types once per form.
+    fill_min_confidence: float = 0.99
+    fill_once_per_form: bool = True
     # The fit pass (SPEC §6.7): default and smallest font size, in points.
     fit_font_size: float = 10.0
     fit_min_font_size: float = 6.0
