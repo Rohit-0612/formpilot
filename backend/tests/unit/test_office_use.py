@@ -20,7 +20,7 @@ from app.ir.models import (
     SourceKind,
     TextLayer,
 )
-from app.ir.phrases import mentions_office_use
+from app.ir.phrases import filled_by_others, mentions_office_use
 from app.passes import understand
 from app.passes.context import PassContext
 from tests.fixtures import pdfs
@@ -106,3 +106,34 @@ def test_a_page_frame_is_not_an_office_use_box() -> None:
         ir = flat.run(doc, detect(doc), uuid.uuid4(), NOW)
 
     assert ir.fields and all(f.no_fill_reason is None for f in ir.fields if f.label_text == "Name")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(To be filled by BPM/SPM or PLI-CPC Official and Handed Over to Insurant or as the case",
+        "(to be filled by Admission Cell)",
+        "To be filled in by the Bank",
+        "To be completed by the Postmaster",
+        "to be filled up by the issuing authority",
+    ],
+)
+def test_parts_for_someone_other_than_the_applicant(text: str) -> None:
+    """P5-D15: who fills the part is named after "by", and the applicant is not among them."""
+    assert filled_by_others(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(to be completed by the Claimant & CBS Post Office)",  # the applicant fills it too
+        "(To be filled in by the person legally entitled to the policy moneys)",
+        "To be filled by the applicant",
+        "Roll No. of the student",
+        "The office will be closed",  # no "to be filled by"
+        "Fields to be filled are marked *",  # no "by"
+        None,
+    ],
+)
+def test_parts_the_applicant_fills(text: str | None) -> None:
+    assert not filled_by_others(text)

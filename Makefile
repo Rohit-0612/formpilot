@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval eval-fill eval-validators eval-questions eval-address render-samples
+.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval eval-fill eval-validators eval-questions eval-address render-samples render-check
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -134,3 +134,8 @@ eval-address:
 ## (git-ignored); replays the recorded understanding answers (PROVIDER/MODEL as for eval-fill)
 render-samples:
 	$(EVAL_PY) eval.render_samples $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),)
+
+## Render checks (P5-D11) on the dev forms rendered as by render-samples: characters in their box or
+## comb cell, dates whole, nothing in never-fill fields or office-use areas, ticks only from the user
+render-check:
+	$(EVAL_PY) eval.render_check $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),) $(if $(TAG),--tag $(TAG),)

@@ -101,6 +101,48 @@ def instructs_upper_case(line: str | None) -> bool:
     return asks_upper_case(line) and any(w.startswith(_INSTRUCTION_PREFIXES) for w in words)
 
 
+# Who a part of the form is for (decision P5-D15): "(To be filled by BPM/SPM or PLI-CPC Official
+# ...)" names someone other than the applicant; "(to be completed by the Claimant & CBS Post
+# Office)" names the applicant too, so the applicant fills that part.
+_FILLED_BY = ("to be filled", "to be completed")
+OTHER_ROLES = (
+    "official", "officials", "officer", "office", "bank", "branch", "bpm", "spm", "postmaster",
+    "authority", "authorities", "authorised signatory", "authorized signatory", "admission cell",
+)  # fmt: skip
+APPLICANT_ROLES = (
+    "applicant", "candidate", "student", "claimant", "insurant", "nominee", "customer",
+    "depositor", "account holder", "policyholder", "policy holder", "member", "employee",
+    "parent", "guardian", "person", "investor", "subscriber", "you", "self",
+)  # fmt: skip
+# The words naming who fills a part end here: "... Official and Handed Over to Insurant".
+_AFTER_WHO = frozenset(
+    {"handed", "given", "sent", "submitted", "to", "for", "after", "before", "on", "with", "at"}
+)
+
+
+def _names(words: list[str], roles: tuple[str, ...]) -> bool:
+    text = f" {' '.join(words)} "
+    return any(f" {role} " in text for role in roles)
+
+
+def filled_by_others(text: str | None) -> bool:
+    """The text says a part is to be filled in by someone other than the applicant (an official,
+    an office, the bank, a postmaster, an authority) and does not name the applicant too."""
+    cleaned = clean_text(text or "")
+    for phrase in _FILLED_BY:
+        at = cleaned.find(phrase)
+        if at < 0:
+            continue
+        words = cleaned[at + len(phrase) :].split()
+        if "by" not in words[:3]:
+            continue
+        who = words[words.index("by") + 1 :]
+        end = next((i for i, w in enumerate(who) if w in _AFTER_WHO), len(who))
+        who = who[:end]
+        return _names(who, OTHER_ROLES) and not _names(who, APPLICANT_ROLES)
+    return False
+
+
 # How a line telling the reader what to do starts (Phase 5): such a line is not a heading.
 _DIRECTIVE_STARTS = ("please ", "kindly ", "note:", "note ", "n.b.", "nb:", "important:")
 MIN_SENTENCE_WORDS = 4
