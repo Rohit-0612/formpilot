@@ -146,6 +146,18 @@ class Field(_IRModel):
     date_part: DatePart | None = None
     # The group the field is answered with (`FormIR.groups`, decision P5-D8), if any.
     group_id: str | None = None
+    # A comb row's cells as drawn, in reading order: one character is printed in each (decision
+    # P5-D14; cells can differ in width). Empty when the form does not draw them (any other
+    # field, an AcroForm comb); `max_chars` cells of equal width are assumed then.
+    cells: list[BBox] = pydantic.Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _cells_match(self) -> Self:
+        if self.cells and len(self.cells) != self.max_chars:
+            raise ValueError("a comb's cells must number max_chars")
+        if any(cell.page != self.bbox.page for cell in self.cells):
+            raise ValueError("a comb's cells must be on its page")
+        return self
 
 
 class FieldGroup(_IRModel):
@@ -184,7 +196,8 @@ class FormIR(_IRModel):
             raise ValueError("field ids must be unique within a document")
         page_count = len(self.pages)
         for field in self.fields:
-            boxes = [field.bbox] + [opt.bbox for opt in field.options if opt.bbox is not None]
+            boxes = [field.bbox, *field.cells]
+            boxes += [opt.bbox for opt in field.options if opt.bbox is not None]
             if any(box.page >= page_count for box in boxes):
                 raise ValueError(f"field {field.id} refers to a page that does not exist")
         group_ids = [group.id for group in self.groups]

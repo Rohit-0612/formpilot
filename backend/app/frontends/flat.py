@@ -175,6 +175,7 @@ class _Candidate:
     source: str  # human-readable, for the trace
     writing_line: float | None = None  # line-type entries only
     max_chars: int | None = None
+    cells: list[Rect] = field(default_factory=list)  # a comb's cells, left to right (P5-D14)
     label: str | None = None
     context: str | None = None
     validations: list[ValidationResult] = field(default_factory=list)
@@ -863,12 +864,16 @@ def _close_comb(
         return None
     x0 = run[0][0] if left is None else max(run[0][0], left)
     union = (x0, min(r[1] for r in run), run[-1][2], max(r[3] for r in run))
+    # Each cell spans the row's height; neighbours share the middle of the edge or gap between
+    # them (drawn edges can overlap by a fraction of a point).
+    edges = [x0, *((a[2] + b[0]) / 2 for a, b in pairwise(run)), run[-1][2]]
     comb = _Candidate(
         union,
         FieldKind.TEXT,
         "comb",
         f"comb row ({len(run)} cells)",
         max_chars=len(run),
+        cells=[(a, union[1], b, union[3]) for a, b in pairwise(edges)],
     )
     combs.append(comb)
     return comb
@@ -1797,6 +1802,7 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     context_text=cand.context,
                     bbox=bbox,
                     max_chars=cand.max_chars,
+                    cells=[_displayed(cell, page, page_no) for cell in cand.cells],
                     validations=cand.validations,
                     no_fill_reason=cand.no_fill_reason,
                     uppercase=cand.case_hint is not None,

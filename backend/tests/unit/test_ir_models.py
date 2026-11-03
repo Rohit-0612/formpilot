@@ -1,6 +1,7 @@
 import math
 import uuid
 from datetime import UTC, datetime
+from itertools import pairwise
 from typing import Any
 
 import pytest
@@ -250,6 +251,35 @@ def test_date_parts_and_groups_round_trip() -> None:
     assert [f.date_part for f in restored.fields] == ["day", "year"]
     assert restored.fields[1].group_id == "p0_g000"
     assert restored.groups[0].kind == "table_row" and restored.groups[0].label == "Class X"
+
+
+def _cells(widths: list[float], page: int = 0) -> list[BBox]:
+    edges = [10.0]
+    for width in widths:
+        edges.append(edges[-1] + width)
+    return [_bbox(page=page, x0=a, x1=b) for a, b in pairwise(edges)]
+
+
+def test_comb_cells_round_trip() -> None:
+    """P5-D14: a comb keeps its drawn cells; fields without them load with none."""
+    ir = _ir(fields=[_field(max_chars=3, cells=_cells([14, 9, 20])), _field("p0_f001")])
+
+    restored = FormIR.model_validate_json(ir.model_dump_json())
+
+    assert [c.width for c in restored.fields[0].cells] == [14, 9, 20]
+    assert restored.fields[1].cells == []
+
+
+def test_cells_must_number_max_chars() -> None:
+    with pytest.raises(ValidationError, match="must number max_chars"):
+        _field(max_chars=4, cells=_cells([14, 9, 20]))
+    with pytest.raises(ValidationError, match="must number max_chars"):
+        _field(cells=_cells([14, 9, 20]))
+
+
+def test_cells_must_be_on_the_fields_page() -> None:
+    with pytest.raises(ValidationError, match="on its page"):
+        _field(max_chars=2, cells=_cells([14, 9], page=1))
 
 
 def test_field_in_a_missing_group_is_rejected() -> None:

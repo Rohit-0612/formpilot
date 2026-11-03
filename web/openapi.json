@@ -1298,6 +1298,13 @@
               }
             ],
             "title": "Group Id"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/BBox"
+            },
+            "type": "array",
+            "title": "Cells"
           }
         },
         "additionalProperties": false,

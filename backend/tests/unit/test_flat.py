@@ -453,6 +453,49 @@ def test_colon_blank_running_into_a_drawn_entry_is_skipped() -> None:
     assert (comb.max_chars, comb.label_text) == (10, "1.Name*")
 
 
+def _uneven_comb(page: pymupdf.Page, widths: list[float], x: float = 170) -> None:
+    _text(page, 72, 140, "11. AADHAR No.")
+    for width in widths:
+        page.draw_rect(pymupdf.Rect(x, 128, x + width, 144), color=(0, 0, 0), width=0.5)
+        x += width
+
+
+def test_comb_keeps_its_cells_as_drawn() -> None:
+    """P5-D14: cells of uneven width are kept one by one, so a character goes in its own cell."""
+    widths = [14.0, 14.0, 12.0, 14.0, 16.0, 14.0]
+
+    (comb,) = _run(_pdf(lambda page: _uneven_comb(page, widths))).fields
+
+    assert comb.max_chars == len(widths) == len(comb.cells)
+    assert [round(c.width, 1) for c in comb.cells] == widths
+    assert comb.cells[0].x0 == comb.bbox.x0 and comb.cells[-1].x1 == comb.bbox.x1
+    assert all(c.y0 == comb.bbox.y0 and c.y1 == comb.bbox.y1 for c in comb.cells)
+
+
+def test_comb_cells_on_a_rotated_page_tile_the_field_box() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        page.set_rotation(90)
+        _uneven_comb(page, [14.0, 12.0, 16.0, 14.0])
+
+    (comb,) = _run(_pdf(draw)).fields
+
+    assert len(comb.cells) == 4
+    for cell in comb.cells:
+        assert comb.bbox.x0 - 0.01 <= cell.x0 < cell.x1 <= comb.bbox.x1 + 0.01
+        assert comb.bbox.y0 - 0.01 <= cell.y0 < cell.y1 <= comb.bbox.y1 + 0.01
+    assert sum(c.width * c.height for c in comb.cells) == pytest.approx(
+        comb.bbox.width * comb.bbox.height
+    )
+
+
+def test_fields_other_than_combs_have_no_cells() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "Name:")
+        _line(page, 110, 102, 300)
+
+    assert all(f.cells == [] for f in _run(_pdf(draw)).fields)
+
+
 def test_colon_printed_apart_still_labels_its_blank() -> None:
     def draw(page: pymupdf.Page) -> None:
         _text(page, 72, 100, "Account holder name and the full address of the branch here")

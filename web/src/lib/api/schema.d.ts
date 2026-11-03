@@ -451,6 +451,8 @@ export interface components {
             date_part?: components["schemas"]["DatePart"] | null;
             /** Group Id */
             group_id?: string | null;
+            /** Cells */
+            cells?: components["schemas"]["BBox"][];
         };
         /**
          * FieldEdit
