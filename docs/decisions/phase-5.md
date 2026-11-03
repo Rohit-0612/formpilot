@@ -29,6 +29,7 @@ To be completed at the end of the milestone.
 | **P5-D8** (human, 2026-10-27, after the Sunrise form) Form-layout reading, as general rules: an instruction line is no section heading; entries outside the visible page are dropped; hinted comb parts are labelled by their hints ("FIRST _ NAME" is one part) and a DD / MM / YYYY part gets `Field.date_part`; tables whose header names two or more entry columns, and rows of labelled lines that repeat the same labels, are `table_row` groups (`FormIR.groups`, `Field.group_id`); tick boxes after one label are a `choices` group. **Fill policy change:** a field in a group is never filled or suggested from the profile (a profile holds one value per type; a table row is one instance of many), and is asked row by row (one card per row, never saved); a tick-box row is one choice question | keep the M2 behaviour (one profile value written into every row; a yes/no question per box); a per-row profile (Class X, Class XII…) | On the human's synthetic registration form, the instruction "Please fill in CAPITAL LETTERS only." was the question text of 6 fields, the full date went into a 2-box DD part, and one passing year was filled into several class rows. Dev: detection precision 95.1 % → 95.3 %, recall 92.4 % unchanged (labels v5). Understanding (Groq, `understand_v2`, complete run of 2026-11-01 against the M2 Groq run of P3-D7): accuracy 70.4 % (369/524) → 74.4 % (390/524), fillable accuracy 62.7 % (151/241) → 70.5 % (170/241), precision of predicted fillable types 67.7 % (151/223) → 71.1 % (170/239). Fill, product policy (LLM confidence ≥ 0.99, once per form, full persona): fill precision 86.5 % (64/74) → 88.6 % (70/79), value precision 82.4 % (61/74) → 88.6 % (70/79), coverage 26.6 % → 29.0 %. Two breakdown rows dropped; the human accepted both as known limitations (2026-11-03, below) |
 | **P5-D9** (human, 2026-10-27) Prompt `understand_v3` (types and English questions in one call) is dropped; typing stays on `understand_v2`, and a separate **phrase pass** (prompt `phrase_v1.md`) writes the English questions after match, only for the fields asked about the form's own text | accept v3; tune v3 once; measure the run-to-run variance of v2 first | v3 lowered typing on dev: Groq accuracy 70.4 % (369/524) → 69.5 % (364/524), fill precision 86.5 % (64/74) → 84.4 % (65/77), below the 85 % target; qwen3:8b 64.3 % → 60.9 % (319/524), fillable accuracy 58.1 % → 52.3 % (126/241). One failed Groq batch (#21, page 1) was re-asked in record mode. A separate call keeps typing unchanged and asks the model only about the fields that are asked |
 | **P5-D10** (human, 2026-11-03) The product keeps `FILL_MIN_CONFIDENCE` = **0.99** (once per form). After the P5-D8 fixes the P4-D2 selection rule picks LLM confidence ≥ **0.95**, once per form (dev, Groq, full persona: fill precision 87.4 % (97/111), coverage 40.2 %); that pick is recorded as a known difference between the eval and the product | move the fill threshold to 0.95 (more coverage, 0.95 meets the 85 % target) | 0.95 is the suggestion floor (P5-D1): with the fill threshold also at 0.95 the suggested band would be empty. At 0.99: fill precision 88.6 % (70/79), coverage 29.0 % |
+| **P5-D11** (human, 2026-11-03; changes P5-D2) The human's spot-check of 3 rendered dev PDFs is waived. It is replaced by two checks, each run before and after the render fixes (P5-D12 to P5-D16): (1) a fresh-eyes review by a separate Claude Code agent that has not seen Claude Code's own findings, given the renders and the printed fields per form; its findings are compared with Claude Code's; (2) programmatic render checks (`make render-check`): every printed character inside its field's box or its comb cell, the day / month / year parts of a date printed all or none, nothing printed in a never-fill field or an office-use area, a tick box ticked only from the user's own choice | the human spot-checks 3 (P5-D2) | The human's call, as with P4-D3. Claude Code still inspects all renders as images |
 
 ### Milestone plan (approved)
 
@@ -49,6 +50,9 @@ To be completed at the end of the milestone.
   against the personas, not only types (value precision: repeated rows have no right profile
   value, split dates want their day, month or year). Before the fixes (dev, Groq replay, chosen
   policy): fill precision 86.5 % (64/74), value precision 82.4 % (61/74).
+- **Added for the render fixes (human, 2026-11-03):** the IR addition `Field.cells` (one box per
+  comb cell, so each character is printed in its own cell; P5-D14); `make render-check`
+  (P5-D11).
 - **Also in the plan:** question grouping by section or person (questions per form before and
   after, inputs and cards counted separately); a free-text address parsing eval with record /
   replay; a UX metric (actions to complete a dev form with the full persona, before and after);
@@ -80,6 +84,9 @@ run of 2026-11-01). The rest is completed at the end of the milestone.
 - Commit `8c1b8c5` (office-use fix) says "make test 1081 passed" in its message; the run before
   that commit had **1089** unit tests passing. The message was not amended because the branch
   was already pushed (no history rewrite).
+- Commit `58a5b2e` (the last Groq understanding batches) says the batches are from forms 06, 25
+  and 32; a replay check shows they are from **form 25 (three batches) and form 32 (one)**. Form
+  06's batches were recorded in `51463a8`. Not amended, for the same reason.
 
 ## Notes for the next phase
 
