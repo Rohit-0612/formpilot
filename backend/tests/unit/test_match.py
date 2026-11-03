@@ -216,3 +216,59 @@ def test_grouped_fields_are_never_filled_or_suggested() -> None:
 
     assert out.fields[0].value is None and out.fields[0].status is FieldStatus.NEEDS_INPUT
     assert out.fields[1].status is FieldStatus.SUGGESTED  # the same type outside a group
+
+
+def _date(*parts: tuple[T, str, str, float]) -> list[Field]:
+    """One date in DD | MM | YYYY boxes side by side: (type, part, method, confidence) each."""
+    widths = {"day": 26.0, "month": 26.0, "year": 52.0}
+    fields, x = [], 100.0
+    for i, (t, part, method, confidence) in enumerate(parts):
+        width = widths[part]
+        f = _f(i, t, method, confidence, date_part=part, max_chars=int(width / 13))  # type: ignore[arg-type]
+        box = BBox(page=0, x0=x, y0=100, x1=x + width, y1=113)
+        fields.append(f.model_copy(update={"bbox": box}))
+        x += width
+    return fields
+
+
+def test_a_date_with_a_part_left_empty_is_not_filled_at_all() -> None:
+    """P5-D13 (dev form #03, section F): only the DD part was typed as the date of filling."""
+    parts = _date(
+        (T.DATE_OF_FILLING, "day", "rule", 0.95),
+        (T.OTHER, "month", "llm", 0.7),
+        (T.OTHER, "year", "llm", 0.7),
+    )
+
+    out = match.run(_ir(*parts), CTX)
+
+    assert all(f.value is None and f.status is FieldStatus.NEEDS_INPUT for f in out.fields)
+    assert out.fields[0].value_source is ValueSource.NONE
+    changes = [e.change for e in out.trace if e.field_id == "p0_f000"]
+    assert changes == [
+        "filled date_of_filling (derived)",
+        "not filled: the date's other parts have no value",
+    ]
+
+
+def test_a_date_with_every_part_known_is_filled_whole() -> None:
+    parts = _date(*((T.DATE_OF_BIRTH, p, "rule", 0.95) for p in ("day", "month", "year")))
+
+    out = match.run(_ir(*parts), CTX)
+
+    assert [f.value for f in out.fields] == ["05", "03", "1999"]
+    assert {f.status for f in out.fields} == {FieldStatus.FILLED}
+
+
+def test_a_date_with_one_suggested_part_is_suggested_whole() -> None:
+    """A date is confirmed and printed whole: "confirm all" must not print two of its parts."""
+    parts = _date(
+        (T.DATE_OF_BIRTH, "day", "rule", 0.95),
+        (T.DATE_OF_BIRTH, "month", "llm", 0.96),
+        (T.DATE_OF_BIRTH, "year", "rule", 0.95),
+    )
+    ctx = PassContext(clock=lambda: NOW, profile=PROFILE, suggest_min_confidence=0.95)
+
+    out = match.run(_ir(*parts), ctx)
+
+    assert [f.value for f in out.fields] == ["05", "03", "1999"]
+    assert {f.status for f in out.fields} == {FieldStatus.SUGGESTED}

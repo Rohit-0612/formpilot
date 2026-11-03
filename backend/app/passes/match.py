@@ -11,6 +11,9 @@ A field is filled only if (decision P4-D2):
   boxes of one date (`date_part`) count once each;
 - it is in no group (decision P5-D8): a row of a table with several rows is one instance of
   many (a profile holds one value per type), and a row of tick boxes is asked as one choice;
+- for a date in DD | MM | YYYY boxes (`app.ir.parts.date_groups`), every part gets a value
+  (decision P5-D13): otherwise none is filled and the date is asked; and if one part is only a
+  suggestion, so are the others (a date is confirmed and printed whole);
 - the profile gives a value: stored (`PROFILE`) or computed in code (`DERIVED`: full name from
   its parts, age from the date of birth, today's date).
 
@@ -29,6 +32,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from app.ir.models import Field, FieldKind, FieldStatus, FormIR, Option, TraceEvent, ValueSource
+from app.ir.parts import date_groups
 from app.ir.semantic_types import SEMANTIC_TYPES
 from app.ir.semantic_types import SemanticType as T
 from app.passes.context import PassContext
@@ -192,4 +196,38 @@ def run(ir: FormIR, ctx: PassContext, policy: FillPolicy | None = None) -> FormI
                 at=ctx.clock(),
             )
         )
+    fields = _whole_dates(fields, {f.id for f in ir.fields if f.value is None}, trace, ctx)
     return ir.model_copy(update={"fields": fields, "trace": ir.trace + trace})
+
+
+def _whole_dates(
+    fields: list[Field], set_here: set[str], trace: list[TraceEvent], ctx: PassContext
+) -> list[Field]:
+    """P5-D13: a date's parts are filled all or none, and confirmed together."""
+    by_id = {f.id: f for f in fields}
+    for parts in date_groups(fields):
+        mine = [p for p in parts if p.id in set_here and p.value is not None]
+        if not mine:
+            continue
+        if any(p.value is None for p in parts):
+            for p in mine:
+                by_id[p.id] = p.model_copy(
+                    update={
+                        "value": None,
+                        "value_source": ValueSource.NONE,
+                        "status": FieldStatus.NEEDS_INPUT,
+                    }
+                )
+                change = "not filled: the date's other parts have no value"
+                trace.append(
+                    TraceEvent(pass_name=STAGE, field_id=p.id, change=change, at=ctx.clock())
+                )
+        elif any(p.status is FieldStatus.SUGGESTED for p in mine):
+            for p in mine:
+                if p.status is FieldStatus.FILLED:
+                    by_id[p.id] = p.model_copy(update={"status": FieldStatus.SUGGESTED})
+                    change = "suggested: a part of the same date is a suggestion"
+                    trace.append(
+                        TraceEvent(pass_name=STAGE, field_id=p.id, change=change, at=ctx.clock())
+                    )
+    return [by_id[f.id] for f in fields]
