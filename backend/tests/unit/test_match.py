@@ -23,6 +23,7 @@ from app.ir.semantic_types import SemanticType as T
 from app.passes import match
 from app.passes.context import PassContext
 from app.passes.match import FillPolicy
+from app.services.review import confirm_all
 
 NOW = datetime(2026, 10, 27, 6, 0, tzinfo=UTC)
 PROFILE = {
@@ -272,3 +273,69 @@ def test_a_date_with_one_suggested_part_is_suggested_whole() -> None:
 
     assert [f.value for f in out.fields] == ["05", "03", "1999"]
     assert {f.status for f in out.fields} == {FieldStatus.SUGGESTED}
+
+
+def _name_row(lead: tuple[T, str], *parts: tuple[T, str]) -> list[Field]:
+    """A name in part boxes side by side: the lead (type, label), then (type, hint label) each."""
+    fields, x = [], 72.0
+    for i, (t, label) in enumerate((lead, *parts)):
+        f = _f(i, t, label=label, max_chars=12)
+        box = BBox(page=0, x0=x, y0=370, x1=x + 150, y1=383)
+        fields.append(f.model_copy(update={"bbox": box}))
+        x += 150
+    return fields
+
+
+def _guardian(name: str) -> PassContext:
+    return PassContext(clock=lambda: NOW, profile={**PROFILE, "guardian_name": name})
+
+
+def test_a_guardians_name_is_split_over_the_part_boxes_as_suggestions() -> None:
+    """P5-D16 (dev form #01): never the whole name in the FIRST NAME part, never the applicant's
+    own middle or last name in the guardian's row."""
+    row = _name_row(
+        (T.GUARDIAN_NAME, "9.Name of Guardian"),
+        (T.MIDDLE_NAME, "MIDDLE NAME"),
+        (T.LAST_NAME, "LAST NAME"),
+    )
+
+    out = match.run(_ir(*row), _guardian("Ramesh Verma"))
+
+    assert [f.value for f in out.fields] == ["Ramesh", None, "Verma"]
+    assert [f.status for f in out.fields] == [
+        FieldStatus.SUGGESTED, FieldStatus.NEEDS_INPUT, FieldStatus.SUGGESTED,
+    ]  # fmt: skip
+    confirmed, _ = confirm_all(out, CTX)
+    assert all(f.status is not FieldStatus.CONFIRMED for f in confirmed.fields)
+    assert all("Ramesh" not in e.change and "Verma" not in e.change for e in out.trace)
+
+
+def test_three_words_fill_a_row_with_three_parts() -> None:
+    row = _name_row(
+        (T.GUARDIAN_NAME, "FIRST NAME"), (T.MIDDLE_NAME, "MIDDLE NAME"), (T.LAST_NAME, "SURNAME")
+    )
+    row[0] = row[0].model_copy(update={"label_text": "Name of Guardian"})
+
+    out = match.run(_ir(*row), _guardian("Ramesh Kumar Verma"))
+
+    assert [f.value for f in out.fields] == ["Ramesh", "Kumar", "Verma"]
+
+
+def test_an_unclear_split_leaves_the_parts_empty_and_asks() -> None:
+    row = _name_row((T.GUARDIAN_NAME, "Name of Guardian"), (T.LAST_NAME, "LAST NAME"))
+
+    for name in ("Ramesh Kumar Verma", "Ramesh", "Ramesh Kumar Singh Verma"):
+        out = match.run(_ir(*row), _guardian(name))
+        assert all(f.value is None and f.status is FieldStatus.NEEDS_INPUT for f in out.fields)
+
+
+def test_the_applicants_own_name_parts_are_filled_as_before() -> None:
+    row = _name_row(
+        (T.FIRST_NAME, "FIRST NAME"), (T.MIDDLE_NAME, "MIDDLE NAME"), (T.LAST_NAME, "LAST NAME")
+    )
+    profile = {**PROFILE, "first_name": "Asha", "middle_name": "Kumari", "last_name": "Verma"}
+
+    out = match.run(_ir(*row), PassContext(clock=lambda: NOW, profile=profile))
+
+    assert [f.value for f in out.fields] == ["Asha", "Kumari", "Verma"]
+    assert {f.status for f in out.fields} == {FieldStatus.FILLED}

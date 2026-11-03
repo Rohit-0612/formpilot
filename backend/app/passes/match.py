@@ -14,6 +14,12 @@ A field is filled only if (decision P4-D2):
 - for a date in DD | MM | YYYY boxes (`app.ir.parts.date_groups`), every part gets a value
   (decision P5-D13): otherwise none is filled and the date is asked; and if one part is only a
   suggestion, so are the others (a date is confirmed and printed whole);
+- for a name in FIRST | MIDDLE | LAST boxes (`app.ir.parts.name_groups`) whose parts include a
+  trusted whole-name type (the guardian's, father's, mother's, spouse's or the applicant's own
+  name), the name is split into the parts as suggestions, each confirmed on its own, never the
+  whole name in one part (decision P5-D16): two words are first and last name, three words fill
+  a row with all three parts; any other split is unclear and the parts are asked. Values the row's
+  other parts got for their own types are removed;
 - the profile gives a value: stored (`PROFILE`) or computed in code (`DERIVED`: full name from
   its parts, age from the date of birth, today's date).
 
@@ -32,7 +38,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from app.ir.models import Field, FieldKind, FieldStatus, FormIR, Option, TraceEvent, ValueSource
-from app.ir.parts import date_groups
+from app.ir.parts import NamePart, date_groups, name_groups
 from app.ir.semantic_types import SEMANTIC_TYPES
 from app.ir.semantic_types import SemanticType as T
 from app.passes.context import PassContext
@@ -196,7 +202,9 @@ def run(ir: FormIR, ctx: PassContext, policy: FillPolicy | None = None) -> FormI
                 at=ctx.clock(),
             )
         )
-    fields = _whole_dates(fields, {f.id for f in ir.fields if f.value is None}, trace, ctx)
+    set_here = {f.id for f in ir.fields if f.value is None}
+    fields = _whole_dates(fields, set_here, trace, ctx)
+    fields = _split_names(fields, set_here, typed | suggested, trace, ctx)
     return ir.model_copy(update={"fields": fields, "trace": ir.trace + trace})
 
 
@@ -230,4 +238,76 @@ def _whole_dates(
                     trace.append(
                         TraceEvent(pass_name=STAGE, field_id=p.id, change=change, at=ctx.clock())
                     )
+    return [by_id[f.id] for f in fields]
+
+
+WHOLE_NAME_TYPES = frozenset(
+    {T.FULL_NAME, T.FATHER_NAME, T.MOTHER_NAME, T.GUARDIAN_NAME, T.SPOUSE_NAME}
+)
+_PART_KEYS: dict[NamePart, str] = {
+    "first": "first_name",
+    "middle": "middle_name",
+    "last": "last_name",
+}
+
+
+def split_name(value: str, parts: set[NamePart]) -> dict[NamePart, str] | None:
+    """The name over the parts a row has, or None when the split is unclear (P5-D16)."""
+    words = value.split()
+    if len(words) == 2 and {"first", "last"} <= parts:
+        return {"first": words[0], "last": words[1]}
+    if len(words) == 3 and parts == {"first", "middle", "last"}:
+        return {"first": words[0], "middle": words[1], "last": words[2]}
+    return None
+
+
+def _whole_name_parts(
+    person: T, profile: Mapping[str, str], parts: set[NamePart]
+) -> dict[NamePart, str] | None:
+    if person is T.FULL_NAME and profile.get("first_name") and profile.get("last_name"):
+        stored = {p: profile[k] for p, k in _PART_KEYS.items() if profile.get(k)}
+        return stored if set(stored) <= parts else None  # a middle name with no box: unclear
+    key = SEMANTIC_TYPES[person].profile_key
+    value = profile.get(key) if key else None
+    return split_name(value, parts) if value else None
+
+
+def _split_names(
+    fields: list[Field],
+    set_here: set[str],
+    trusted: set[str],
+    trace: list[TraceEvent],
+    ctx: PassContext,
+) -> list[Field]:
+    """P5-D16: a whole name split over its FIRST | MIDDLE | LAST boxes, as suggestions."""
+    by_id = {f.id: f for f in fields}
+    for row in name_groups(fields):
+        if any(f.id not in set_here for f, _ in row):
+            continue  # a part already had a value (the user's): left alone
+        persons = {f.semantic_type for f, _ in row if f.semantic_type in WHOLE_NAME_TYPES}
+        persons &= {f.semantic_type for f, _ in row if f.id in trusted}
+        if len(persons) != 1:
+            continue  # parts typed one by one (the applicant's own row), or two people
+        (person,) = persons
+        split = _whole_name_parts(person, ctx.profile, {p for _, p in row})
+        for f, part in row:
+            value = split.get(part) if split else None
+            if value is not None:
+                update = {
+                    "value": value,
+                    "value_source": ValueSource.DERIVED,
+                    "status": FieldStatus.SUGGESTED,
+                }
+                change = f"suggested the {part} part of {person.value} (split)"
+            else:
+                update = {
+                    "value": None,
+                    "value_source": ValueSource.NONE,
+                    "status": FieldStatus.NEEDS_INPUT,
+                }
+                change = f"not filled: {part} part of {person.value}, " + (
+                    "no such word" if split else "the split is unclear"
+                )
+            by_id[f.id] = f.model_copy(update=update)
+            trace.append(TraceEvent(pass_name=STAGE, field_id=f.id, change=change, at=ctx.clock()))
     return [by_id[f.id] for f in fields]
