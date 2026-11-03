@@ -7,7 +7,9 @@
    output constrained to the SemanticType enum and validated with Pydantic (prompt v2 since the
    Phase 3 tuning; v1 is kept for the pre-tuning reports); one retry with the
    validation error, then `unknown` (invariant 4). The request holds printed form text only.
-3. Never filled (decision P3-D1): signature fields and fields under an office-use heading get a
+3. Tick boxes (decision P5-D12): a tick box or radio answers a choice, so it never keeps a type
+   that holds a value (a passport number, a name): such a type becomes `other`.
+4. Never filled (decision P3-D1): signature fields and fields under an office-use heading get a
    `no_fill_reason` and status SKIPPED; fields below the review threshold get NEEDS_REVIEW.
 
 Fields whose semantic method is already set (an AcroForm signature widget) are left alone. With
@@ -33,6 +35,15 @@ from app.passes.context import PassContext
 
 STAGE = "understand"
 RULE_CONFIDENCE = 0.95  # SPEC §6.2
+TICK_KINDS = frozenset({FieldKind.CHECKBOX, FieldKind.RADIO})
+# The types a tick box may have (P5-D12): one option of a choice, or none.
+TICK_TYPES = frozenset(
+    {
+        SemanticType.GENDER, SemanticType.MARITAL_STATUS, SemanticType.CATEGORY,
+        SemanticType.NATIONALITY, SemanticType.COURSE, SemanticType.YEAR_OF_STUDY,
+        SemanticType.DECLARATION_CHECKBOX, SemanticType.OTHER, SemanticType.UNKNOWN,
+    }
+)  # fmt: skip
 LLM_BATCH = 20  # fields per request: short answers, and dense pages (120 fields) are split
 PROMPT_FILE = Path(__file__).resolve().parent.parent / "llm" / "prompts" / "understand_v2.md"
 
@@ -327,11 +338,20 @@ def run(ir: FormIR, ctx: PassContext) -> FormIR:
         trace.append(_event(None, "no LLM provider: rules only", ctx))
 
     for field_id, field in fields.items():
-        fields[field_id] = _mark(field, ctx, trace)
+        fields[field_id] = _mark(_tick_type(field, ctx, trace), ctx, trace)
 
     return ir.model_copy(
         update={"fields": [fields[f.id] for f in ir.fields], "trace": ir.trace + trace}
     )
+
+
+def _tick_type(field: Field, ctx: PassContext, trace: list[TraceEvent]) -> Field:
+    """A tick box holds no value (P5-D12): a value type on it becomes `other`."""
+    if field.kind not in TICK_KINDS or field.semantic_type in TICK_TYPES:
+        return field
+    held = field.semantic_type.value
+    trace.append(_event(field.id, f"semantic_type other (a tick box holds no {held})", ctx))
+    return field.model_copy(update={"semantic_type": SemanticType.OTHER})
 
 
 def _mark(field: Field, ctx: PassContext, trace: list[TraceEvent]) -> Field:

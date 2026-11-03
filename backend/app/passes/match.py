@@ -2,6 +2,8 @@
 
 A field is filled only if (decision P4-D2):
 - it is not a never-fill field and has no value yet;
+- it is no tick box or radio (decision P5-D12): a tick comes only from the user's own answer to a
+  choice question, never from the profile having a value;
 - its semantic type is confident under the policy: matched by a rule, or by the LLM with a
   confidence of at least `min_llm_confidence` (None: the LLM's types never fill);
 - a type in `once_per_form` has not been filled earlier on the form (reading order): a second
@@ -41,6 +43,7 @@ PERSON_AND_DATE_TYPES: frozenset[T] = frozenset(
     }
 )  # fmt: skip
 _OPTION_KINDS = frozenset({FieldKind.CHECKBOX, FieldKind.RADIO, FieldKind.CHOICE})
+TICK_KINDS = frozenset({FieldKind.CHECKBOX, FieldKind.RADIO})
 
 
 @dataclass(frozen=True)
@@ -115,6 +118,11 @@ def _once_key(f: Field) -> tuple[T, str | None]:
     return f.semantic_type, f.date_part
 
 
+def _profile_fillable(f: Field) -> bool:
+    """Neither a never-fill field, nor in a group (P5-D8), nor a tick box (P5-D12)."""
+    return f.no_fill_reason is None and f.group_id is None and f.kind not in TICK_KINDS
+
+
 def typed_field_ids(ir: FormIR, policy: FillPolicy) -> set[str]:
     """The fields whose semantic type the policy trusts: confident, in no group, and for a
     once-per-form type the first such field (or date part) in reading order. Only these are
@@ -122,7 +130,7 @@ def typed_field_ids(ir: FormIR, policy: FillPolicy) -> set[str]:
     seen: set[tuple[T, str | None]] = set()
     typed: set[str] = set()
     for f in ir.fields:
-        if f.no_fill_reason is not None or f.group_id is not None or not policy.confident(f):
+        if not _profile_fillable(f) or not policy.confident(f):
             continue
         if f.semantic_type in policy.once_per_form:
             if _once_key(f) in seen:
@@ -144,9 +152,7 @@ def suggested_field_ids(
     seen = {_once_key(f) for f in ir.fields if f.id in typed}
     suggested: set[str] = set()
     for f in ir.fields:
-        if f.id in typed or f.no_fill_reason is not None or f.semantic_method != "llm":
-            continue
-        if f.group_id is not None:
+        if f.id in typed or not _profile_fillable(f) or f.semantic_method != "llm":
             continue
         if f.semantic_confidence < floor or f.semantic_type in (T.OTHER, T.UNKNOWN):
             continue

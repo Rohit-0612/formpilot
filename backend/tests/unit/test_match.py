@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Literal
 
+import pytest
+
 from app.ir.models import (
     BBox,
     Field,
@@ -131,7 +133,7 @@ def test_choice_fields_pick_the_matching_option_or_stay_empty() -> None:
 
     out = match.run(
         _ir(
-            _f(0, T.GENDER, kind=FieldKind.RADIO, options=letters),
+            _f(0, T.GENDER, kind=FieldKind.CHOICE, options=letters),
             _f(1, T.GENDER, kind=FieldKind.CHOICE, options=words),
             _f(2, T.GENDER, kind=FieldKind.CHOICE, options=other),
         ),
@@ -139,6 +141,19 @@ def test_choice_fields_pick_the_matching_option_or_stay_empty() -> None:
     )
 
     assert [f.value for f in out.fields] == ["F", "2", None]
+
+
+@pytest.mark.parametrize("kind", [FieldKind.CHECKBOX, FieldKind.RADIO])
+def test_a_tick_is_never_set_from_the_profile(kind: FieldKind) -> None:
+    """P5-D12: a tick box or radio is asked, even when the profile has a value for its type."""
+    options = [Option(value="M", label="M"), Option(value="F", label="F")]
+    rule = _f(0, T.GENDER, kind=kind, options=options)
+    llm = _f(1, T.GENDER, "llm", 0.99, kind=kind, options=options)
+
+    out = match.run(_ir(rule, llm), CTX)
+
+    assert all(f.value is None and f.status is FieldStatus.NEEDS_INPUT for f in out.fields)
+    assert all(e.pass_name != match.STAGE for e in out.trace)
 
 
 def test_missing_profile_values_never_fill_and_other_types_are_asked() -> None:

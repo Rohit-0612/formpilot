@@ -339,3 +339,18 @@ def test_batches_after_the_deadline_are_skipped_and_traced() -> None:
     assert provider.requests == []
     assert [f.semantic_type for f in out.fields] == [T.PHONE_MOBILE, T.UNKNOWN]
     assert "page 0: LLM time budget used up" in [e.change for e in out.trace]
+
+
+def test_a_tick_box_never_keeps_a_value_type() -> None:
+    """P5-D12: "A- PASSPORT" next to a tick box picks a document; the box holds no number."""
+    passport = _field("p0_f000", "A- PASSPORT", kind=FieldKind.CHECKBOX)
+    female = _field("p0_f001", "Female", kind=FieldKind.CHECKBOX)
+    radio = _field("p0_f002", "Asha Verma", kind=FieldKind.RADIO)
+    provider = FakeProvider([_answer(("p0_f001", "gender", 0.98), ("p0_f002", "full_name", 0.9))])
+
+    out = understand.run(_ir(passport, female, radio), _ctx(provider))
+
+    assert [f.semantic_type for f in out.fields] == [T.OTHER, T.GENDER, T.OTHER]
+    changes = [e.change for e in out.trace if e.field_id == "p0_f000"]
+    assert changes[-1] == "semantic_type other (a tick box holds no passport_number)"
+    assert all("Asha" not in e.change for e in out.trace)
