@@ -66,6 +66,8 @@ human (about 10 minutes). The final teach-back comes before the README is writte
 - AcroForm *filling* (AcroForm detection is in v1);
 - drag / resize of boxes in review;
 - signature areas above a caption with nothing drawn (Phase 2's fix 8);
+- rule matches on generic labels that may refer to another person (nominee, bank): "Name",
+  "Age", "Date", "Name of the Bank" (human decision, 2026-11-03; no tuning in M3);
 - Phase 6 (scanned PDFs and OCR);
 - Phase 7's provider comparison;
 - Phase 8.
@@ -300,14 +302,20 @@ Deliverables
   - suggested values (P5-D1): a fillable type with a profile value and LLM confidence ≥ 0.95
     but below the fill threshold is prefilled as `suggested`, unconfirmed, rendered only after
     an explicit confirm; suggestions report on dev;
-  - readable questions (P5-D6): an English question per field from the understanding call
-    (prompt `understand_v3.md`), the form's label below it; readability check on dev;
+  - readable questions (P5-D6): an English question per asked field, the form's label below
+    it; readability check on dev. The question comes from a separate phrase pass (prompt
+    `phrase_v1.md`, decision P5-D9: asking the understanding call for it lowered typing);
   - question grouping by section or person; questions per form before and after;
   - format hints such as "(Capital letters)" → `Field.uppercase`, upper-cased when rendered;
   - free-text address parsing eval (record / replay);
   - UX metric: actions to complete a dev form with the full persona, before and after;
   - Devanagari rendering, time-boxed (P5-D5); otherwise review and question say the field will
     not be printed.
+- Added after the Sunrise registration form (human decision, 2026-10-27, P5-D8): form-layout
+  reading as general rules (instruction lines, entries off the page, hinted comb parts and
+  DD / MM / YYYY parts, table rows, tick-box rows), table rows never filled from the profile and
+  asked row by row, one choice question per tick-box row; the fill eval also checks values
+  against the personas (value precision).
 
 Acceptance
 - [ ] Human opens 10 rendered PDFs from dev forms in a normal PDF reader: values correct and in place.
