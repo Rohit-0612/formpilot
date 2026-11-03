@@ -137,3 +137,49 @@ def test_parts_for_someone_other_than_the_applicant(text: str) -> None:
 )
 def test_parts_the_applicant_fills(text: str | None) -> None:
     assert not filled_by_others(text)
+
+
+def _slip(heading: str, x: float | None = None) -> FormIR:
+    """An applicant's line, then a heading (centred unless x is given) and two lines below it."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_text((72, 120), "Applicant name: " + "_" * 30, fontname="helv", fontsize=10)
+    width = pymupdf.get_text_length(heading, fontname="helv", fontsize=10)
+    page.insert_text(
+        (x if x is not None else (595 - width) / 2, 300), heading, fontname="helv", fontsize=10
+    )
+    page.insert_text((72, 360), "Date: " + "_" * 20, fontname="helv", fontsize=10)
+    page.insert_text((300, 400), "Name: " + "_" * 25, fontname="helv", fontsize=10)
+    with doc:
+        return flat.run(doc, detect(doc), uuid.uuid4(), NOW)
+
+
+def test_fields_below_a_centred_heading_for_an_official_are_never_filled() -> None:
+    """P5-D15 (dev form #41): the acknowledgement slip is filled in by the post office."""
+    ir = _slip("(To be filled by BPM/SPM or PLI-CPC Official and Handed Over to Insurant)")
+
+    applicant, *slip = ir.fields
+    assert applicant.no_fill_reason is None
+    assert len(slip) == 2 and all(f.no_fill_reason == "office_use" for f in slip)
+    changes = {e.change for e in ir.trace if e.field_id == slip[0].id}
+    assert "no_fill_reason office_use (below a heading for an official)" in changes
+
+
+@pytest.mark.parametrize(
+    ("heading", "x"),
+    [
+        ("(To be completed by the Claimant & CBS Post Office)", None),  # the applicant too
+        ("(to be filled by the Bank)", 72.0),  # not centred: a field's own note, not a heading
+    ],
+)
+def test_other_headings_leave_the_fields_below_alone(heading: str, x: float | None) -> None:
+    assert all(f.no_fill_reason is None for f in _slip(heading, x).fields)
+
+
+def test_understanding_marks_a_field_whose_label_names_an_official() -> None:
+    out = understand.run(
+        _ir("Roll No. of the student (to be filled by Admission Cell)"),
+        PassContext(clock=lambda: NOW),
+    )
+
+    assert out.fields[0].no_fill_reason == "office_use"

@@ -48,6 +48,7 @@ from app.ir.models import (
 )
 from app.ir.phrases import (
     asks_upper_case,
+    filled_by_others,
     instructs_upper_case,
     is_instruction,
     mentions_office_use,
@@ -180,6 +181,7 @@ class _Candidate:
     context: str | None = None
     validations: list[ValidationResult] = field(default_factory=list)
     no_fill_reason: Literal["office_use"] | None = None
+    no_fill_why: str = "inside an office-use box"  # for the trace
     case_hint: Literal["label", "page"] | None = None  # write the value upper-case
     hint: str | None = None  # the grey hint printed in a comb part ("FIRST NAME", "DD")
     date_part: DatePart | None = None
@@ -1632,6 +1634,31 @@ def _mark_office_use(
             cand.no_fill_reason = "office_use"
 
 
+# A heading is centred: its middle is at most this share of the page width off the page's middle.
+CENTRED_SHARE = 0.1
+
+
+def _mark_filled_by_others(
+    candidates: list[_Candidate], text: _PageText, unrotated: pymupdf.Rect
+) -> None:
+    """Below a centred line saying the part is to be filled by an official, an office, the bank,
+    a postmaster or an authority ("(To be filled by BPM/SPM or PLI-CPC Official ...)"), every
+    field on the page is for them, not the applicant (decision P5-D15): never filled."""
+    middle = (unrotated.x0 + unrotated.x1) / 2
+    tops = [
+        line.rect[3]
+        for line in text.lines
+        if filled_by_others(line.text)
+        and abs((line.rect[0] + line.rect[2]) / 2 - middle) <= CENTRED_SHARE * unrotated.width
+    ]
+    if not tops:
+        return
+    for cand in candidates:
+        if cand.no_fill_reason is None and cand.rect[1] >= min(tops) - 0.5:
+            cand.no_fill_reason = "office_use"
+            cand.no_fill_why = "below a heading for an official"
+
+
 _TEXT_KINDS = frozenset({FieldKind.TEXT, FieldKind.DATE, FieldKind.UNKNOWN})
 
 
@@ -1685,6 +1712,7 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     _label_hinted_parts(kept)
     _group_choice_rows(kept, text)
     _mark_office_use(kept, cells, text, page_area)
+    _mark_filled_by_others(kept, text, unrotated)
     _mark_upper_case(kept, text)
     return kept, notes
 
@@ -1820,7 +1848,7 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     TraceEvent(
                         pass_name=STAGE,
                         field_id=field_id,
-                        change="no_fill_reason office_use (inside an office-use box)",
+                        change=f"no_fill_reason office_use ({cand.no_fill_why})",
                         at=at,
                     )
                 )

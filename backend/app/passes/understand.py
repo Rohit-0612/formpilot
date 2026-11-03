@@ -9,8 +9,10 @@
    validation error, then `unknown` (invariant 4). The request holds printed form text only.
 3. Tick boxes (decision P5-D12): a tick box or radio answers a choice, so it never keeps a type
    that holds a value (a passport number, a name): such a type becomes `other`.
-4. Never filled (decision P3-D1): signature fields and fields under an office-use heading get a
-   `no_fill_reason` and status SKIPPED; fields below the review threshold get NEEDS_REVIEW.
+4. Never filled (decision P3-D1): signature fields and fields under an office-use heading, or
+   whose label or heading says an official fills them in ("to be filled by Admission Cell",
+   decision P5-D15), get a `no_fill_reason` and status SKIPPED; fields below the review
+   threshold get NEEDS_REVIEW.
 
 Fields whose semantic method is already set (an AcroForm signature widget) are left alone. With
 a deadline in the context, batches due after it are skipped (their fields stay unknown).
@@ -28,7 +30,7 @@ import pydantic
 from pydantic import BaseModel
 
 from app.ir.models import Field, FieldKind, FieldStatus, FormIR, TraceEvent
-from app.ir.phrases import clean_text, mentions_office_use
+from app.ir.phrases import clean_text, filled_by_others, mentions_office_use
 from app.ir.semantic_types import SEMANTIC_TYPES, SemanticType
 from app.llm.provider import LLMError, LLMProvider, LLMRequest
 from app.passes.context import PassContext
@@ -359,8 +361,9 @@ def _mark(field: Field, ctx: PassContext, trace: list[TraceEvent]) -> Field:
     reason = field.no_fill_reason
     if reason is None and field.semantic_type is SemanticType.SIGNATURE:
         reason = "signature"
-    if reason is None and (
-        mentions_office_use(field.context_text) or mentions_office_use(field.label_text)
+    if reason is None and any(
+        mentions_office_use(text) or filled_by_others(text)
+        for text in (field.context_text, field.label_text)
     ):
         reason = "office_use"
     if reason is not None:
