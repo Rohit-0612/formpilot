@@ -1,0 +1,603 @@
+{
+  "kind": "understanding",
+  "split": "dev",
+  "mode": "hybrid",
+  "detector": "flat@51463a8",
+  "provider": "groq:openai/gpt-oss-120b",
+  "prompt": "understand_v2.md",
+  "created_at": "2026-11-01T05:56:47+00:00",
+  "tag": "m3-forms",
+  "reference_labels": "Reference labels: written by Claude Code (claude-opus-5-5), blind to the model's output, not by a human (decision P3-D6). Accuracy is agreement with them.",
+  "metrics": {
+    "overall": {
+      "all": {
+        "correct": 390,
+        "total": 524,
+        "accuracy": 0.7442748091603053
+      },
+      "fillable": {
+        "correct": 170,
+        "total": 241,
+        "accuracy": 0.7053941908713693
+      },
+      "fillable_precision": {
+        "correct": 170,
+        "total": 239,
+        "accuracy": 0.7112970711297071
+      }
+    },
+    "from_scratch": {
+      "all": {
+        "correct": 40,
+        "total": 63,
+        "accuracy": 0.6349206349206349
+      },
+      "fillable": {
+        "correct": 14,
+        "total": 30,
+        "accuracy": 0.4666666666666667
+      },
+      "fillable_precision": {
+        "correct": 14,
+        "total": 23,
+        "accuracy": 0.6086956521739131
+      }
+    },
+    "prefilled": {
+      "all": {
+        "correct": 350,
+        "total": 461,
+        "accuracy": 0.7592190889370932
+      },
+      "fillable": {
+        "correct": 156,
+        "total": 211,
+        "accuracy": 0.7393364928909952
+      },
+      "fillable_precision": {
+        "correct": 156,
+        "total": 216,
+        "accuracy": 0.7222222222222222
+      }
+    },
+    "macro_fillable": 0.6745341433445883,
+    "by_method": {
+      "rule": {
+        "correct": 83,
+        "total": 108,
+        "accuracy": 0.7685185185185185
+      },
+      "llm": {
+        "correct": 307,
+        "total": 416,
+        "accuracy": 0.7379807692307693
+      },
+      "none": {
+        "correct": 0,
+        "total": 0,
+        "accuracy": null
+      }
+    },
+    "by_type": {
+      "aadhaar": {
+        "support": 5,
+        "recall": 0.6,
+        "predicted": 3,
+        "precision": 1.0
+      },
+      "age": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 3,
+        "precision": 0.3333333333333333
+      },
+      "bank_account_number": {
+        "support": 11,
+        "recall": 0.7272727272727273,
+        "predicted": 10,
+        "precision": 0.8
+      },
+      "bank_branch": {
+        "support": 3,
+        "recall": 0.6666666666666666,
+        "predicted": 4,
+        "precision": 0.5
+      },
+      "bank_name": {
+        "support": 2,
+        "recall": 0.5,
+        "predicted": 4,
+        "precision": 0.25
+      },
+      "category": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 6,
+        "precision": 0.3333333333333333
+      },
+      "course": {
+        "support": 1,
+        "recall": 0.0,
+        "predicted": 1,
+        "precision": 0.0
+      },
+      "current_address_line1": {
+        "support": 9,
+        "recall": 0.6666666666666666,
+        "predicted": 9,
+        "precision": 0.6666666666666666
+      },
+      "current_address_line2": {
+        "support": 5,
+        "recall": 0.4,
+        "predicted": 4,
+        "precision": 0.5
+      },
+      "current_city": {
+        "support": 4,
+        "recall": 0.75,
+        "predicted": 5,
+        "precision": 0.6
+      },
+      "current_country": {
+        "support": 3,
+        "recall": 0.6666666666666666,
+        "predicted": 3,
+        "precision": 0.6666666666666666
+      },
+      "current_district": {
+        "support": 5,
+        "recall": 0.4,
+        "predicted": 3,
+        "precision": 0.6666666666666666
+      },
+      "current_pincode": {
+        "support": 5,
+        "recall": 0.6,
+        "predicted": 4,
+        "precision": 0.75
+      },
+      "current_state": {
+        "support": 5,
+        "recall": 0.6,
+        "predicted": 4,
+        "precision": 0.75
+      },
+      "date_of_birth": {
+        "support": 7,
+        "recall": 1.0,
+        "predicted": 7,
+        "precision": 1.0
+      },
+      "date_of_filling": {
+        "support": 38,
+        "recall": 0.9210526315789473,
+        "predicted": 39,
+        "precision": 0.8974358974358975
+      },
+      "email": {
+        "support": 5,
+        "recall": 1.0,
+        "predicted": 5,
+        "precision": 1.0
+      },
+      "enrollment_number": {
+        "support": 5,
+        "recall": 0.6,
+        "predicted": 10,
+        "precision": 0.3
+      },
+      "father_name": {
+        "support": 5,
+        "recall": 0.6,
+        "predicted": 3,
+        "precision": 1.0
+      },
+      "first_name": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 4,
+        "precision": 0.5
+      },
+      "full_name": {
+        "support": 21,
+        "recall": 0.8095238095238095,
+        "predicted": 26,
+        "precision": 0.6538461538461539
+      },
+      "gender": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 1,
+        "precision": 1.0
+      },
+      "guardian_name": {
+        "support": 3,
+        "recall": 0.3333333333333333,
+        "predicted": 1,
+        "precision": 1.0
+      },
+      "ifsc": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 2,
+        "precision": 1.0
+      },
+      "institution_name": {
+        "support": 3,
+        "recall": 1.0,
+        "predicted": 4,
+        "precision": 0.75
+      },
+      "last_name": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 5,
+        "precision": 0.4
+      },
+      "marital_status": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 1,
+        "precision": 1.0
+      },
+      "middle_name": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 5,
+        "precision": 0.4
+      },
+      "mother_name": {
+        "support": 4,
+        "recall": 0.5,
+        "predicted": 2,
+        "precision": 1.0
+      },
+      "nationality": {
+        "support": 4,
+        "recall": 1.0,
+        "predicted": 4,
+        "precision": 1.0
+      },
+      "other": {
+        "support": 272,
+        "recall": 0.8014705882352942,
+        "predicted": 271,
+        "precision": 0.8044280442804428
+      },
+      "pan": {
+        "support": 2,
+        "recall": 1.0,
+        "predicted": 2,
+        "precision": 1.0
+      },
+      "passing_year": {
+        "support": 8,
+        "recall": 0.375,
+        "predicted": 3,
+        "precision": 1.0
+      },
+      "percentage_or_cgpa": {
+        "support": 5,
+        "recall": 1.0,
+        "predicted": 9,
+        "precision": 0.5555555555555556
+      },
+      "permanent_address_line1": {
+        "support": 1,
+        "recall": 0.0,
+        "predicted": 1,
+        "precision": 0.0
+      },
+      "phone_alternate": {
+        "support": 3,
+        "recall": 1.0,
+        "predicted": 5,
+        "precision": 0.6
+      },
+      "phone_mobile": {
+        "support": 8,
+        "recall": 0.75,
+        "predicted": 7,
+        "precision": 0.8571428571428571
+      },
+      "place": {
+        "support": 7,
+        "recall": 0.8571428571428571,
+        "predicted": 7,
+        "precision": 0.8571428571428571
+      },
+      "signature": {
+        "support": 40,
+        "recall": 0.4,
+        "predicted": 19,
+        "precision": 0.8421052631578947
+      },
+      "spouse_name": {
+        "support": 1,
+        "recall": 1.0,
+        "predicted": 1,
+        "precision": 1.0
+      },
+      "unknown": {
+        "support": 11,
+        "recall": 0.18181818181818182,
+        "predicted": 14,
+        "precision": 0.14285714285714285
+      }
+    },
+    "per_form": {
+      "01_sbi_account_opening_form": {
+        "all": {
+          "correct": 125,
+          "total": 168,
+          "accuracy": 0.7440476190476191
+        },
+        "fillable": {
+          "correct": 54,
+          "total": 74,
+          "accuracy": 0.7297297297297297
+        },
+        "fillable_precision": {
+          "correct": 54,
+          "total": 79,
+          "accuracy": 0.6835443037974683
+        }
+      },
+      "02_sbi_kyc_annexure_a": {
+        "all": {
+          "correct": 31,
+          "total": 33,
+          "accuracy": 0.9393939393939394
+        },
+        "fillable": {
+          "correct": 23,
+          "total": 24,
+          "accuracy": 0.9583333333333334
+        },
+        "fillable_precision": {
+          "correct": 23,
+          "total": 24,
+          "accuracy": 0.9583333333333334
+        }
+      },
+      "03_sbi_kyc_annexure_b": {
+        "all": {
+          "correct": 31,
+          "total": 39,
+          "accuracy": 0.7948717948717948
+        },
+        "fillable": {
+          "correct": 15,
+          "total": 21,
+          "accuracy": 0.7142857142857143
+        },
+        "fillable_precision": {
+          "correct": 15,
+          "total": 21,
+          "accuracy": 0.7142857142857143
+        }
+      },
+      "06_union_bank_nomination_form": {
+        "all": {
+          "correct": 25,
+          "total": 27,
+          "accuracy": 0.9259259259259259
+        },
+        "fillable": {
+          "correct": 4,
+          "total": 4,
+          "accuracy": 1.0
+        },
+        "fillable_precision": {
+          "correct": 4,
+          "total": 6,
+          "accuracy": 0.6666666666666666
+        }
+      },
+      "21_india_post_pmjjby_claim_form": {
+        "all": {
+          "correct": 27,
+          "total": 47,
+          "accuracy": 0.574468085106383
+        },
+        "fillable": {
+          "correct": 13,
+          "total": 28,
+          "accuracy": 0.4642857142857143
+        },
+        "fillable_precision": {
+          "correct": 13,
+          "total": 20,
+          "accuracy": 0.65
+        }
+      },
+      "23_lic_claim_form_a_3783": {
+        "all": {
+          "correct": 36,
+          "total": 44,
+          "accuracy": 0.8181818181818182
+        },
+        "fillable": {
+          "correct": 10,
+          "total": 13,
+          "accuracy": 0.7692307692307693
+        },
+        "fillable_precision": {
+          "correct": 10,
+          "total": 11,
+          "accuracy": 0.9090909090909091
+        }
+      },
+      "25_cdlsiet_btech_admission_form": {
+        "all": {
+          "correct": 67,
+          "total": 97,
+          "accuracy": 0.6907216494845361
+        },
+        "fillable": {
+          "correct": 34,
+          "total": 47,
+          "accuracy": 0.723404255319149
+        },
+        "fillable_precision": {
+          "correct": 34,
+          "total": 52,
+          "accuracy": 0.6538461538461539
+        }
+      },
+      "30_allahabad_univ_enrollment_form": {
+        "all": {
+          "correct": 17,
+          "total": 29,
+          "accuracy": 0.5862068965517241
+        },
+        "fillable": {
+          "correct": 7,
+          "total": 14,
+          "accuracy": 0.5
+        },
+        "fillable_precision": {
+          "correct": 7,
+          "total": 13,
+          "accuracy": 0.5384615384615384
+        }
+      },
+      "32_niftem_student_declaration_form": {
+        "all": {
+          "correct": 12,
+          "total": 16,
+          "accuracy": 0.75
+        },
+        "fillable": {
+          "correct": 8,
+          "total": 11,
+          "accuracy": 0.7272727272727273
+        },
+        "fillable_precision": {
+          "correct": 8,
+          "total": 9,
+          "accuracy": 0.8888888888888888
+        }
+      },
+      "39_cebs_joining_report": {
+        "all": {
+          "correct": 6,
+          "total": 8,
+          "accuracy": 0.75
+        },
+        "fillable": {
+          "correct": 1,
+          "total": 3,
+          "accuracy": 0.3333333333333333
+        },
+        "fillable_precision": {
+          "correct": 1,
+          "total": 1,
+          "accuracy": 1.0
+        }
+      },
+      "41_india_post_pli_name_change_form": {
+        "all": {
+          "correct": 13,
+          "total": 16,
+          "accuracy": 0.8125
+        },
+        "fillable": {
+          "correct": 1,
+          "total": 2,
+          "accuracy": 0.5
+        },
+        "fillable_precision": {
+          "correct": 1,
+          "total": 3,
+          "accuracy": 0.3333333333333333
+        }
+      }
+    },
+    "confusions": [
+      {
+        "reference": "signature",
+        "predicted": "unknown",
+        "count": 12
+      },
+      {
+        "reference": "signature",
+        "predicted": "other",
+        "count": 11
+      },
+      {
+        "reference": "other",
+        "predicted": "full_name",
+        "count": 9
+      },
+      {
+        "reference": "other",
+        "predicted": "enrollment_number",
+        "count": 7
+      },
+      {
+        "reference": "unknown",
+        "predicted": "other",
+        "count": 7
+      },
+      {
+        "reference": "full_name",
+        "predicted": "other",
+        "count": 4
+      },
+      {
+        "reference": "other",
+        "predicted": "category",
+        "count": 4
+      },
+      {
+        "reference": "passing_year",
+        "predicted": "other",
+        "count": 4
+      },
+      {
+        "reference": "bank_account_number",
+        "predicted": "other",
+        "count": 3
+      },
+      {
+        "reference": "current_address_line1",
+        "predicted": "other",
+        "count": 3
+      },
+      {
+        "reference": "other",
+        "predicted": "percentage_or_cgpa",
+        "count": 3
+      },
+      {
+        "reference": "date_of_filling",
+        "predicted": "other",
+        "count": 3
+      },
+      {
+        "reference": "other",
+        "predicted": "bank_branch",
+        "count": 2
+      },
+      {
+        "reference": "other",
+        "predicted": "first_name",
+        "count": 2
+      },
+      {
+        "reference": "other",
+        "predicted": "middle_name",
+        "count": 2
+      }
+    ],
+    "predicted_unknown": 14,
+    "never_fill": {
+      "signature": 19,
+      "office_use": 41
+    },
+    "not_detected": 43,
+    "llm_trouble": {}
+  }
+}
