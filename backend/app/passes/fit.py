@@ -6,8 +6,10 @@ out once on a scratch page (decision P5-D5). Start at the default size (capped b
 height), shrink in 0.5 pt steps down to the minimum; if the value still does not fit, uses
 another script, or is Devanagari in a comb row (its conjuncts cannot be split one letter per
 box), the result `fits_box` fails and the field needs review. On flat and scanned forms a box with
-`max_chars` is a comb row (decision D8) and is measured per character cell; an AcroForm /MaxLen
-does not say whether the widget is a comb, so there the whole text is measured. A field the form
+`max_chars` is a comb row (decision D8) and is measured per character cell, each character in
+the cell it is printed in when the form draws them (`Field.cells`, decision P5-D14); an
+AcroForm /MaxLen does not say whether the widget is a comb, so there the whole text is
+measured. A field the form
 asks to write in capitals (`Field.uppercase`) is measured as it will be printed, upper-case.
 """
 
@@ -124,14 +126,15 @@ def fit(
             return size, "The value is too long for the box, even at the smallest font size."
         return size, None
     if comb and field.max_chars:
-        cell = (box.x1 - box.x0) / field.max_chars
-        widest = max(value, key=lambda ch: _width(ch, 1.0)) if value else "M"
-        text, room = widest, cell - 1.0
+        even = (box.x1 - box.x0) / field.max_chars
+        rooms = [c.x1 - c.x0 for c in field.cells] or [even] * field.max_chars
+        # Each character in its own cell, with half a point to spare on each side.
+        pairs = [(ch, room - 1.0) for ch, room in zip(value or "M", rooms, strict=False)]
     else:
-        text, room = value, box.x1 - box.x0 - 2 * PADDING
-    while size > minimum and _width(text, size) > room:
+        pairs = [(value, box.x1 - box.x0 - 2 * PADDING)]
+    while size > minimum and any(_width(text, size) > room for text, room in pairs):
         size = max(minimum, size - STEP)
-    if _width(text, size) > room:
+    if any(_width(text, size) > room for text, room in pairs):
         return size, "The value is too long for the box, even at the smallest font size."
     return size, None
 

@@ -3,7 +3,9 @@
 Only the fields `review.renderable` returns are drawn (invariant 7: confirmed, with a value,
 never a never-fill field). A text value is written as printed (`fit.printed`: upper-case where
 the form asks for capitals) in Helvetica at the fit pass's font size, vertically centred in its
-box and PADDING from its left edge; a comb row gets one character per cell, centred. Devanagari
+box and PADDING from its left edge; a comb row gets one character per cell, centred in the cell
+as the form draws it (`Field.cells`, decision P5-D14), or in equal cells when the form does not
+draw them (an AcroForm comb). Devanagari
 is laid out by MuPDF's HTML engine, shaped with HarfBuzz in its built-in Noto Serif Devanagari
 (OFL), embedded in the PDF (decision P5-D5). A ticked checkbox or radio gets an "X". A value in
 another script, or Devanagari in a comb row, is not drawn: it is returned in
@@ -18,7 +20,7 @@ from dataclasses import dataclass
 
 import pymupdf
 
-from app.ir.models import Field, FieldKind, FormIR, SourceKind
+from app.ir.models import BBox, Field, FieldKind, FormIR, SourceKind
 from app.passes import fit
 from app.services.review import renderable
 
@@ -38,10 +40,13 @@ class Rendered:
     skipped: list[str]  # field ids whose value the font cannot show
 
 
-def _unrotated(page: pymupdf.Page, field: Field) -> pymupdf.Rect:
-    """The field's box on the unrotated page, where PyMuPDF draws and the form's text runs."""
-    box = field.bbox
+def _unrotated_box(page: pymupdf.Page, box: BBox) -> pymupdf.Rect:
+    """An IR box on the unrotated page, where PyMuPDF draws and the form's text runs."""
     return (pymupdf.Rect(box.x0, box.y0, box.x1, box.y1) * page.derotation_matrix).normalize()
+
+
+def _unrotated(page: pymupdf.Page, field: Field) -> pymupdf.Rect:
+    return _unrotated_box(page, field.bbox)
 
 
 def _write(page: pymupdf.Page, x: float, baseline: float, text: str, size: float) -> None:
@@ -64,10 +69,14 @@ def _draw_text(page: pymupdf.Page, field: Field, value: str, comb: bool) -> None
     size = field.font_size or min(10.0, box.height * fit.HEIGHT_RATIO)
     baseline = (box.y0 + box.y1) / 2 + CAP_RATIO * size
     if comb and field.max_chars:
-        cell = box.width / field.max_chars
-        for i, ch in enumerate(value[: field.max_chars]):
+        cells = [_unrotated_box(page, c) for c in field.cells]
+        if not cells:
+            step = box.width / field.max_chars
+            cells = [pymupdf.Rect(box.x0 + i * step, box.y0, box.x0 + (i + 1) * step, box.y1)
+                     for i in range(field.max_chars)]  # fmt: skip
+        for ch, cell in zip(value, cells, strict=False):
             width = pymupdf.get_text_length(ch, fontname=FONT, fontsize=size)
-            _write(page, box.x0 + i * cell + (cell - width) / 2, baseline, ch, size)
+            _write(page, cell.x0 + (cell.width - width) / 2, baseline, ch, size)
         return
     _write(page, box.x0 + PADDING, baseline, value, size)
 

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from itertools import pairwise
 
 from app.ir.models import (
     BBox,
@@ -131,6 +132,27 @@ def test_comb_rows_are_measured_per_cell_on_flat_forms_only() -> None:
     # the same box as an AcroForm field with /MaxLen 6: the whole text must fit
     whole = fit.run(_ir(comb, kind=SourceKind.FILLABLE), CTX).fields[0]
     assert whole.validations[-1].ok and whole.font_size is not None
+
+
+def _cells(widths: list[float], height: float = 14) -> list[BBox]:
+    edges = [10.0]
+    for width in widths:
+        edges.append(edges[-1] + width)
+    return [BBox(page=0, x0=a, y0=10, x1=b, y1=10 + height) for a, b in pairwise(edges)]
+
+
+def test_each_comb_character_is_measured_in_its_own_cell() -> None:
+    """P5-D14: a narrow drawn cell shrinks the size, though the even share of the row would fit."""
+    widths = [14.0, 5.0, 14.0]
+    even = _field(0, T.CURRENT_PINCODE, "MWM", width=sum(widths), max_chars=3)
+    drawn = _field(
+        0, T.CURRENT_PINCODE, "MWM", width=sum(widths), max_chars=3, cells=_cells(widths)
+    )
+
+    as_even, as_drawn = fit.run(_ir(even), CTX).fields[0], fit.run(_ir(drawn), CTX).fields[0]
+
+    assert as_even.font_size == 10.0
+    assert as_drawn.font_size is not None and as_drawn.font_size < as_even.font_size
 
 
 def test_devanagari_is_measured_shaped_and_fits(  # P5-D5

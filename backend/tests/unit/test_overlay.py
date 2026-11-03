@@ -4,13 +4,24 @@ Synthetic fixtures and values only; no model."""
 
 import uuid
 from datetime import UTC, datetime
+from itertools import pairwise
 
 import pymupdf
 
 from app.backends import overlay
 from app.frontends import flat
 from app.frontends.detect import detect
-from app.ir.models import BBox, FieldStatus, FormIR
+from app.ir.models import (
+    BBox,
+    Field,
+    FieldKind,
+    FieldStatus,
+    FormIR,
+    PageInfo,
+    SourceKind,
+    TextLayer,
+    ValueSource,
+)
 from app.passes import fit, match, understand, validate
 from app.passes.context import PassContext
 from app.services.review import confirm_all, edit_field
@@ -197,3 +208,39 @@ def test_the_original_is_not_changed() -> None:
     overlay.render(original, confirm_all(ir, CTX)[0])
 
     assert original == copy
+
+
+def test_comb_characters_are_centred_in_cells_of_uneven_width() -> None:
+    """P5-D14 (dev form #25's Aadhaar row): each character in the middle of its own drawn cell."""
+    widths = [24.0, 21.0, 20.0, 26.0, 24.0]
+    edges = [100.0]
+    for width in widths:
+        edges.append(edges[-1] + width)
+    cells = [BBox(page=0, x0=a, y0=100, x1=b, y1=116) for a, b in pairwise(edges)]
+    comb = Field(
+        id="p0_f000", kind=FieldKind.TEXT, native_name=None, label_text="Aadhaar No.",
+        context_text=None, bbox=BBox(page=0, x0=100, y0=100, x1=edges[-1], y1=116),
+        max_chars=5, cells=cells, value="23001", value_source=ValueSource.USER_ANSWER,
+        status=FieldStatus.CONFIRMED, font_size=10.0,
+    )  # fmt: skip
+    ir = FormIR(
+        document_id=uuid.uuid4(), source_kind=SourceKind.FLAT_TEXT,
+        pages=[PageInfo(width=595, height=842, text_layer=TextLayer.OK)], fields=[comb],
+    )  # fmt: skip
+    blank = pymupdf.open()
+    blank.new_page(width=595, height=842)
+
+    out = overlay.render(blank.tobytes(), ir)
+
+    with pymupdf.open("pdf", out.pdf) as doc:
+        chars = [
+            c["bbox"]
+            for block in doc[0].get_text("rawdict")["blocks"]
+            for line in block.get("lines", [])
+            for span in line["spans"]
+            for c in span["chars"]
+        ]
+    assert len(chars) == len(cells)
+    for (x0, _, x1, _), cell in zip(sorted(chars), cells, strict=True):
+        assert cell.x0 < x0 and x1 < cell.x1
+        assert abs((x0 + x1) / 2 - (cell.x0 + cell.x1) / 2) < 0.01
