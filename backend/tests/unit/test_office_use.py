@@ -3,6 +3,7 @@ heading ("कार्यालय" extracted as "कायाथलय", dev fo
 enclosing box rather than its nearest heading."""
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import pymupdf
@@ -183,3 +184,60 @@ def test_understanding_marks_a_field_whose_label_names_an_official() -> None:
     )
 
     assert out.fields[0].no_fill_reason == "office_use"
+
+
+def _page(draw: Callable[[pymupdf.Page], None]) -> FormIR:
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    draw(page)
+    with doc:
+        return flat.run(doc, detect(doc), uuid.uuid4(), NOW)
+
+
+def _write(page: pymupdf.Page, y: float, text: str, size: float = 10) -> None:
+    page.insert_text((72, y), text, fontname="helv", fontsize=size)
+
+
+@pytest.mark.parametrize("title", ["ACKNOWLEDGEMENT DA-1", "Acknowledgement Slip", "RECEIPT"])
+def test_fields_in_a_tear_off_slip_are_for_the_office(title: str) -> None:
+    """P5-D18 (dev forms #01, #02): the slip the bank fills in and hands back."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _write(page, 120, "Applicant name: " + "_" * 30)
+        _write(page, 600, title)
+        _write(page, 640, "Account No.: " + "_" * 25)
+
+    applicant, slip = _page(draw).fields
+
+    assert applicant.no_fill_reason is None and slip.no_fill_reason == "office_use"
+
+
+def test_a_sentence_starting_like_a_slip_title_is_no_slip() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _write(page, 300, "Acknowledgement of the terms and conditions by the applicant below")
+        _write(page, 340, "Name: " + "_" * 30)
+
+    assert all(f.no_fill_reason is None for f in _page(draw).fields)
+
+
+def test_an_office_use_block_runs_to_the_next_section_heading() -> None:
+    """P5-D18 (dev form #01): the note on a line of its own; the block ends at a section heading
+    (base-14 Helvetica cannot write the "Ħ" of dev form #01's text layer: see the phrase test)."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _write(page, 100, "(For office use only)", size=6)
+        _write(page, 130, "Customer ID: " + "_" * 25, size=6)
+        _write(page, 200, "A Personal Details", size=9)
+        _write(page, 230, "Name: " + "_" * 25, size=6)
+        _write(page, 260, "Mobile: " + "_" * 25, size=6)
+
+    block, *personal = _page(draw).fields
+
+    assert block.no_fill_reason == "office_use"
+    assert personal and all(f.no_fill_reason is None for f in personal)
+
+
+@pytest.mark.parametrize("text", ["(For o\u0126ce use only)", "FOR OFFICE USE/ATTESTATION"])
+def test_office_use_matches_through_extracted_ligatures(text: str) -> None:
+    """Dev form #01's text layer extracts "ffi" as "Ħ" (P5-D18)."""
+    assert mentions_office_use(text)

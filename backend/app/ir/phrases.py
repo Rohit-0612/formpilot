@@ -84,8 +84,13 @@ def mentions(text: str | None, phrases: tuple[str, ...]) -> bool:
     return False
 
 
+# Ligatures some text layers extract as other letters (dev form #01: "(For oĦce use only)",
+# "Please Ĥll up"): undone before matching office-use phrases (decision P5-D18).
+_LIGATURES = str.maketrans({"Ħ": "ffi", "ħ": "ffi", "Ĥ": "fi", "ĥ": "fi"})
+
+
 def mentions_office_use(text: str | None) -> bool:
-    return mentions(text, OFFICE_USE_PHRASES)
+    return mentions((text or "").translate(_LIGATURES), OFFICE_USE_PHRASES)
 
 
 def asks_upper_case(text: str | None) -> bool:

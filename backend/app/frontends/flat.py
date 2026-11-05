@@ -24,6 +24,7 @@ The thresholds are first guesses checked on synthetic fixtures; they are tuned o
 in Step 11, never on the test split.
 """
 
+import math
 import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
@@ -48,6 +49,7 @@ from app.ir.models import (
 )
 from app.ir.phrases import (
     asks_upper_case,
+    clean_text,
     filled_by_others,
     instructs_upper_case,
     is_instruction,
@@ -1659,6 +1661,54 @@ def _mark_filled_by_others(
             cand.no_fill_why = "below a heading for an official"
 
 
+# A tear-off slip the office fills in and hands back starts with a short title (decision P5-D18):
+# "ACKNOWLEDGEMENT DA-1", "Acknowledgement Slip", "RECEIPT".
+SLIP_TITLES = frozenset({"acknowledgement", "acknowledgment", "receipt"})
+MAX_SLIP_TITLE_WORDS = 4
+# A block note such as "(For office use only)" is a line of its own, a few words long.
+MAX_OFFICE_NOTE_WORDS = 6
+# A block ends at a section heading that starts at most this far right of the note.
+BLOCK_HEADING_INDENT = 30.0
+
+
+def _is_slip_title(line: _TextLine) -> bool:
+    words = clean_text(line.text).split()
+    return 0 < len(words) <= MAX_SLIP_TITLE_WORDS and words[0] in SLIP_TITLES
+
+
+def _is_office_note(line: _TextLine) -> bool:
+    words = clean_text(line.text).split()
+    return len(words) <= MAX_OFFICE_NOTE_WORDS and mentions_office_use(line.text)
+
+
+def _mark_office_areas(candidates: list[_Candidate], text: _PageText) -> None:
+    """Decision P5-D18: every field below a tear-off slip's title is for the office (the slip
+    runs to the page's end); every field below a line of its own saying "(For office use
+    only)" is too, up to the next section heading (bold or large, starting near the note)."""
+    areas: list[tuple[float, float, str]] = []  # (top, bottom, why)
+    for line in text.lines:
+        if _is_slip_title(line):
+            areas.append((line.rect[3], math.inf, "in a tear-off slip"))
+        elif _is_office_note(line):
+            ends = [
+                other.rect[1]
+                for other in text.lines
+                if other.rect[1] > line.rect[3]
+                and (other.bold or other.size >= HEADING_SIZE_FACTOR * text.median_size)
+                and other.rect[0] <= line.rect[0] + BLOCK_HEADING_INDENT
+                and not _is_office_note(other)
+            ]
+            areas.append((line.rect[3], min(ends, default=math.inf), "in an office-use block"))
+    for cand in candidates:
+        if cand.no_fill_reason is not None:
+            continue
+        for top, bottom, why in areas:
+            if top - 0.5 <= cand.rect[1] < bottom:
+                cand.no_fill_reason = "office_use"
+                cand.no_fill_why = why
+                break
+
+
 _TEXT_KINDS = frozenset({FieldKind.TEXT, FieldKind.DATE, FieldKind.UNKNOWN})
 
 
@@ -1713,6 +1763,7 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     _group_choice_rows(kept, text)
     _mark_office_use(kept, cells, text, page_area)
     _mark_filled_by_others(kept, text, unrotated)
+    _mark_office_areas(kept, text)
     _mark_upper_case(kept, text)
     return kept, notes
 
