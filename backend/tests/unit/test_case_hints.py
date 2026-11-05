@@ -60,7 +60,9 @@ def test_page_instructions(line: str, expected: bool) -> None:
     assert instructs_upper_case(line) is expected
 
 
-def test_the_flat_frontend_marks_the_page_and_the_labelled_field() -> None:
+def test_an_instruction_in_the_first_pages_header_covers_the_whole_form() -> None:
+    """P5-D22: page 1's "Please fill in BLOCK letters only." also reaches page 2's "Place"
+    (dev form #03: the page 2 address); a negated note changes nothing."""
     fixture = pdfs.get("flat_case_hints")
     with pymupdf.open("pdf", fixture.data) as doc:
         ir = flat.run(doc, detect(doc), uuid.uuid4(), NOW)
@@ -69,10 +71,60 @@ def test_the_flat_frontend_marks_the_page_and_the_labelled_field() -> None:
         ("Full name", True),
         ("City", True),
         ("Name (in capital letters)", True),
-        ("Place", False),
+        ("Place", True),
     }
     hints = sorted(t.change for t in ir.trace if t.change.startswith("uppercase"))
-    assert hints == ["uppercase (label hint)"] + ["uppercase (page hint)"] * 2
+    assert hints == ["uppercase (form hint)"] * 3 + ["uppercase (label hint)"]
+
+
+def _form(*pages: list[tuple[float, str, float]]) -> list[tuple[str, bool]]:
+    """(label, uppercase) of each field; each page is (y, text, font size) lines, a text ending
+    in ":" gets a blank after it."""
+    doc = pymupdf.open()
+    for lines in pages:
+        page = doc.new_page(width=595, height=842)
+        for y, text, size in lines:
+            line = text + " " + "_" * 30 if text.endswith(":") else text
+            page.insert_text((72, y), line, fontname="helv", fontsize=size)
+    with doc:
+        ir = flat.run(doc, detect(doc), uuid.uuid4(), NOW)
+    return [(f.label_text or "", f.uppercase) for f in ir.fields]
+
+
+def test_an_instruction_inside_a_section_stays_in_that_section() -> None:
+    fields = _form(
+        [
+            (100, "Name:", 10),
+            (400, "Part B: Bank details", 14),
+            (430, "Please fill in BLOCK letters only.", 10),
+            (460, "Bank name:", 10),
+            (600, "Part C: Declaration", 14),
+            (630, "Place:", 10),
+        ]
+    )
+
+    assert fields == [("Name", False), ("Bank name", True), ("Place", False)]
+
+
+def test_a_general_instructions_block_on_a_later_page_covers_the_whole_form() -> None:
+    fields = _form(
+        [(100, "Name:", 10)],
+        [
+            (100, "General Instructions", 14),
+            (130, "1. Please fill in BLOCK letters only.", 10),
+            (160, "2. Attach a recent photograph.", 10),
+        ],
+    )
+
+    assert fields == [("Name", True)]
+
+
+def test_an_instruction_low_on_the_first_page_is_local() -> None:
+    fields = _form(
+        [(100, "Name:", 10), (700, "Please write in capital letters.", 10), (730, "Place:", 10)]
+    )
+
+    assert fields == [("Name", False), ("Place", True)]
 
 
 def _field(value: str, uppercase: bool) -> Field:

@@ -518,9 +518,9 @@ def flat_office_use_box() -> PdfFixture:
 
 
 def flat_case_hints() -> PdfFixture:
-    """Capital-letter hints (Phase 5): page 1 has an instruction "Please fill in BLOCK letters
-    only" (every text field upper-case); page 2 only a negated note, so only the field whose own
-    label asks for capitals is upper-case."""
+    """Capital-letter hints (Phase 5): page 1's header has an instruction "Please fill in BLOCK
+    letters only", which covers the whole form (P5-D22); page 2 has only a negated note, which
+    changes nothing, and a field whose own label asks for capitals."""
     doc = _new_doc(A4, A4)
     first, second = doc[0], doc[1]
     _text(first, 72, 80, "Please fill in BLOCK letters only.")

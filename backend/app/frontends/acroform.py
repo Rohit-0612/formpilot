@@ -185,10 +185,13 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
     """Build a FormIR from the widgets of every page. Reads the document only."""
     fields: list[Field] = []
     trace: list[TraceEvent] = []
+    ok_pages = [n for n, info in enumerate(detection.pages) if info.text_layer is TextLayer.OK]
+    form_upper = flat.form_case_instruction(doc, ok_pages)  # P5-D22
     for page_no, (page, info) in enumerate(zip(doc, detection.pages, strict=True)):
         specs, skipped = _page_specs(page, page_no, info.text_layer is TextLayer.OK)
-        page_upper = info.text_layer is TextLayer.OK and flat.instructs_upper_case_on(
-            flat.page_text(page)
+        # Widgets carry no section: a local instruction still counts for its whole page.
+        page_upper = form_upper or (
+            info.text_layer is TextLayer.OK and flat.instructs_upper_case_on(flat.page_text(page))
         )
         for index, (bbox, spec) in enumerate(flat.reading_order([(s.bbox, s) for s in specs])):
             field_id = f"p{page_no}_f{index:03d}"

@@ -186,7 +186,7 @@ class _Candidate:
     no_fill_reason: Literal["office_use"] | None = None
     no_fill_why: str = "inside an office-use box"  # for the trace
     condition: str | None = None  # P5-D19: "(In Case Of Minor*)"
-    case_hint: Literal["label", "page"] | None = None  # write the value upper-case
+    case_hint: Literal["label", "form", "section"] | None = None  # write the value upper-case
     hint: str | None = None  # the grey hint printed in a comb part ("FIRST NAME", "DD")
     date_part: DatePart | None = None
     # P5-D8: ("choices" | "table_row" | "line_row", number, row); a line row is a table_row
@@ -1739,25 +1739,96 @@ def _mark_conditions(candidates: list[_Candidate], text: _PageText) -> None:
 _TEXT_KINDS = frozenset({FieldKind.TEXT, FieldKind.DATE, FieldKind.UNKNOWN})
 
 
+# A form-level instruction area (decision P5-D22): the first page's header, the top quarter of it,
+# and any block under a heading such as "General Instructions".
+HEADER_SHARE = 0.25
+_INSTRUCTION_TITLES = ("instructions", "general instructions", "important instructions")
+
+
+def _is_section_heading(line: _TextLine, median_size: float) -> bool:
+    return line.bold or line.size >= HEADING_SIZE_FACTOR * median_size
+
+
+def _instruction_block(text: _PageText) -> list[_TextLine]:
+    """The lines under a heading that starts "Instructions", up to the next section heading."""
+    block: list[_TextLine] = []
+    inside = False
+    for line in sorted(text.lines, key=lambda line: (line.rect[1], line.rect[0])):
+        if clean_text(line.text).startswith(_INSTRUCTION_TITLES):
+            inside = True
+        elif inside and _is_section_heading(line, text.median_size):
+            inside = False
+        elif inside:
+            block.append(line)
+    return block
+
+
+def case_instructions(
+    text: _PageText, unrotated: pymupdf.Rect, first_page: bool
+) -> tuple[bool, list[_TextLine]]:
+    """Whether the page holds a form-level instruction to write in capital letters (in the first
+    page's header or an instructions block), and the page's other, local ones."""
+    form_level, local = False, []
+    block = _instruction_block(text)
+    for line in text.lines:
+        if not instructs_upper_case(line.text):
+            continue
+        header = first_page and line.rect[1] - unrotated.y0 <= HEADER_SHARE * unrotated.height
+        if header or line in block:
+            form_level = True
+        else:
+            local.append(line)
+    return form_level, local
+
+
+def form_case_instruction(doc: pymupdf.Document, ok_pages: Sequence[int]) -> bool:
+    """A form-level instruction to write in capital letters anywhere in the document (P5-D22)."""
+    for page_no in ok_pages:
+        page = doc[page_no]
+        unrotated = page.rect * page.derotation_matrix
+        if case_instructions(_extract_text(page), unrotated, page_no == 0)[0]:
+            return True
+    return False
+
+
 def instructs_upper_case_on(text: _PageText) -> bool:
     """A line of the page tells the reader to write in capital letters."""
     return any(instructs_upper_case(line.text) for line in text.lines)
 
 
-def _mark_upper_case(candidates: list[_Candidate], text: _PageText) -> None:
-    """Text fields whose own label asks for capital letters, or all of them when a page
-    instruction does. A heading is not used: it is often the previous field's label."""
-    page_wide = instructs_upper_case_on(text)
+def _mark_upper_case(
+    candidates: list[_Candidate], text: _PageText, form_wide: bool, local: list[_TextLine]
+) -> None:
+    """Text fields whose own label asks for capital letters; all of them when a form-level
+    instruction does (P5-D22); those below a local instruction up to the next section heading.
+    A heading is not used: it is often the previous field's label."""
+    ends = [
+        min(
+            (
+                other.rect[1]
+                for other in text.lines
+                if other.rect[1] > line.rect[3] and _is_section_heading(other, text.median_size)
+            ),
+            default=math.inf,
+        )
+        for line in local
+    ]
     for cand in candidates:
         if cand.kind not in _TEXT_KINDS:
             continue
         if asks_upper_case(cand.label):
             cand.case_hint = "label"
-        elif page_wide:
-            cand.case_hint = "page"
+        elif form_wide:
+            cand.case_hint = "form"
+        elif any(
+            line.rect[3] - 0.5 <= cand.rect[1] < end for line, end in zip(local, ends, strict=True)
+        ):
+            cand.case_hint = "section"
 
 
-def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
+def _page_candidates(
+    page: pymupdf.Page, form_upper: bool = False
+) -> tuple[list[_Candidate], list[str]]:
     text = _extract_text(page)
     drawings = _extract_drawings(page)
     unrotated = page.rect * page.derotation_matrix
@@ -1792,7 +1863,8 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     _mark_filled_by_others(kept, text, unrotated)
     _mark_office_areas(kept, text)
     _mark_conditions(kept, text)
-    _mark_upper_case(kept, text)
+    page_upper, local = case_instructions(text, unrotated, page.number == 0)
+    _mark_upper_case(kept, text, form_upper or page_upper, local)
     return kept, notes
 
 
@@ -1870,6 +1942,8 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
     groups: list[FieldGroup] = []
     trace: list[TraceEvent] = []
 
+    ok_pages = [n for n, info in enumerate(detection.pages) if info.text_layer is TextLayer.OK]
+    form_upper = form_case_instruction(doc, ok_pages)
     for page_no, (page, info) in enumerate(zip(doc, detection.pages, strict=True)):
         if info.text_layer is not TextLayer.OK:
             trace.append(
@@ -1882,7 +1956,7 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                 )
             )
             continue
-        candidates, notes = _page_candidates(page)
+        candidates, notes = _page_candidates(page, form_upper)
         boxes = [(_displayed(c.rect, page, page_no), c) for c in candidates]
         group_ids: dict[tuple[str, int, int], str] = {}
         for index, (bbox, cand) in enumerate(_reading_order(boxes)):
