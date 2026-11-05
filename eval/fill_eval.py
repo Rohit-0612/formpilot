@@ -6,13 +6,18 @@ For every dev form, the understanding eval's matched fields (eval/run_eval.py, r
 eval/llm_cache/understand/) go through the match pass with each synthetic persona's profile and
 each candidate fill policy. Per policy and persona:
 - fill precision (the key metric, decision P4-D2): of the compared fields the policy fills, the
-  share whose predicted semantic type is the reference type;
+  share whose predicted semantic type is the reference type. A fill is a value with status
+  `filled`; a suggestion (status `suggested`, decision P5-D1) is not a fill (decision P5-D17);
 - fill coverage: those correct fills / the compared fields with a fillable reference type;
 - value correctness: of the filled fields, the share whose value is the value the reference type
   would get from the same persona (formatting and derived values included);
 - value precision (Phase 5): of the filled fields, the share whose value as printed is right for
   the persona, where the reference layout says what is right: no profile value in a repeated row
-  (a table row), the day, month or year in a part of a split date (eval/value_truth.py).
+  (a table row), the day, month or year in a part of a split date (eval/value_truth.py);
+- suggestion precision (decision P5-D17): with the product's suggestion floor, of the compared
+  fields given a suggested value, the share right for the persona: a part of a split name
+  (P5-D16) against the persona's matching part of that person's name, any other suggestion
+  against the value its reference type gets.
 
 The policy is chosen on the full persona by a rule fixed before the run (decision P4-D2,
 docs/decisions/phase-4.md): the highest coverage among candidates with fill precision >= 85 %;
@@ -29,7 +34,8 @@ from datetime import date
 from pathlib import Path
 
 from app.ir.models import Field, FieldStatus, ValueSource
-from app.ir.semantic_types import SemanticType
+from app.ir.parts import name_groups
+from app.ir.semantic_types import SEMANTIC_TYPES, SemanticType
 from app.logging import configure_logging
 from app.passes import fit, match
 from app.passes.context import PassContext
@@ -60,6 +66,8 @@ CANDIDATES: dict[str, FillPolicy] = {
     "rules only, once per form": FillPolicy(None, _ONCE),
 }
 _FILLED_SOURCES = frozenset({ValueSource.PROFILE, ValueSource.DERIVED})
+SUGGEST_FLOOR = 0.95  # the product's SUGGEST_MIN_CONFIDENCE (decision P5-D1)
+PRODUCT_POLICY = "LLM confidence >= 0.99, once per form"  # FILL_MIN_CONFIDENCE (P5-D10)
 
 
 @dataclass(frozen=True)
@@ -81,6 +89,19 @@ class FillScore:
             "value_correctness": self.value_correct / self.filled if self.filled else None,
             "value_right": self.value_right,
             "value_precision": self.value_right / self.filled if self.filled else None,
+        }
+
+
+@dataclass(frozen=True)
+class SuggestionScore:
+    suggested: int
+    right: int
+
+    def as_dict(self) -> dict[str, float | int | None]:
+        return {
+            "suggested": self.suggested,
+            "suggestion_right": self.right,
+            "suggestion_precision": self.right / self.suggested if self.suggested else None,
         }
 
 
@@ -109,7 +130,14 @@ def value_right(c: run_eval.Compared, got: Field, profile: Mapping[str, str], to
     return expected is not None and same_text(printed, expected[0])
 
 
-def score(result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillPolicy) -> FillScore:
+def score(
+    result: run_eval.EvalResult,
+    profile: Mapping[str, str],
+    policy: FillPolicy,
+    count_suggested: bool = False,
+) -> FillScore:
+    """The fill scores; `count_suggested` restores the definition before P5-D17 (a value from the
+    profile counted as a fill whatever its status), for before/after comparisons only."""
     ctx = PassContext(clock=lambda: run_eval.FIXED_TIME, profile=profile)
     today = ctx.today()
     filled = type_correct = value_correct = fillable = right = 0
@@ -122,6 +150,8 @@ def score(result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillP
             got = by_id[c.predicted_id]
             if got.value is None or got.value_source not in _FILLED_SOURCES:
                 continue
+            if got.status is not FieldStatus.FILLED and not count_suggested:
+                continue
             filled += 1
             type_correct += c.correct
             as_reference = got.model_copy(update={"semantic_type": c.reference})
@@ -129,6 +159,54 @@ def score(result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillP
             value_correct += expected is not None and expected[0] == got.value
             right += value_right(c, got, profile, today)
     return FillScore(filled, type_correct, value_correct, fillable, right)
+
+
+def _name_part_truth(fields: list[Field], profile: Mapping[str, str]) -> dict[str, str | None]:
+    """For each part of a split name (P5-D16), the persona's matching part of that name."""
+    truth: dict[str, str | None] = {}
+    for row in name_groups(fields):
+        persons = {f.semantic_type for f, _ in row if f.semantic_type in match.WHOLE_NAME_TYPES}
+        if len(persons) != 1:
+            continue
+        (person,) = persons
+        if person is SemanticType.FULL_NAME and profile.get("first_name"):
+            parts = {p: profile.get(f"{p}_name") for p in ("first", "middle", "last")}
+        else:
+            key = SEMANTIC_TYPES[person].profile_key
+            words = (profile.get(key, "") if key else "").split()
+            middle = " ".join(words[1:-1]) or None
+            parts = {"first": words[0] if words else None, "middle": middle,
+                     "last": words[-1] if len(words) > 1 else None}  # fmt: skip
+        truth.update({f.id: parts[part] for f, part in row})
+    return truth
+
+
+def suggestions(
+    result: run_eval.EvalResult, profile: Mapping[str, str], policy: FillPolicy
+) -> SuggestionScore:
+    """Suggestion precision with the product's floor (P5-D17), on the compared fields."""
+    ctx = PassContext(
+        clock=lambda: run_eval.FIXED_TIME, profile=profile, suggest_min_confidence=SUGGEST_FLOOR
+    )
+    today = ctx.today()
+    suggested = right = 0
+    for form in result.forms:
+        if form.understood is None:
+            continue
+        fields = match.run(form.understood, ctx, policy).fields
+        by_id = {f.id: f for f in fields}
+        name_truth = _name_part_truth(fields, profile)
+        for c in form.compared:
+            got = by_id[c.predicted_id]
+            if got.status is not FieldStatus.SUGGESTED or got.value is None:
+                continue
+            suggested += 1
+            if got.id in name_truth:
+                expected = name_truth[got.id]
+                right += expected is not None and same_text(got.value, expected)
+            else:
+                right += value_right(c, got, profile, today)
+    return SuggestionScore(suggested, right)
 
 
 def questions_per_form(
@@ -176,6 +254,7 @@ def report(
     met: bool,
     tag: str | None,
     questions: Mapping[str, Mapping[str, Mapping[str, int]]] | None = None,
+    suggested: Mapping[str, Mapping[str, SuggestionScore]] | None = None,
 ) -> dict[str, object]:
     return {
         "kind": "fill",
@@ -198,6 +277,11 @@ def report(
             for name, by_persona in table.items()
         },
         "questions_per_form": questions or {},
+        "suggestion_floor": SUGGEST_FLOOR,
+        "suggestions": {
+            name: {persona: s.as_dict() for persona, s in by_persona.items()}
+            for name, by_persona in (suggested or {}).items()
+        },
     }
 
 
@@ -245,6 +329,25 @@ def markdown(data: Mapping[str, object]) -> str:
         f"| {_pct(candidates[data['chosen']][p]['fill_precision'])} |"  # type: ignore[index]
         for p in personas
     ]
+    sugg: Mapping[str, Mapping[str, Mapping[str, object]]] = data.get("suggestions", {})  # type: ignore[assignment]
+    if sugg:
+        lines += [
+            "",
+            f"## Suggestions (floor {data['suggestion_floor']}, decision P5-D17)",
+            "",
+            "Suggested values are not fills: they are confirmed one by one. A part of a split "
+            "name is scored against the persona's matching part of that person's name.",
+            "",
+            "| Policy | " + " | ".join(f"`{p}`" for p in personas) + " |",
+            "|---|" + "--:|" * len(personas),
+        ]
+        for name, by_persona in sugg.items():
+            cells = [
+                f"{_pct(by_persona[p]['suggestion_precision'])} "
+                f"({by_persona[p]['suggestion_right']}/{by_persona[p]['suggested']})"
+                for p in personas
+            ]
+            lines.append(f"| {name} | " + " | ".join(cells) + " |")
     per_profile: Mapping[str, Mapping[str, Mapping[str, int]]] = data["questions_per_form"]  # type: ignore[assignment]
     if per_profile:
         names = list(per_profile)
@@ -312,7 +415,11 @@ def main(argv: list[str] | None = None) -> int:
         name: questions_per_form(result, profile, CANDIDATES[chosen])
         for name, profile in profiles.items()
     }
-    data = report(result, table, chosen, met, args.tag, questions)
+    suggested = {
+        name: {p: suggestions(result, profile, CANDIDATES[name]) for p, profile in personas.items()}
+        for name in (chosen, PRODUCT_POLICY)
+    }
+    data = report(result, table, chosen, met, args.tag, questions, suggested)
     stamp = result.created_at[:10].replace("-", "")
     tag = f"-{args.tag}" if args.tag else ""
     commit = result.detector.removeprefix("flat@")
