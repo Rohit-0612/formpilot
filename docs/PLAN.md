@@ -39,6 +39,22 @@ Plus, from the old Phase 7:
 | M4 | 5b | Ship v1: deploy, CI eval gate, test-set detection measurement, README |
 | M5 (optional) | 8 (part) | MCP server (`analyze_form`, `fill_form`) |
 
+**M4 additions (planned; human decision, 2026-11-05).** Planned with the rest of M4 in its plan:
+- **Error analysis** of the dev understanding errors before any further tuning: a confusion
+  matrix by semantic type, rules vs LLM.
+- **Section-subject layer:** each section of a form gets a subject (applicant, nominee,
+  guardian, joint holder, witness, official) and a condition; fields are matched only to the
+  right person's profile data. Rules for strong cues, one LLM call per section for the rest
+  (blank-form text only, no user data). It handles the generic-label fills and conditional
+  annexures without a condition line (P5-D24).
+- **Agreement-based confidence:** calibrate the fill and suggestion thresholds on dev from
+  rule / LLM and qwen / Groq agreement, not only the model's self-reported confidence. Suggestion
+  precision now (P5-D17, product policy): 64.5 / 69.2 / 70.8 % (asha / meera / ravi).
+- **External baseline:** run CommonForms FFDNet on the test set and compare its detection with
+  ours.
+- **Semantic label audit:** compare Groq's and Claude Code's semantic labels; the human reviews
+  only the disagreements, on a sample; report the label error rate.
+
 **Working rule** (CLAUDE.md §1, "Milestone gates"): each milestone's plan is approved once,
 including any Form IR, database or API change and any new dependency. The milestone is then
 built in full: every logical change its own commit, tested, pushed and green on all three CI
@@ -69,6 +85,9 @@ human (about 10 minutes). The final teach-back comes before the README is writte
 - rule matches on generic labels that may refer to another person (nominee, bank): "Name",
   "Age", "Date", "Name of the Bank" (human decision, 2026-11-03; no tuning in M3), and an
   existing account's number and branch used on an account-opening form (human, 2026-11-05);
+- template memory: a confirmed field structure (types only, never values), keyed by a form
+  fingerprint and reused on the next upload of the same form (human, 2026-11-05);
+- a vision pass on blank pages for ambiguous fields (human, 2026-11-05);
 - Phase 6 (scanned PDFs and OCR);
 - Phase 7's provider comparison;
 - Phase 8.
