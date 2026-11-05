@@ -367,3 +367,25 @@ def test_other_labels_are_no_institution_number(label: str) -> None:
     from app.ir.phrases import names_institution_number
 
     assert not names_institution_number(label)
+
+
+@pytest.mark.parametrize(
+    ("label", "stored", "printed"),
+    [
+        ("Country of Citizenship", "Indian", "India"),
+        ("Country", "India", "India"),
+        ("Nationality", "Indian", "Indian"),
+        ("Country of Citizenship", "Martian", None),  # not in the table: asked, not guessed
+    ],
+)
+def test_a_field_asking_for_a_country_gets_the_country(
+    label: str, stored: str, printed: str | None
+) -> None:
+    """P5-D21 (dev form #25): "Country of Citizenship" is "India", not "Indian"."""
+    profile = {**PROFILE, "nationality": stored}
+
+    out = match.run(
+        _ir(_f(0, T.NATIONALITY, label=label)), PassContext(clock=lambda: NOW, profile=profile)
+    )
+
+    assert out.fields[0].value == printed

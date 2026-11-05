@@ -24,7 +24,9 @@ A field is filled only if (decision P4-D2):
   a row with all three parts; any other split is unclear and the parts are asked. Values the row's
   other parts got for their own types are removed;
 - the profile gives a value: stored (`PROFILE`) or computed in code (`DERIVED`: full name from
-  its parts, age from the date of birth, today's date).
+  its parts, age from the date of birth, today's date, the country of a nationality for a field
+  that asks for a country, decision P5-D21: "Country of Citizenship" gets "India", not
+  "Indian"; a nationality missing from `COUNTRY_OF` is asked).
 
 Suggested values (decision P5-D1): a field the policy does not trust, typed by the LLM with a
 confidence of at least `suggest_min_confidence`, gets the profile value with status SUGGESTED:
@@ -42,7 +44,7 @@ from datetime import date
 
 from app.ir.models import Field, FieldKind, FieldStatus, FormIR, Option, TraceEvent, ValueSource
 from app.ir.parts import NamePart, date_groups, name_groups
-from app.ir.phrases import names_institution_number
+from app.ir.phrases import clean_text, names_institution_number
 from app.ir.semantic_types import SEMANTIC_TYPES
 from app.ir.semantic_types import SemanticType as T
 from app.passes.context import PassContext
@@ -95,6 +97,24 @@ def _choose_option(options: list[Option], value: str) -> str | None:
     return letters[0].value if len(letters) == 1 and len(wanted) > 1 else None
 
 
+# The country of a nationality (P5-D21); a country name maps to itself.
+COUNTRY_OF: dict[str, str] = {
+    "indian": "India", "nepali": "Nepal", "nepalese": "Nepal", "bhutanese": "Bhutan",
+    "bangladeshi": "Bangladesh", "sri lankan": "Sri Lanka", "american": "United States",
+    "british": "United Kingdom", "canadian": "Canada", "australian": "Australia",
+}  # fmt: skip
+
+
+def _asks_country(f: Field) -> bool:
+    return "country" in clean_text(f.label_text or "").split()
+
+
+def country_of(nationality: str) -> str | None:
+    key = clean_text(nationality)
+    known = {clean_text(c): c for c in COUNTRY_OF.values()}
+    return COUNTRY_OF.get(key) or known.get(key)
+
+
 def resolve(f: Field, profile: Mapping[str, str], today: date) -> tuple[str, ValueSource] | None:
     """The value for the field's type from the profile, formatted for this field, or None."""
     t = f.semantic_type
@@ -112,6 +132,9 @@ def resolve(f: Field, profile: Mapping[str, str], today: date) -> tuple[str, Val
         return None
     if stored is None:
         return None
+    if t is T.NATIONALITY and _asks_country(f):
+        country = country_of(stored)
+        return (country, ValueSource.DERIVED) if country else None
     if t is T.DATE_OF_BIRTH:
         born = _iso(stored)
         return (format_date(born, date_format_for(f)), ValueSource.PROFILE) if born else None
