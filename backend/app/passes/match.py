@@ -4,6 +4,8 @@ A field is filled only if (decision P4-D2):
 - it is not a never-fill field and has no value yet;
 - it is no tick box or radio (decision P5-D12): a tick comes only from the user's own answer to a
   choice question, never from the profile having a value;
+- the form prints no condition for it (decision P5-D19, `Field.condition`: "(In Case Of
+  Minor*)", "if applicable"): such a field is asked;
 - it asks for no number an institution gives for this application (decision P5-D20): the
   `enrollment_number` type, or a label naming an enrolment, roll, registration, application,
   membership or admission number is always asked;
@@ -159,9 +161,11 @@ INSTITUTION_SCOPED: frozenset[T] = frozenset({T.ENROLLMENT_NUMBER})
 
 
 def _profile_fillable(f: Field) -> bool:
-    """Neither a never-fill field, nor in a group (P5-D8), nor a tick box (P5-D12), nor a number
-    an institution gives (P5-D20)."""
+    """Neither a never-fill field, nor in a group (P5-D8), nor a tick box (P5-D12), nor under a
+    printed condition (P5-D19), nor a number an institution gives (P5-D20)."""
     if f.no_fill_reason is not None or f.group_id is not None or f.kind in TICK_KINDS:
+        return False
+    if f.condition is not None:
         return False
     return f.semantic_type not in INSTITUTION_SCOPED and not names_institution_number(f.label_text)
 

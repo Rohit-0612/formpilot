@@ -389,3 +389,18 @@ def test_a_field_asking_for_a_country_gets_the_country(
     )
 
     assert out.fields[0].value == printed
+
+
+def test_a_field_under_a_printed_condition_is_asked() -> None:
+    """P5-D19: a guardian's name "(In Case Of Minor*)" is not filled for an adult applicant."""
+    conditional = _f(0, T.GUARDIAN_NAME, condition="(In Case Of Minor*)")
+    llm = _f(1, T.FATHER_NAME, "llm", 0.97, condition="if applicable")
+    ctx = PassContext(
+        clock=lambda: NOW,
+        profile={**PROFILE, "guardian_name": "Ramesh Verma"},
+        suggest_min_confidence=0.95,
+    )
+
+    out = match.run(_ir(conditional, llm), ctx)
+
+    assert all(f.value is None and f.status is FieldStatus.NEEDS_INPUT for f in out.fields)
