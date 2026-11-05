@@ -30,6 +30,59 @@ To be completed at the end of the milestone.
 | **P5-D9** (human, 2026-10-27) Prompt `understand_v3` (types and English questions in one call) is dropped; typing stays on `understand_v2`, and a separate **phrase pass** (prompt `phrase_v1.md`) writes the English questions after match, only for the fields asked about the form's own text | accept v3; tune v3 once; measure the run-to-run variance of v2 first | v3 lowered typing on dev: Groq accuracy 70.4 % (369/524) → 69.5 % (364/524), fill precision 86.5 % (64/74) → 84.4 % (65/77), below the 85 % target; qwen3:8b 64.3 % → 60.9 % (319/524), fillable accuracy 58.1 % → 52.3 % (126/241). One failed Groq batch (#21, page 1) was re-asked in record mode. A separate call keeps typing unchanged and asks the model only about the fields that are asked |
 | **P5-D10** (human, 2026-11-03) The product keeps `FILL_MIN_CONFIDENCE` = **0.99** (once per form). After the P5-D8 fixes the P4-D2 selection rule picks LLM confidence ≥ **0.95**, once per form (dev, Groq, full persona: fill precision 87.4 % (97/111), coverage 40.2 %); that pick is recorded as a known difference between the eval and the product | move the fill threshold to 0.95 (more coverage, 0.95 meets the 85 % target) | 0.95 is the suggestion floor (P5-D1): with the fill threshold also at 0.95 the suggested band would be empty. At 0.99: fill precision 88.6 % (70/79), coverage 29.0 % |
 | **P5-D11** (human, 2026-11-03; changes P5-D2) The human's spot-check of 3 rendered dev PDFs is waived. It is replaced by two checks, each run before and after the render fixes (P5-D12 to P5-D16): (1) a fresh-eyes review by a separate Claude Code agent that has not seen Claude Code's own findings, given the renders and the printed fields per form; its findings are compared with Claude Code's; (2) programmatic render checks (`make render-check`): every printed character inside its field's box or its comb cell, the day / month / year parts of a date printed all or none, nothing printed in a never-fill field or an office-use area, a tick box ticked only from the user's own choice | the human spot-checks 3 (P5-D2) | The human's call, as with P4-D3. Claude Code still inspects all renders as images |
+| **P5-D12** (human, 2026-11-03) A tick box or radio never keeps a type that holds a value (a passport number, a name: such a type becomes `other`), and a tick is never set from the profile: it comes only from the user's own answer to a choice question | tick a box whose type the profile has a value for (M3 before) | Dev form #03: "A- PASSPORT" was ticked because the profile has a passport number; the user picks the document. An AcroForm radio group is now asked too; a dropdown is still filled |
+| **P5-D13** (human, 2026-11-03) The day, month and year parts of one date (`app.ir.parts.date_groups`) are filled all or none; if one part is only a suggestion, so are the others | fill each part on its own | Dev form #03, section F: only the DD part was typed as a date and printed |
+| **P5-D14** (human, 2026-11-03; IR addition `Field.cells` approved the same day) A comb row keeps its cells as drawn; each character is centred in its own cell and measured against it | equal cells over the comb's box (M3 before); a known limitation with a review note | Dev form #25's Aadhaar cells differ in width: two digits sat on the dividers. Done inside the half-session time-box |
+| **P5-D15** (human, 2026-11-03) Below a centred line saying the part is to be filled by an official, an office, the bank, BPM/SPM, a postmaster or an authority (and not by the applicant too), every field on the page is `office_use`; so is a field whose own label or heading says so | mark only "for office use" text (P3-D1) | Dev form #41 is an acknowledgement slip the post office fills in. Dev: 17 fields newly office-use, all on #41 |
+| **P5-D16** (human, 2026-11-03) A whole name (guardian's, father's, mother's, spouse's, the applicant's) in FIRST / MIDDLE / LAST boxes is split into the parts as suggestions, confirmed one by one, never the whole name in one part: two words are first and last, three fill a row with three parts, anything else is asked | the whole name in the first part (M3 before) | Dev form #01's guardian row. Since P5-D19 that row is conditional and asked, so no dev field is split now |
+| **P5-D17** (human, 2026-11-05) The fill eval counts only values with status `filled` as fills; a suggestion is not a fill (P5-D1). New metric: suggestion precision, with the product's floor (0.95), each part of a split name against the persona's matching part of that person's name, any other suggestion against the value its reference type gets | count every profile value whatever its status (before) | At `14e5bc3` the old definition counted the two split guardian parts as fills (asha 77 filled, 69 right type, 68 right value; new definition 75 / 68 / 68). Old and new give the same numbers at `c955d10` and now (table below) |
+| **P5-D18** (human, 2026-11-05) Fields below a tear-off slip's title ("ACKNOWLEDGEMENT …", "RECEIPT", a short line) to the page's end, and fields below a line of its own saying "(For office use only)" up to the next section heading (bold or large, near the note) are `office_use`. Office-use phrases match through ligatures a text layer extracts as other letters ("oĦce") | only fields inside a drawn office-use box (P3-D1) | Fresh-eyes review: dates and account numbers printed in bank slips and in #01's CIF block. Dev: 63 fields newly office-use, all in office areas (#01 page 1 CIF block, page 4 "FOR OFFICE USE/ATTESTATION", page 5 "ACKNOWLEDGEMENT DA-1"; #02 and #03 office blocks and acknowledgements) |
+| **P5-D19** (human, 2026-11-05; IR addition `Field.condition` approved the same day) A short line stating a condition ("in case of", "if applicable", "where applicable", "only if", "if yes", at most 8 words) sets `Field.condition` on the fields of its row from its start on, and a note in parentheses under a row's label ("(In Case Of Minor*)") also on the row above. Such a field is never filled or suggested from the profile: it is asked | prefill and let the user clear it | Dev form #01: the guardian's name "(In Case Of Minor*)" was prefilled for an adult. Dev: 12 fields get a condition, all conditional on the form |
+| **P5-D20** (human, 2026-11-05) Numbers an institution gives for this application are never filled or suggested from the profile: the `enrollment_number` type and any label naming an enrolment, roll, registration, application, membership or admission number | fill the profile's number | Dev form #25: a 2014 enrolment number from another institute printed on a 2026-27 admission |
+| **P5-D21** (human, 2026-11-05) A nationality-typed field whose label asks for a country gets the country of the stored nationality from a fixed table ("Indian" → "India"); a nationality not in the table is asked | print the nationality | Dev form #25: "Country of Citizenship: Indian" |
+
+### Dev numbers before and after the render fixes (P5-D12 to P5-D21)
+
+Groq `openai/gpt-oss-120b` replayed, `understand_v2`; `c955d10` is the last commit before the
+render fixes, `b24202a` the last fix. Reports: `eval/reports/*-m3-forms-after-20261101-51463a8*`
+and `*-m3-render-fixes-20261105-b24202a*`.
+
+| Understanding (dev) | c955d10 | b24202a |
+|---|--:|--:|
+| Groq, all fields | 74.4 % (390/524) | 74.4 % (390/524) |
+| Groq, fillable accuracy | 70.5 % (170/241) | 70.5 % (170/241) |
+| qwen3:8b, live, all / fillable | 66.4 % / 64.7 % (`4f143bd`) | 66.4 % (348/524) / 64.7 % (156/241) |
+
+Fill, product policy (LLM confidence ≥ 0.99, once per form), under the definition before P5-D17
+(a profile value counts as a fill whatever its status) and after it (only status `filled`):
+
+| Persona | Definition | c955d10: filled, fill precision, coverage, value precision | b24202a |
+|---|---|---|---|
+| `asha_verma` | old | 79, 88.6 % (70/79), 29.0 %, 88.6 % (70/79) | 66, 92.4 % (61/66), 25.3 %, 92.4 % (61/66) |
+| `asha_verma` | new | 79, 88.6 %, 29.0 %, 88.6 % | 66, 92.4 %, 25.3 %, 92.4 % |
+| `meera_iyer` | old | 56, 87.5 % (49/56), 20.3 %, 87.5 % (49/56) | 47, 93.6 % (44/47), 18.3 %, 93.6 % (44/47) |
+| `meera_iyer` | new | 56, 87.5 %, 20.3 %, 87.5 % | 47, 93.6 %, 18.3 %, 93.6 % |
+| `ravi_kumar` | old | 71, 91.5 % (65/71), 27.0 %, 91.5 % (65/71) | 63, 93.7 % (59/63), 24.5 %, 93.7 % (59/63) |
+| `ravi_kumar` | new | 71, 91.5 %, 27.0 %, 91.5 % | 63, 93.7 %, 24.5 %, 93.7 % |
+
+The two definitions agree at both commits: the eval context has no suggestion floor, and since
+P5-D19 the guardian row is conditional, so no split name is suggested on dev. They differed at
+`14e5bc3` (asha 77 / 69 / 68 old, 75 / 68 / 68 new). A per-field diff explains every changed fill
+(asha: 8 office-use P5-D15/D18, 3 institution numbers P5-D20, 1 condition P5-D19, 1 date part
+P5-D13; meera 4 / 3 / 1 / 1; ravi 7 office-use, 1 date part); fill precision and value precision
+rose for every persona, the coverage drop comes from those fields only (human: expected).
+Suggestion precision (P5-D17, floor 0.95, product policy): asha 64.5 % (20/31), meera 69.2 %
+(18/26), ravi 70.8 % (17/24). The P4-D2 rule now picks ≥ 0.90, once per form: 85.7 % (90/105),
+coverage 37.3 %.
+
+Render checks (`make render-check`, P5-D11): before (`bfacffa`) 5 failures (#03 a part-printed
+date and a tick from the profile, #25 two comb digits on dividers, #41 two fields below an
+official-only heading); after (`b24202a`) none on the 11 forms. Fresh-eyes review by a separate
+agent: 35 problems before (12 high), 13 after (6 high): the generic-label fills (nominee name and
+age, #21 address, #32 guardian name), #21's certificate date, the existing account's number,
+and the low-severity notes in Known limitations; new after: #03's address in mixed case although
+page 1 asks for BLOCK letters (the case hint is per page), #01's FATCA account number (a
+conditional annexure without a condition line), #21 page 1's IFSC alone in its table.
 
 ### Milestone plan (approved)
 
@@ -72,8 +125,28 @@ run of 2026-11-01). The rest is completed at the end of the milestone.
   → 91.5 % (65/71): 6 more right fills and 1 more wrong one (net +5). All 6 wrong fills come from rules on
   generic labels ("Name", "Age", "Date", "Name of the Bank") that refer to another person or
   thing (a nominee, a bank). After v1 (PLAN.md); no tuning now.
-- **Eval pick vs product threshold** (P5-D10): the fill eval's chosen policy is ≥ 0.95, the
-  product fills at ≥ 0.99.
+- **Eval pick vs product threshold** (P5-D10): the fill eval's chosen policy is ≥ 0.95 at
+  `c955d10` and ≥ 0.90, once per form after the render fixes (85.7 %, 90/105); the product fills
+  at ≥ 0.99.
+- **Form 41, the official's slip Date** (human, 2026-11-05). The frozen reference labels the post
+  office's acknowledgement date `date_of_filling`; P5-D15 makes the slip office-use, so the fill
+  eval loses one right fill per persona. It is not an applicant fill; the labels stay unchanged,
+  as for form 06.
+
+Accepted by the human on 2026-11-05, no fix in M3 (from the fresh-eyes review of P5-D11):
+
+- **Form 21's post-office certificate DATE** ("We hereby certify …", signed by the Post Office
+  official) is printed: the block has no "to be filled by" line, no office-use phrase and no slip
+  title.
+- **An existing account's number and branch on an account-opening form** (#01's DA-1 and FATCA
+  account numbers): the profile's account is not the account being opened. Part of the generic-
+  label entry in PLAN.md's After v1 list.
+- **Form 23's "Telephone No." gets the alternate number** (typed `phone_alternate` by rule), not
+  the mobile.
+- **Values slightly above their line** (form 21's Branch and IFSC): text is centred in the
+  detected box, whose bottom is the drawn line.
+- **01/01/2026 in the renders** is the eval's fixed clock (`run_eval.FIXED_TIME`), so runs are
+  reproducible; the product prints the day of filling.
 
 ## Open issues
 
@@ -87,6 +160,22 @@ run of 2026-11-01). The rest is completed at the end of the milestone.
 - Commit `58a5b2e` (the last Groq understanding batches) says the batches are from forms 06, 25
   and 32; a replay check shows they are from **form 25 (three batches) and form 32 (one)**. Form
   06's batches were recorded in `51463a8`. Not amended, for the same reason.
+
+## Resume point (2026-11-05)
+
+- **Done in M3:** IR additions (suggestions, uppercase, question text, date parts, groups, comb
+  cells, conditions); case hints, suggestions, readable questions (phrase pass), grouping;
+  questions, address and fill evals; review routes and audit; overlay renderer with Devanagari
+  (P5-D5), render job and download; `render-samples` and `render-check`; render fixes P5-D12 to
+  P5-D21. Last commit of this stretch: see `git log` after `f5a7c28`; CI green.
+- **Next, in the human's order (2026-11-05):** (1) the Devanagari time-box, started only when the
+  human says so (P5-D5 records a first time-box as met on 2026-10-27; ask what this one covers);
+  (2) the M3 gate and the teach-back / "In my own words" checkpoint. Not built yet and needed for
+  the gate (PLAN Phase 5 acceptance): the expiry job, the review screen with readable questions,
+  the fill-correctness and placement evals, the UX metric, the Playwright happy path.
+- **Open for the human:** P5-D7 ("confirm all") still awaits the human's OK; the new
+  fresh-eyes findings listed above (per-page case hint, FATCA annexure, #21 page 1 IFSC) are not
+  decided.
 
 ## Notes for the next phase
 

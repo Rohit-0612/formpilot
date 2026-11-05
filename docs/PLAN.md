@@ -67,7 +67,8 @@ human (about 10 minutes). The final teach-back comes before the README is writte
 - drag / resize of boxes in review;
 - signature areas above a caption with nothing drawn (Phase 2's fix 8);
 - rule matches on generic labels that may refer to another person (nominee, bank): "Name",
-  "Age", "Date", "Name of the Bank" (human decision, 2026-11-03; no tuning in M3);
+  "Age", "Date", "Name of the Bank" (human decision, 2026-11-03; no tuning in M3), and an
+  existing account's number and branch used on an account-opening form (human, 2026-11-05);
 - Phase 6 (scanned PDFs and OCR);
 - Phase 7's provider comparison;
 - Phase 8.
