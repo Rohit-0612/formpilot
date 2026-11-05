@@ -4,6 +4,9 @@ A field is filled only if (decision P4-D2):
 - it is not a never-fill field and has no value yet;
 - it is no tick box or radio (decision P5-D12): a tick comes only from the user's own answer to a
   choice question, never from the profile having a value;
+- it asks for no number an institution gives for this application (decision P5-D20): the
+  `enrollment_number` type, or a label naming an enrolment, roll, registration, application,
+  membership or admission number is always asked;
 - its semantic type is confident under the policy: matched by a rule, or by the LLM with a
   confidence of at least `min_llm_confidence` (None: the LLM's types never fill);
 - a type in `once_per_form` has not been filled earlier on the form (reading order): a second
@@ -39,6 +42,7 @@ from datetime import date
 
 from app.ir.models import Field, FieldKind, FieldStatus, FormIR, Option, TraceEvent, ValueSource
 from app.ir.parts import NamePart, date_groups, name_groups
+from app.ir.phrases import names_institution_number
 from app.ir.semantic_types import SEMANTIC_TYPES
 from app.ir.semantic_types import SemanticType as T
 from app.passes.context import PassContext
@@ -128,9 +132,15 @@ def _once_key(f: Field) -> tuple[T, str | None]:
     return f.semantic_type, f.date_part
 
 
+INSTITUTION_SCOPED: frozenset[T] = frozenset({T.ENROLLMENT_NUMBER})
+
+
 def _profile_fillable(f: Field) -> bool:
-    """Neither a never-fill field, nor in a group (P5-D8), nor a tick box (P5-D12)."""
-    return f.no_fill_reason is None and f.group_id is None and f.kind not in TICK_KINDS
+    """Neither a never-fill field, nor in a group (P5-D8), nor a tick box (P5-D12), nor a number
+    an institution gives (P5-D20)."""
+    if f.no_fill_reason is not None or f.group_id is not None or f.kind in TICK_KINDS:
+        return False
+    return f.semantic_type not in INSTITUTION_SCOPED and not names_institution_number(f.label_text)
 
 
 def typed_field_ids(ir: FormIR, policy: FillPolicy) -> set[str]:

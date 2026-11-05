@@ -339,3 +339,31 @@ def test_the_applicants_own_name_parts_are_filled_as_before() -> None:
 
     assert [f.value for f in out.fields] == ["Asha", "Kumari", "Verma"]
     assert {f.status for f in out.fields} == {FieldStatus.FILLED}
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "with Registration No./ Enrolment number",
+        "Roll No. of the student",
+        "Application Number",
+        "Membership ID",
+        "Enrollment No",
+    ],
+)
+def test_numbers_an_institution_gives_are_always_asked(label: str) -> None:
+    """P5-D20 (dev form #25): a profile's enrolment number is another institution's."""
+    typed = _f(0, T.ENROLLMENT_NUMBER, label=label)
+    other_type = _f(1, T.PAN, label=label)
+    profile = {**PROFILE, "enrollment_number": "EIT2014CS001", "pan": "ABCDE1234F"}
+
+    out = match.run(_ir(typed, other_type), PassContext(clock=lambda: NOW, profile=profile))
+
+    assert all(f.value is None and f.status is FieldStatus.NEEDS_INPUT for f in out.fields)
+
+
+@pytest.mark.parametrize("label", ["Date of Admission", "Name of the applicant", "Mobile No."])
+def test_other_labels_are_no_institution_number(label: str) -> None:
+    from app.ir.phrases import names_institution_number
+
+    assert not names_institution_number(label)

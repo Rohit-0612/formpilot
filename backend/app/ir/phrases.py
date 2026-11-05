@@ -143,6 +143,30 @@ def filled_by_others(text: str | None) -> bool:
     return False
 
 
+# Numbers an institution gives for this application or membership (decision P5-D20): a profile's
+# number from another institution or an earlier application is not the one asked for.
+_INSTITUTION_NUMBERS = (
+    "enrolment",
+    "enrollment",
+    "roll",
+    "registration",
+    "application",
+    "membership",
+    "admission",
+)
+_NUMBER_WORDS = frozenset({"no", "number", "num", "id"})
+
+
+def names_institution_number(text: str | None) -> bool:
+    """The text asks for an enrolment, roll, registration, application, membership or admission
+    number ("Registration No./ Enrolment number", "Roll No. of the student")."""
+    words = clean_text(text or "").split()
+    return any(
+        word.startswith(_INSTITUTION_NUMBERS) and _NUMBER_WORDS & set(words[i + 1 : i + 3])
+        for i, word in enumerate(words)
+    )
+
+
 # How a line telling the reader what to do starts (Phase 5): such a line is not a heading.
 _DIRECTIVE_STARTS = ("please ", "kindly ", "note:", "note ", "n.b.", "nb:", "important:")
 MIN_SENTENCE_WORDS = 4
