@@ -54,6 +54,7 @@ from app.ir.phrases import (
     instructs_upper_case,
     is_instruction,
     mentions_office_use,
+    states_condition,
 )
 
 STAGE = "frontend.flat"
@@ -184,6 +185,7 @@ class _Candidate:
     validations: list[ValidationResult] = field(default_factory=list)
     no_fill_reason: Literal["office_use"] | None = None
     no_fill_why: str = "inside an office-use box"  # for the trace
+    condition: str | None = None  # P5-D19: "(In Case Of Minor*)"
     case_hint: Literal["label", "page"] | None = None  # write the value upper-case
     hint: str | None = None  # the grey hint printed in a comb part ("FIRST NAME", "DD")
     date_part: DatePart | None = None
@@ -1709,6 +1711,31 @@ def _mark_office_areas(candidates: list[_Candidate], text: _PageText) -> None:
                 break
 
 
+# A condition note is a short line of its own (decision P5-D19): "(In Case Of Minor*)" under
+# "9.Name of Guardian". A long line that mentions a case is a heading or an instruction.
+MAX_CONDITION_WORDS = 8
+CONDITION_ROW_REACH = 2.5  # line heights above the note where its row may sit
+
+
+def _mark_conditions(candidates: list[_Candidate], text: _PageText) -> None:
+    """The fields a condition applies to: on its own row to its right ("If yes, [ ] i. Visually
+    impaired"), and for a note in parentheses printed under a row's label ("(In Case Of Minor*)")
+    the row right above it, from the note's left edge on."""
+    for line in text.lines:
+        words = clean_text(line.text).split()
+        if not words or len(words) > MAX_CONDITION_WORDS or not states_condition(line.text):
+            continue
+        x0, top, _, bottom = line.rect
+        reach = CONDITION_ROW_REACH * (bottom - top)
+        note = line.text.strip().startswith("(") and line.text.strip().rstrip("*:. ").endswith(")")
+        for cand in candidates:
+            middle = (cand.rect[1] + cand.rect[3]) / 2
+            same_row = top <= middle <= bottom and cand.rect[0] >= x0
+            row_above = note and top - reach <= middle < top and cand.rect[2] > x0
+            if cand.condition is None and (same_row or row_above):
+                cand.condition = " ".join(line.text.split())[:200]
+
+
 _TEXT_KINDS = frozenset({FieldKind.TEXT, FieldKind.DATE, FieldKind.UNKNOWN})
 
 
@@ -1764,6 +1791,7 @@ def _page_candidates(page: pymupdf.Page) -> tuple[list[_Candidate], list[str]]:
     _mark_office_use(kept, cells, text, page_area)
     _mark_filled_by_others(kept, text, unrotated)
     _mark_office_areas(kept, text)
+    _mark_conditions(kept, text)
     _mark_upper_case(kept, text)
     return kept, notes
 
@@ -1882,6 +1910,7 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                     bbox=bbox,
                     max_chars=cand.max_chars,
                     cells=[_displayed(cell, page, page_no) for cell in cand.cells],
+                    condition=cand.condition,
                     validations=cand.validations,
                     no_fill_reason=cand.no_fill_reason,
                     uppercase=cand.case_hint is not None,
@@ -1901,6 +1930,12 @@ def run(doc: pymupdf.Document, detection: Detection, document_id: UUID, at: date
                         field_id=field_id,
                         change=f"no_fill_reason office_use ({cand.no_fill_why})",
                         at=at,
+                    )
+                )
+            if cand.condition is not None:
+                trace.append(
+                    TraceEvent(
+                        pass_name=STAGE, field_id=field_id, change="condition (printed note)", at=at
                     )
                 )
             if cand.case_hint is not None:

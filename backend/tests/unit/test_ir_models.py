@@ -351,3 +351,14 @@ def test_consistency_messages_never_contain_values() -> None:
         _ir(fields=duplicate)
 
     assert all(FAKE_PAN not in error["msg"] for error in excinfo.value.errors())
+
+
+def test_a_printed_condition_round_trips_and_is_form_text_only() -> None:
+    """P5-D19: the condition is the form's own note; an IR stored without it still loads."""
+    ir = _ir(fields=[_field(condition="(In Case Of Minor*)"), _field("p0_f001")])
+
+    restored = FormIR.model_validate_json(ir.model_dump_json())
+
+    assert [f.condition for f in restored.fields] == ["(In Case Of Minor*)", None]
+    with pytest.raises(ValidationError):
+        _field(condition="")

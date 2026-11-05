@@ -1305,6 +1305,19 @@
             },
             "type": "array",
             "title": "Cells"
+          },
+          "condition": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition"
           }
         },
         "additionalProperties": false,

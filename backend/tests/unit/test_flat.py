@@ -773,3 +773,45 @@ def test_a_lone_tick_box_is_no_group() -> None:
         _text(page, 86, 130, "I agree to the terms.")
 
     assert _run(_pdf(draw)).groups == []
+
+
+def test_a_note_in_parentheses_under_a_row_makes_the_row_conditional() -> None:
+    """P5-D19 (dev form #01): "(In Case Of Minor*)" printed under "9.Name of Guardian"."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "8.Mobile: " + "_" * 30)
+        _text(page, 72, 140, "9.Name of Guardian: " + "_" * 30)
+        _text(page, 72, 152, "(In Case Of Minor*)")
+        _text(page, 72, 200, "10.Nationality: " + "_" * 30)
+
+    mobile, guardian, nationality = _run(_pdf(draw)).fields
+
+    assert guardian.condition == "(In Case Of Minor*)"
+    assert mobile.condition is None and nationality.condition is None
+    events = {e.change for e in _run(_pdf(draw)).trace if e.field_id == guardian.id}
+    assert "condition (printed note)" in events
+
+
+def test_a_condition_in_a_label_reaches_only_its_own_row() -> None:
+    """ "if yes : Identification Marks" labels the blank on its right, not the row above it."""
+
+    def draw(page: pymupdf.Page) -> None:
+        _text(page, 72, 100, "6.Name of Spouse: " + "_" * 30)
+        _text(page, 72, 120, "if yes : Identification Marks: " + "_" * 20)
+
+    spouse, marks = _run(_pdf(draw)).fields
+
+    assert spouse.condition is None and marks.condition == "if yes : Identification Marks:"
+
+
+def test_a_long_line_mentioning_a_case_is_no_condition() -> None:
+    def draw(page: pymupdf.Page) -> None:
+        _text(
+            page,
+            72,
+            100,
+            "(In case of joint accounts, Part I and the terms are taken for each one)",
+        )
+        _text(page, 72, 130, "Name: " + "_" * 30)
+
+    assert all(f.condition is None for f in _run(_pdf(draw)).fields)

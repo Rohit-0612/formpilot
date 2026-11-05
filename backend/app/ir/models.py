@@ -150,6 +150,10 @@ class Field(_IRModel):
     # P5-D14; cells can differ in width). Empty when the form does not draw them (any other
     # field, an AcroForm comb); `max_chars` cells of equal width are assumed then.
     cells: list[BBox] = pydantic.Field(default_factory=list)
+    # A condition the form prints for the field ("(In Case Of Minor*)", "if applicable"): the
+    # field is asked, never filled or suggested from the profile (decision P5-D19). Printed form
+    # text only, never a value. Set by the frontend.
+    condition: str | None = pydantic.Field(default=None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
     def _cells_match(self) -> Self:

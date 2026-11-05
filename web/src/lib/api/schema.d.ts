@@ -453,6 +453,8 @@ export interface components {
             group_id?: string | null;
             /** Cells */
             cells?: components["schemas"]["BBox"][];
+            /** Condition */
+            condition?: string | null;
         };
         /**
          * FieldEdit

@@ -172,6 +172,16 @@ def names_institution_number(text: str | None) -> bool:
     )
 
 
+# A part the applicant fills only in some cases (decision P5-D19): "(In Case Of Minor*)".
+CONDITION_PHRASES = (
+    "in case of", "if applicable", "where applicable", "applicable only", "only if", "if yes",
+)  # fmt: skip
+
+
+def states_condition(text: str | None) -> bool:
+    return mentions(text, CONDITION_PHRASES)
+
+
 # How a line telling the reader what to do starts (Phase 5): such a line is not a heading.
 _DIRECTIVE_STARTS = ("please ", "kindly ", "note:", "note ", "n.b.", "nb:", "important:")
 MIN_SENTENCE_WORDS = 4
