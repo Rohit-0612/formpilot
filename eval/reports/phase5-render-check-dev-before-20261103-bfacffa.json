@@ -1,0 +1,165 @@
+{
+  "kind": "render-check",
+  "split": "dev",
+  "detector": "flat@bfacffa",
+  "provider": "groq:openai/gpt-oss-120b",
+  "created_at": "2026-11-03T15:04:10+00:00",
+  "tag": "before",
+  "checks": [
+    "characters",
+    "dates",
+    "never_fill",
+    "ticks"
+  ],
+  "forms": {
+    "01_sbi_account_opening_form": {
+      "printed": 20,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "02_sbi_kyc_annexure_a": {
+      "printed": 11,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "03_sbi_kyc_annexure_b": {
+      "printed": 8,
+      "failures": {
+        "characters": 0,
+        "dates": 1,
+        "never_fill": 0,
+        "ticks": 1
+      },
+      "violations": [
+        {
+          "check": "dates",
+          "field_id": "p1_f045",
+          "page": 2,
+          "detail": "date printed without month, year"
+        },
+        {
+          "check": "ticks",
+          "field_id": "p1_f000",
+          "page": 2,
+          "detail": "ticked from profile"
+        }
+      ]
+    },
+    "06_union_bank_nomination_form": {
+      "printed": 1,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "21_india_post_pmjjby_claim_form": {
+      "printed": 10,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "23_lic_claim_form_a_3783": {
+      "printed": 3,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "25_cdlsiet_btech_admission_form": {
+      "printed": 10,
+      "failures": {
+        "characters": 2,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": [
+        {
+          "check": "characters",
+          "field_id": "p0_f019",
+          "page": 1,
+          "detail": "a character on a comb cell divider"
+        },
+        {
+          "check": "characters",
+          "field_id": "p0_f019",
+          "page": 1,
+          "detail": "a character on a comb cell divider"
+        }
+      ]
+    },
+    "30_allahabad_univ_enrollment_form": {
+      "printed": 4,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "32_niftem_student_declaration_form": {
+      "printed": 4,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "39_cebs_joining_report": {
+      "printed": 1,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "41_india_post_pli_name_change_form": {
+      "printed": 2,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 2,
+        "ticks": 0
+      },
+      "violations": [
+        {
+          "check": "never_fill",
+          "field_id": "p0_f013",
+          "page": 1,
+          "detail": "below an official-only heading"
+        },
+        {
+          "check": "never_fill",
+          "field_id": "p0_f014",
+          "page": 1,
+          "detail": "below an official-only heading"
+        }
+      ]
+    }
+  }
+}

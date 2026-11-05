@@ -1,0 +1,126 @@
+{
+  "kind": "render-check",
+  "split": "dev",
+  "detector": "flat@b24202a",
+  "provider": "groq:openai/gpt-oss-120b",
+  "created_at": "2026-11-05T05:41:24+00:00",
+  "tag": "after",
+  "checks": [
+    "characters",
+    "dates",
+    "never_fill",
+    "ticks"
+  ],
+  "forms": {
+    "01_sbi_account_opening_form": {
+      "printed": 16,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "02_sbi_kyc_annexure_a": {
+      "printed": 11,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "03_sbi_kyc_annexure_b": {
+      "printed": 6,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "06_union_bank_nomination_form": {
+      "printed": 1,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "21_india_post_pmjjby_claim_form": {
+      "printed": 10,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "23_lic_claim_form_a_3783": {
+      "printed": 3,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "25_cdlsiet_btech_admission_form": {
+      "printed": 8,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "30_allahabad_univ_enrollment_form": {
+      "printed": 4,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "32_niftem_student_declaration_form": {
+      "printed": 4,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "39_cebs_joining_report": {
+      "printed": 1,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    },
+    "41_india_post_pli_name_change_form": {
+      "printed": 0,
+      "failures": {
+        "characters": 0,
+        "dates": 0,
+        "never_fill": 0,
+        "ticks": 0
+      },
+      "violations": []
+    }
+  }
+}
