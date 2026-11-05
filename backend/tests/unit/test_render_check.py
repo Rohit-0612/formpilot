@@ -10,6 +10,7 @@ from itertools import pairwise
 from typing import Any
 
 import pymupdf
+import pytest
 
 from app.ir.models import (
     BBox,
@@ -226,3 +227,27 @@ def test_a_tick_counts_only_from_the_users_choice() -> None:
     found = render_check.check_ticks(_ir(assumed, chosen), ["p0_f000", "p0_f001"])
 
     assert [(v.field_id, v.detail) for v in found] == [("p0_f000", "ticked from profile")]
+
+
+# --- Devanagari smoke test ----------------------------------------------------------------------
+
+
+def test_the_overlay_renderer_shapes_devanagari() -> None:
+    """P5-D23: conjuncts are one glyph, a pre-base vowel sign sits left of its consonant."""
+    assert render_check.devanagari_smoke() == []
+
+
+def test_the_smoke_test_catches_unshaped_devanagari(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Writing the code points one by one, with no shaping, fails the conjuncts and the
+    pre-base vowel sign."""
+    from app.backends import overlay
+
+    def unshaped(page: pymupdf.Page, field: Field, value: str) -> bool:
+        page.insert_text((field.bbox.x0 + 2, field.bbox.y1 - 4), value, fontsize=10)
+        return True
+
+    monkeypatch.setattr(overlay, "_draw_shaped", unshaped)
+
+    failures = render_check.devanagari_smoke()
+
+    assert {f.split(":")[0] for f in failures} >= {"p0_f000", "p0_f001", "p0_f002"}

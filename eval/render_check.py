@@ -14,6 +14,10 @@ The dev forms go through the same passes as `make render-samples`; then, per for
   like (P5-D15);
 - ticks: a tick box is ticked only from the user's own answer or edit (P5-D12).
 
+Once per run, a Devanagari smoke test (decision P5-D23): a synthetic page with Devanagari values
+rendered by the overlay renderer; a conjunct ("क्ष", "श्र") must be one shaped glyph, a pre-base
+vowel sign ("कि") must sit left of its consonant, a post-base one ("की") right of it.
+
 Reports (JSON and Markdown) go to eval/reports/. They hold field ids, pages and counts, never a
 printed value or character.
 """
@@ -25,13 +29,27 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import UUID
 
 import pymupdf
 
-from app.ir.models import BBox, FieldKind, FormIR, ValueSource
+from app.backends import overlay
+from app.ir.models import (
+    BBox,
+    Field,
+    FieldKind,
+    FieldStatus,
+    FormIR,
+    PageInfo,
+    SourceKind,
+    TextLayer,
+    ValueSource,
+)
 from app.ir.parts import date_groups
 from app.ir.phrases import filled_by_others, mentions_office_use
 from app.logging import configure_logging
+from app.passes import fit
+from app.passes.context import PassContext
 from eval import run_eval
 from eval.labelling.schema import REPO_ROOT
 from eval.labelling.tasks import detector_version
@@ -247,6 +265,61 @@ def check_form(
     )
 
 
+# (value, what correct shaping looks like) for the Devanagari smoke test (P5-D23)
+DEVANAGARI_CASES = (
+    ("क्ष", "conjunct"),
+    ("श्र", "conjunct"),
+    ("कि", "pre-base vowel sign"),
+    ("की", "post-base vowel sign"),
+)
+
+
+def devanagari_smoke() -> list[str]:
+    """Failures of the Devanagari smoke test; empty when every case is shaped right."""
+    fields = [
+        Field(
+            id=f"p0_f{i:03d}",
+            kind=FieldKind.TEXT,
+            native_name=None,
+            label_text="Name",
+            context_text=None,
+            bbox=BBox(page=0, x0=100, y0=100 + 40 * i, x1=400, y1=126 + 40 * i),
+            value=value,
+            value_source=ValueSource.USER_ANSWER,
+            status=FieldStatus.CONFIRMED,
+        )
+        for i, (value, _) in enumerate(DEVANAGARI_CASES)
+    ]
+    ir = FormIR(
+        document_id=UUID(int=0), source_kind=SourceKind.FLAT_TEXT,
+        pages=[PageInfo(width=595, height=842, text_layer=TextLayer.OK)], fields=fields,
+    )  # fmt: skip
+    blank = pymupdf.open()
+    blank.new_page(width=595, height=842)
+    out = overlay.render(blank.tobytes(), fit.run(ir, PassContext(clock=lambda: datetime.now(UTC))))
+    failures = [f"{f.id}: not drawn" for f in fields if f.id not in out.drawn]
+    with pymupdf.open("pdf", out.pdf) as doc:
+        glyphs = [
+            (ch["c"], ch["bbox"])
+            for block in doc[0].get_text("rawdict")["blocks"]
+            for line in block.get("lines", [])
+            for span in line["spans"]
+            for ch in span["chars"]
+        ]
+    for f, (_, kind) in zip(fields, DEVANAGARI_CASES, strict=True):
+        inside = sorted(
+            (bbox[0], c) for c, bbox in glyphs if f.bbox.y0 <= (bbox[1] + bbox[3]) / 2 <= f.bbox.y1
+        )
+        if kind == "conjunct":
+            ok = len(inside) == 1
+        else:
+            order = [c == "क" for _, c in inside]  # True for the consonant, left to right
+            ok = order == ([False, True] if kind.startswith("pre") else [True, False])
+        if not ok:
+            failures.append(f"{f.id}: {kind} not shaped ({len(inside)} glyphs)")
+    return failures
+
+
 def report(forms: Sequence[RenderedForm], tag: str | None, provider: str) -> dict[str, object]:
     per_form: dict[str, object] = {}
     for item in forms:
@@ -265,6 +338,7 @@ def report(forms: Sequence[RenderedForm], tag: str | None, provider: str) -> dic
         "tag": tag,
         "checks": list(CHECKS),
         "forms": per_form,
+        "devanagari_smoke": devanagari_smoke(),
     }
 
 
@@ -289,6 +363,13 @@ def markdown(data: dict[str, object]) -> str:
         counts = " | ".join(str(failures[c]) for c in CHECKS)
         lines.append(f"| {name} | {form['printed']} | {counts} |")
     lines.append("| **Total** | | " + " | ".join(f"**{totals[c]}**" for c in CHECKS) + " |")
+    smoke: list[str] = data.get("devanagari_smoke", [])  # type: ignore[assignment]
+    cases = ", ".join(f"{v} ({k})" for v, k in DEVANAGARI_CASES)
+    lines += [
+        "",
+        f"Devanagari smoke test (P5-D23; {cases}): "
+        + ("passed." if not smoke else "**failed**: " + "; ".join(smoke)),
+    ]
     lines += ["", "## Failures", ""]
     any_failure = False
     for name, form in forms.items():
@@ -325,6 +406,8 @@ def main(argv: list[str] | None = None) -> int:
     forms_data: dict[str, dict[str, object]] = data["forms"]  # type: ignore[assignment]
     for name, form in forms_data.items():
         print(f"{name}: {form['printed']} printed, failures {form['failures']}")  # noqa: T201
+    smoke_failures: list[str] = data["devanagari_smoke"]  # type: ignore[assignment]
+    print(f"devanagari smoke: {smoke_failures or 'passed'}")  # noqa: T201 - CLI output
     print(base.with_suffix(".md"))  # noqa: T201 - CLI output
     return 0
 
