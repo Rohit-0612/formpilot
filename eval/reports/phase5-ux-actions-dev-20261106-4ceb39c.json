@@ -1,0 +1,267 @@
+{
+  "kind": "ux-actions",
+  "split": "dev",
+  "detector": "flat@4ceb39c",
+  "provider": "groq:openai/gpt-oss-120b",
+  "created_at": "2026-11-06T10:52:19+00:00",
+  "tag": null,
+  "persona": "asha_verma",
+  "suggest_min_confidence": 0.95,
+  "policy": "LLM confidence >= 0.99, once per form",
+  "before_note": "Before: recomputed from today's pipeline with the M3 features turned off (no suggestions, the M2 question plan, no confirm all), not a historical M2 measurement.",
+  "forms": {
+    "01_sbi_account_opening_form": {
+      "before": {
+        "cards": 153,
+        "suggestions": 0,
+        "review": 1,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 176,
+        "actions": 331,
+        "inputs": 159
+      },
+      "after": {
+        "cards": 50,
+        "suggestions": 12,
+        "review": 1,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 65,
+        "inputs": 147
+      }
+    },
+    "02_sbi_kyc_annexure_a": {
+      "before": {
+        "cards": 16,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 27,
+        "actions": 44,
+        "inputs": 16
+      },
+      "after": {
+        "cards": 4,
+        "suggestions": 8,
+        "review": 0,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 14,
+        "inputs": 8
+      }
+    },
+    "03_sbi_kyc_annexure_b": {
+      "before": {
+        "cards": 44,
+        "suggestions": 0,
+        "review": 1,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 50,
+        "actions": 96,
+        "inputs": 44
+      },
+      "after": {
+        "cards": 14,
+        "suggestions": 0,
+        "review": 1,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 17,
+        "inputs": 44
+      }
+    },
+    "06_union_bank_nomination_form": {
+      "before": {
+        "cards": 21,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 24,
+        "actions": 46,
+        "inputs": 23
+      },
+      "after": {
+        "cards": 6,
+        "suggestions": 1,
+        "review": 0,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 9,
+        "inputs": 22
+      }
+    },
+    "21_india_post_pmjjby_claim_form": {
+      "before": {
+        "cards": 40,
+        "suggestions": 0,
+        "review": 1,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 50,
+        "actions": 92,
+        "inputs": 40
+      },
+      "after": {
+        "cards": 21,
+        "suggestions": 0,
+        "review": 1,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 24,
+        "inputs": 40
+      }
+    },
+    "23_lic_claim_form_a_3783": {
+      "before": {
+        "cards": 44,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 47,
+        "actions": 92,
+        "inputs": 44
+      },
+      "after": {
+        "cards": 20,
+        "suggestions": 1,
+        "review": 0,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 23,
+        "inputs": 43
+      }
+    },
+    "25_cdlsiet_btech_admission_form": {
+      "before": {
+        "cards": 65,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 97,
+        "actions": 163,
+        "inputs": 89
+      },
+      "after": {
+        "cards": 16,
+        "suggestions": 5,
+        "review": 0,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 23,
+        "inputs": 84
+      }
+    },
+    "30_allahabad_univ_enrollment_form": {
+      "before": {
+        "cards": 14,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 28,
+        "actions": 43,
+        "inputs": 24
+      },
+      "after": {
+        "cards": 10,
+        "suggestions": 4,
+        "review": 0,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 16,
+        "inputs": 20
+      }
+    },
+    "32_niftem_student_declaration_form": {
+      "before": {
+        "cards": 10,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 14,
+        "actions": 25,
+        "inputs": 10
+      },
+      "after": {
+        "cards": 2,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 4,
+        "inputs": 10
+      }
+    },
+    "39_cebs_joining_report": {
+      "before": {
+        "cards": 7,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 8,
+        "actions": 16,
+        "inputs": 7
+      },
+      "after": {
+        "cards": 2,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 1,
+        "render": 1,
+        "actions": 4,
+        "inputs": 7
+      }
+    },
+    "41_india_post_pli_name_change_form": {
+      "before": {
+        "cards": 0,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "confirm_one_by_one": 0,
+        "actions": 1,
+        "inputs": 0
+      },
+      "after": {
+        "cards": 0,
+        "suggestions": 0,
+        "review": 0,
+        "confirm_all": 0,
+        "render": 1,
+        "actions": 1,
+        "inputs": 0
+      }
+    }
+  },
+  "total": {
+    "before": {
+      "actions": 949,
+      "inputs": 456,
+      "confirm_one_by_one": 521,
+      "cards": 414,
+      "suggestions": 0,
+      "review": 3,
+      "confirm_all": 0,
+      "render": 11
+    },
+    "after": {
+      "actions": 200,
+      "inputs": 425,
+      "confirm_one_by_one": 0,
+      "cards": 145,
+      "suggestions": 31,
+      "review": 3,
+      "confirm_all": 10,
+      "render": 11
+    }
+  }
+}
