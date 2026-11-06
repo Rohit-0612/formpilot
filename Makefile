@@ -3,7 +3,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BACKEND := cd backend &&
 
-.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval eval-fill eval-validators eval-questions eval-address render-samples render-check eval-render
+.PHONY: vault-key up down migrate ping logs types services test test-int lint label-tasks label-convert label-semantic label-semantic-merge label-semantic-reference label-examples label-images eval-detect eval eval-fill eval-validators eval-questions eval-address render-samples render-check eval-render eval-ux
 
 # Created once from .env.example with a freshly generated JWT_SECRET. Never overwritten.
 .env:
@@ -144,3 +144,8 @@ render-check:
 ## the printed text read back from the PDFs and scored against the personas and the label boxes
 eval-render:
 	$(EVAL_PY) eval.render_eval $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),) $(if $(TAG),--tag $(TAG),)
+
+## UX metric (M3 gate): actions to complete each dev form with the full persona, now and with the
+## M3 features turned off (suggestions, section cards, confirm all)
+eval-ux:
+	$(EVAL_PY) eval.ux_eval $(if $(PROVIDER),--provider $(PROVIDER),) $(if $(MODEL),--model $(MODEL),) $(if $(TAG),--tag $(TAG),)
