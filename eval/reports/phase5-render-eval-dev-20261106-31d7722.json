@@ -1,0 +1,1248 @@
+{
+  "kind": "render-eval",
+  "split": "dev",
+  "detector": "flat@31d7722",
+  "provider": "groq:openai/gpt-oss-120b",
+  "created_at": "2026-11-06T10:48:03+00:00",
+  "tag": null,
+  "full_persona": "asha_verma",
+  "policy": "LLM confidence >= 0.99, once per form",
+  "personas": {
+    "asha_verma": {
+      "total": {
+        "printed": 64,
+        "compared": 64,
+        "right": 59,
+        "fillable_reference": 241,
+        "correct_of_printed": 0.9219,
+        "correct_of_fillable": 0.2448,
+        "match_level_right": 59,
+        "printed_text_errors": {
+          "nothing read back": 0,
+          "cut short": 0,
+          "spacing": 0,
+          "case": 0,
+          "different text": 0
+        },
+        "missed_by_match_level": 0,
+        "iou": {
+          "n": 64,
+          "mean": 0.8572,
+          "median": 1.0,
+          "share_at_least_0_5": 0.8594
+        },
+        "containment": {
+          "n": 64,
+          "mean": 0.8688,
+          "median": 1.0
+        },
+        "chars": 633,
+        "chars_inside_label_by_centre": 0.9273,
+        "chars_inside_label_whole": 0.8041
+      },
+      "from_scratch": {
+        "printed": 10,
+        "compared": 10,
+        "right": 9,
+        "fillable_reference": 30,
+        "correct_of_printed": 0.9,
+        "correct_of_fillable": 0.3,
+        "match_level_right": 9,
+        "printed_text_errors": {
+          "nothing read back": 0,
+          "cut short": 0,
+          "spacing": 0,
+          "case": 0,
+          "different text": 0
+        },
+        "missed_by_match_level": 0,
+        "iou": {
+          "n": 10,
+          "mean": 0.4413,
+          "median": 0.4733,
+          "share_at_least_0_5": 0.3
+        },
+        "containment": {
+          "n": 10,
+          "mean": 0.4823,
+          "median": 0.4959
+        },
+        "chars": 116,
+        "chars_inside_label_by_centre": 0.6466,
+        "chars_inside_label_whole": 0.0
+      },
+      "from_scratch_forms": [
+        "21_india_post_pmjjby_claim_form",
+        "41_india_post_pli_name_change_form"
+      ],
+      "forms": {
+        "01_sbi_account_opening_form": {
+          "printed": 16,
+          "compared": 16,
+          "right": 14,
+          "fillable_reference": 74,
+          "correct_of_printed": 0.875,
+          "correct_of_fillable": 0.1892,
+          "match_level_right": 14,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 16,
+            "mean": 0.8997,
+            "median": 0.9394,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 16,
+            "mean": 0.9205,
+            "median": 1.0
+          },
+          "chars": 107,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "02_sbi_kyc_annexure_a": {
+          "printed": 11,
+          "compared": 11,
+          "right": 11,
+          "fillable_reference": 24,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.4583,
+          "match_level_right": 11,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 11,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 11,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 123,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "03_sbi_kyc_annexure_b": {
+          "printed": 6,
+          "compared": 6,
+          "right": 6,
+          "fillable_reference": 21,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.2857,
+          "match_level_right": 6,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 6,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 6,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 73,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "06_union_bank_nomination_form": {
+          "printed": 1,
+          "compared": 1,
+          "right": 1,
+          "fillable_reference": 4,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.25,
+          "match_level_right": 1,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 1,
+            "mean": 0.9667,
+            "median": 0.9667,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 1,
+            "mean": 0.9667,
+            "median": 0.9667
+          },
+          "chars": 9,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "21_india_post_pmjjby_claim_form": {
+          "printed": 10,
+          "compared": 10,
+          "right": 9,
+          "fillable_reference": 28,
+          "correct_of_printed": 0.9,
+          "correct_of_fillable": 0.3214,
+          "match_level_right": 9,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 10,
+            "mean": 0.4413,
+            "median": 0.4733,
+            "share_at_least_0_5": 0.3
+          },
+          "containment": {
+            "n": 10,
+            "mean": 0.4823,
+            "median": 0.4959
+          },
+          "chars": 116,
+          "chars_inside_label_by_centre": 0.6466,
+          "chars_inside_label_whole": 0.0
+        },
+        "23_lic_claim_form_a_3783": {
+          "printed": 3,
+          "compared": 3,
+          "right": 2,
+          "fillable_reference": 13,
+          "correct_of_printed": 0.6667,
+          "correct_of_fillable": 0.1538,
+          "match_level_right": 2,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 3,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 3,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 21,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "25_cdlsiet_btech_admission_form": {
+          "printed": 8,
+          "compared": 8,
+          "right": 8,
+          "fillable_reference": 47,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.1702,
+          "match_level_right": 8,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 8,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 8,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 79,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "30_allahabad_univ_enrollment_form": {
+          "printed": 4,
+          "compared": 4,
+          "right": 4,
+          "fillable_reference": 14,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.2857,
+          "match_level_right": 4,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 4,
+            "mean": 0.5218,
+            "median": 0.4987,
+            "share_at_least_0_5": 0.5
+          },
+          "containment": {
+            "n": 4,
+            "mean": 0.5218,
+            "median": 0.4987
+          },
+          "chars": 54,
+          "chars_inside_label_by_centre": 0.9074,
+          "chars_inside_label_whole": 0.8519
+        },
+        "32_niftem_student_declaration_form": {
+          "printed": 4,
+          "compared": 4,
+          "right": 3,
+          "fillable_reference": 11,
+          "correct_of_printed": 0.75,
+          "correct_of_fillable": 0.2727,
+          "match_level_right": 3,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 4,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 4,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 41,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "39_cebs_joining_report": {
+          "printed": 1,
+          "compared": 1,
+          "right": 1,
+          "fillable_reference": 3,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.3333,
+          "match_level_right": 1,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 1,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 1,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 10,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "41_india_post_pli_name_change_form": {
+          "printed": 0,
+          "compared": 0,
+          "right": 0,
+          "fillable_reference": 2,
+          "correct_of_printed": null,
+          "correct_of_fillable": 0.0,
+          "match_level_right": 0,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 0,
+            "mean": null,
+            "median": null,
+            "share_at_least_0_5": null
+          },
+          "containment": {
+            "n": 0,
+            "mean": null,
+            "median": null
+          },
+          "chars": 0,
+          "chars_inside_label_by_centre": null,
+          "chars_inside_label_whole": null
+        }
+      },
+      "errors": []
+    },
+    "meera_iyer": {
+      "total": {
+        "printed": 46,
+        "compared": 46,
+        "right": 43,
+        "fillable_reference": 241,
+        "correct_of_printed": 0.9348,
+        "correct_of_fillable": 0.1784,
+        "match_level_right": 43,
+        "printed_text_errors": {
+          "nothing read back": 0,
+          "cut short": 0,
+          "spacing": 0,
+          "case": 0,
+          "different text": 0
+        },
+        "missed_by_match_level": 0,
+        "iou": {
+          "n": 46,
+          "mean": 0.8871,
+          "median": 1.0,
+          "share_at_least_0_5": 0.8696
+        },
+        "containment": {
+          "n": 46,
+          "mean": 0.8912,
+          "median": 1.0
+        },
+        "chars": 420,
+        "chars_inside_label_by_centre": 0.9,
+        "chars_inside_label_whole": 0.8667
+      },
+      "from_scratch": {
+        "printed": 4,
+        "compared": 4,
+        "right": 4,
+        "fillable_reference": 30,
+        "correct_of_printed": 1.0,
+        "correct_of_fillable": 0.1333,
+        "match_level_right": 4,
+        "printed_text_errors": {
+          "nothing read back": 0,
+          "cut short": 0,
+          "spacing": 0,
+          "case": 0,
+          "different text": 0
+        },
+        "missed_by_match_level": 0,
+        "iou": {
+          "n": 4,
+          "mean": 0.4037,
+          "median": 0.4335,
+          "share_at_least_0_5": 0.0
+        },
+        "containment": {
+          "n": 4,
+          "mean": 0.4414,
+          "median": 0.4814
+        },
+        "chars": 51,
+        "chars_inside_label_by_centre": 0.2549,
+        "chars_inside_label_whole": 0.0
+      },
+      "from_scratch_forms": [
+        "21_india_post_pmjjby_claim_form",
+        "41_india_post_pli_name_change_form"
+      ],
+      "forms": {
+        "01_sbi_account_opening_form": {
+          "printed": 11,
+          "compared": 11,
+          "right": 9,
+          "fillable_reference": 74,
+          "correct_of_printed": 0.8182,
+          "correct_of_fillable": 0.1216,
+          "match_level_right": 9,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 11,
+            "mean": 0.8811,
+            "median": 0.8713,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 11,
+            "mean": 0.8844,
+            "median": 0.8787
+          },
+          "chars": 58,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "02_sbi_kyc_annexure_a": {
+          "printed": 8,
+          "compared": 8,
+          "right": 8,
+          "fillable_reference": 24,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.3333,
+          "match_level_right": 8,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 8,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 8,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 91,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "03_sbi_kyc_annexure_b": {
+          "printed": 7,
+          "compared": 7,
+          "right": 7,
+          "fillable_reference": 21,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.3333,
+          "match_level_right": 7,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 7,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 7,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 59,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "06_union_bank_nomination_form": {
+          "printed": 1,
+          "compared": 1,
+          "right": 1,
+          "fillable_reference": 4,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.25,
+          "match_level_right": 1,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 1,
+            "mean": 0.9667,
+            "median": 0.9667,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 1,
+            "mean": 0.9667,
+            "median": 0.9667
+          },
+          "chars": 9,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "21_india_post_pmjjby_claim_form": {
+          "printed": 4,
+          "compared": 4,
+          "right": 4,
+          "fillable_reference": 28,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.1429,
+          "match_level_right": 4,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 4,
+            "mean": 0.4037,
+            "median": 0.4335,
+            "share_at_least_0_5": 0.0
+          },
+          "containment": {
+            "n": 4,
+            "mean": 0.4414,
+            "median": 0.4814
+          },
+          "chars": 51,
+          "chars_inside_label_by_centre": 0.2549,
+          "chars_inside_label_whole": 0.0
+        },
+        "23_lic_claim_form_a_3783": {
+          "printed": 2,
+          "compared": 2,
+          "right": 2,
+          "fillable_reference": 13,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.1538,
+          "match_level_right": 2,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 2,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 2,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 11,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "25_cdlsiet_btech_admission_form": {
+          "printed": 6,
+          "compared": 6,
+          "right": 6,
+          "fillable_reference": 47,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.1277,
+          "match_level_right": 6,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 6,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 6,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 60,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "30_allahabad_univ_enrollment_form": {
+          "printed": 3,
+          "compared": 3,
+          "right": 3,
+          "fillable_reference": 14,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.2143,
+          "match_level_right": 3,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 3,
+            "mean": 0.5117,
+            "median": 0.4457,
+            "share_at_least_0_5": 0.3333
+          },
+          "containment": {
+            "n": 3,
+            "mean": 0.5117,
+            "median": 0.4457
+          },
+          "chars": 42,
+          "chars_inside_label_by_centre": 0.9048,
+          "chars_inside_label_whole": 0.881
+        },
+        "32_niftem_student_declaration_form": {
+          "printed": 3,
+          "compared": 3,
+          "right": 2,
+          "fillable_reference": 11,
+          "correct_of_printed": 0.6667,
+          "correct_of_fillable": 0.1818,
+          "match_level_right": 2,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 3,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 3,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 29,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "39_cebs_joining_report": {
+          "printed": 1,
+          "compared": 1,
+          "right": 1,
+          "fillable_reference": 3,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.3333,
+          "match_level_right": 1,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 1,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 1,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 10,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "41_india_post_pli_name_change_form": {
+          "printed": 0,
+          "compared": 0,
+          "right": 0,
+          "fillable_reference": 2,
+          "correct_of_printed": null,
+          "correct_of_fillable": 0.0,
+          "match_level_right": 0,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 0,
+            "mean": null,
+            "median": null,
+            "share_at_least_0_5": null
+          },
+          "containment": {
+            "n": 0,
+            "mean": null,
+            "median": null
+          },
+          "chars": 0,
+          "chars_inside_label_by_centre": null,
+          "chars_inside_label_whole": null
+        }
+      },
+      "errors": []
+    },
+    "ravi_kumar": {
+      "total": {
+        "printed": 61,
+        "compared": 61,
+        "right": 57,
+        "fillable_reference": 241,
+        "correct_of_printed": 0.9344,
+        "correct_of_fillable": 0.2365,
+        "match_level_right": 57,
+        "printed_text_errors": {
+          "nothing read back": 0,
+          "cut short": 0,
+          "spacing": 0,
+          "case": 0,
+          "different text": 0
+        },
+        "missed_by_match_level": 0,
+        "iou": {
+          "n": 61,
+          "mean": 0.8551,
+          "median": 1.0,
+          "share_at_least_0_5": 0.8525
+        },
+        "containment": {
+          "n": 61,
+          "mean": 0.8624,
+          "median": 1.0
+        },
+        "chars": 606,
+        "chars_inside_label_by_centre": 0.9224,
+        "chars_inside_label_whole": 0.7574
+      },
+      "from_scratch": {
+        "printed": 10,
+        "compared": 10,
+        "right": 9,
+        "fillable_reference": 30,
+        "correct_of_printed": 0.9,
+        "correct_of_fillable": 0.3,
+        "match_level_right": 9,
+        "printed_text_errors": {
+          "nothing read back": 0,
+          "cut short": 0,
+          "spacing": 0,
+          "case": 0,
+          "different text": 0
+        },
+        "missed_by_match_level": 0,
+        "iou": {
+          "n": 10,
+          "mean": 0.4413,
+          "median": 0.4733,
+          "share_at_least_0_5": 0.3
+        },
+        "containment": {
+          "n": 10,
+          "mean": 0.4823,
+          "median": 0.4959
+        },
+        "chars": 139,
+        "chars_inside_label_by_centre": 0.705,
+        "chars_inside_label_whole": 0.0
+      },
+      "from_scratch_forms": [
+        "21_india_post_pmjjby_claim_form",
+        "41_india_post_pli_name_change_form"
+      ],
+      "forms": {
+        "01_sbi_account_opening_form": {
+          "printed": 15,
+          "compared": 15,
+          "right": 13,
+          "fillable_reference": 74,
+          "correct_of_printed": 0.8667,
+          "correct_of_fillable": 0.1757,
+          "match_level_right": 13,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 15,
+            "mean": 0.9128,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 15,
+            "mean": 0.9152,
+            "median": 1.0
+          },
+          "chars": 102,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "02_sbi_kyc_annexure_a": {
+          "printed": 10,
+          "compared": 10,
+          "right": 10,
+          "fillable_reference": 24,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.4167,
+          "match_level_right": 10,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 10,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 10,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 106,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "03_sbi_kyc_annexure_b": {
+          "printed": 6,
+          "compared": 6,
+          "right": 6,
+          "fillable_reference": 21,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.2857,
+          "match_level_right": 6,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 6,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 6,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 55,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "06_union_bank_nomination_form": {
+          "printed": 1,
+          "compared": 1,
+          "right": 1,
+          "fillable_reference": 4,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.25,
+          "match_level_right": 1,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 1,
+            "mean": 0.9667,
+            "median": 0.9667,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 1,
+            "mean": 0.9667,
+            "median": 0.9667
+          },
+          "chars": 9,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "21_india_post_pmjjby_claim_form": {
+          "printed": 10,
+          "compared": 10,
+          "right": 9,
+          "fillable_reference": 28,
+          "correct_of_printed": 0.9,
+          "correct_of_fillable": 0.3214,
+          "match_level_right": 9,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 10,
+            "mean": 0.4413,
+            "median": 0.4733,
+            "share_at_least_0_5": 0.3
+          },
+          "containment": {
+            "n": 10,
+            "mean": 0.4823,
+            "median": 0.4959
+          },
+          "chars": 139,
+          "chars_inside_label_by_centre": 0.705,
+          "chars_inside_label_whole": 0.0
+        },
+        "23_lic_claim_form_a_3783": {
+          "printed": 2,
+          "compared": 2,
+          "right": 2,
+          "fillable_reference": 13,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.1538,
+          "match_level_right": 2,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 2,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 2,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 11,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "25_cdlsiet_btech_admission_form": {
+          "printed": 8,
+          "compared": 8,
+          "right": 8,
+          "fillable_reference": 47,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.1702,
+          "match_level_right": 8,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 8,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 8,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 79,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "30_allahabad_univ_enrollment_form": {
+          "printed": 4,
+          "compared": 4,
+          "right": 4,
+          "fillable_reference": 14,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.2857,
+          "match_level_right": 4,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 4,
+            "mean": 0.5218,
+            "median": 0.4987,
+            "share_at_least_0_5": 0.5
+          },
+          "containment": {
+            "n": 4,
+            "mean": 0.5218,
+            "median": 0.4987
+          },
+          "chars": 54,
+          "chars_inside_label_by_centre": 0.8889,
+          "chars_inside_label_whole": 0.8519
+        },
+        "32_niftem_student_declaration_form": {
+          "printed": 4,
+          "compared": 4,
+          "right": 3,
+          "fillable_reference": 11,
+          "correct_of_printed": 0.75,
+          "correct_of_fillable": 0.2727,
+          "match_level_right": 3,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 4,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 4,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 41,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "39_cebs_joining_report": {
+          "printed": 1,
+          "compared": 1,
+          "right": 1,
+          "fillable_reference": 3,
+          "correct_of_printed": 1.0,
+          "correct_of_fillable": 0.3333,
+          "match_level_right": 1,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 1,
+            "mean": 1.0,
+            "median": 1.0,
+            "share_at_least_0_5": 1.0
+          },
+          "containment": {
+            "n": 1,
+            "mean": 1.0,
+            "median": 1.0
+          },
+          "chars": 10,
+          "chars_inside_label_by_centre": 1.0,
+          "chars_inside_label_whole": 1.0
+        },
+        "41_india_post_pli_name_change_form": {
+          "printed": 0,
+          "compared": 0,
+          "right": 0,
+          "fillable_reference": 2,
+          "correct_of_printed": null,
+          "correct_of_fillable": 0.0,
+          "match_level_right": 0,
+          "printed_text_errors": {
+            "nothing read back": 0,
+            "cut short": 0,
+            "spacing": 0,
+            "case": 0,
+            "different text": 0
+          },
+          "missed_by_match_level": 0,
+          "iou": {
+            "n": 0,
+            "mean": null,
+            "median": null,
+            "share_at_least_0_5": null
+          },
+          "containment": {
+            "n": 0,
+            "mean": null,
+            "median": null
+          },
+          "chars": 0,
+          "chars_inside_label_by_centre": null,
+          "chars_inside_label_whole": null
+        }
+      },
+      "errors": []
+    }
+  }
+}
