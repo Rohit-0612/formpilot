@@ -84,6 +84,8 @@ class _Char:
     x1: float
     top: float
     bottom: float  # unrotated page, like PyMuPDF's text extraction
+    c: str = ""  # the character, for the read-back eval only (eval/render_eval.py); never reported
+    size: float = 0.0  # font size
 
     @property
     def centre(self) -> tuple[float, float]:
@@ -111,7 +113,8 @@ def printed_chars(original: bytes, rendered: bytes) -> list[_Char]:
             for (c, x, y, size), count in added.items():
                 width = pymupdf.get_text_length(c, fontname="helv", fontsize=size)
                 below = DESCENT * size if c in _DESCENDERS else 0.0
-                printed += [_Char(page_no, x, x + width, y - CAP_HEIGHT * size, y + below)] * count
+                top, bottom = y - CAP_HEIGHT * size, y + below
+                printed += [_Char(page_no, x, x + width, top, bottom, c, size)] * count
     return printed
 
 

@@ -37,14 +37,18 @@ class RenderedForm:
     rendered: overlay.Rendered
 
 
-def render_dev_forms(provider_name: str, model: str) -> list[RenderedForm]:
-    """The dev forms of the subset through the product's passes, rendered (replay only)."""
+def dev_result(provider_name: str, model: str) -> run_eval.EvalResult:
+    """The understanding eval on the dev forms of the subset, replayed."""
     provider = run_eval._provider(provider_name, model, "replay", "http://localhost:11434")
-    result = run_eval.evaluate(
+    return run_eval.evaluate(
         DATASET_DIR / "dev", LABELS_DIR, REFERENCE_DIR, "dev", "hybrid", provider,
         DEV_SUBSET, detector_version(),
     )  # fmt: skip
-    profile = fill_eval.load_personas()[fill_eval.FULL_PERSONA]
+
+
+def render_forms(result: run_eval.EvalResult, profile: dict[str, str]) -> list[RenderedForm]:
+    """Each understood form through match (product policy), validate, fit, "confirm all" and
+    the overlay renderer, with one persona's profile."""
     ctx = PassContext(clock=lambda: run_eval.FIXED_TIME, profile=profile)
     forms: list[RenderedForm] = []
     for form in result.forms:
@@ -55,6 +59,12 @@ def render_dev_forms(provider_name: str, model: str) -> list[RenderedForm]:
         original = (DATASET_DIR / "dev" / f"{form.form}.pdf").read_bytes()
         forms.append(RenderedForm(form.form, original, ir, overlay.render(original, ir)))
     return forms
+
+
+def render_dev_forms(provider_name: str, model: str) -> list[RenderedForm]:
+    """The dev forms of the subset rendered with the full persona (replay only)."""
+    result = dev_result(provider_name, model)
+    return render_forms(result, fill_eval.load_personas()[fill_eval.FULL_PERSONA])
 
 
 def main(argv: list[str] | None = None) -> int:

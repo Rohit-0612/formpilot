@@ -112,9 +112,17 @@ def load_personas(directory: Path = PERSONAS_DIR) -> dict[str, dict[str, str]]:
     }
 
 
-def value_right(c: run_eval.Compared, got: Field, profile: Mapping[str, str], today: date) -> bool:
-    """The filled value, as printed, is right for the persona (eval/value_truth.py)."""
-    printed = fit.printed(got)
+def value_right(
+    c: run_eval.Compared,
+    got: Field,
+    profile: Mapping[str, str],
+    today: date,
+    printed: str | None = None,
+) -> bool:
+    """The filled value, as printed, is right for the persona (eval/value_truth.py). `printed`
+    is the text read back from a rendered PDF (eval/render_eval.py); by default, the text the
+    renderer is asked to print (`fit.printed`)."""
+    printed = fit.printed(got) if printed is None else printed
     if printed is None or c.role.repeated:
         return False
     if c.role.part is not None:
