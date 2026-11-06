@@ -44,6 +44,9 @@ To be completed at the end of the milestone.
 | **P5-D23** (human, 2026-11-05) P5-D5's time-box is met; a Devanagari smoke test runs in every `make render-check`: on a synthetic page the overlay renderer must draw "क्ष" and "श्र" as one shaped glyph each, "कि" with its vowel sign left of the consonant and "की" with it right | a further time-box | Passed on 2026-11-05; a unit test shows the check fails on unshaped text. Had it failed, the review screen would show the "won't print" note for Devanagari values |
 | **P5-D24** (human, 2026-11-05) #01's FATCA annexure account number stays a known limitation: the annexure is conditional (tax residence outside India) but prints no condition line, so P5-D19 cannot see it. The section-subject layer (M4) handles it | a rule for FATCA annexures | A general rule needs each section's subject and condition: planned for M4 |
 | **P5-D25** (human, 2026-11-05) #21 page 1's IFSC is accepted: it sits in section 16, the nominee's bank account, and this claim form is completed by the claimant, who is the nominee and the applicant; the IFSC is the applicant's own bank's. The account number and bank name beside it are asked (the LLM typed those labels `other`) | record a known limitation | The value is right for the section |
+| **P5-D26** (human, 2026-11-06, additions to the approved gate plan) The 24 h expiry: an hourly arq cron sweep (minute 0) and one sweep each time the worker starts, after the stale jobs are failed, because a free-tier host can sleep through cron runs. A document past `expires_at` is deleted with its stored files, IR versions, jobs and audit events (cascade), as the user's own delete; one with a queued or running job waits for the next sweep. Until it is swept, every route of the document and its jobs answers **410** "This form expired: FormPilot deletes forms 24 hours after upload. Upload it again."; `DELETE` still works; other users still get 404. Each expiry leaves one `document_expired` audit event on the owner (actor `system`, no document id, file name or value), so the events count expiries; logs hold counts only | hourly cron only; a counts column on `audit_events` (a schema change); sweep in the API process too | No schema change: the existing columns hold a per-owner event with nothing identifying. The start-up sweep runs in the worker, which owns the jobs; see Open issues for the API side |
+| **P5-D27** (Claude Code, within the approved gate plan, 2026-11-06) `make eval-render`: per persona, the dev forms are rendered as by `render-samples` and the printed text is read back from the PDF. *Fill correctness*: read-back values right for the persona (as the fill eval's value precision; an upper-case field must read back in capitals) out of all printed values, and out of the compared fields with a fillable reference type. *Printed-text errors*: right as `fit.printed`, wrong as read back. *Placement* against the human label boxes: IoU, containment, share of printed characters inside the label box (by centre and whole glyph), also on the forms labelled from scratch alone | score `fit.printed` only (the match level); IoU only | Only the read-back sees what the PDF shows. 9 of the 11 dev label files were pre-annotated with the detector's boxes, so their IoU partly measures that start; the from-scratch forms are reported apart |
+| **P5-D28** (Claude Code, within the approved gate plan, 2026-11-06) `make eval-ux`: actions to complete one dev form with the full persona: one per question card (answered or skipped), one per suggestion, one per profile value confirm all leaves to the user, one confirm all, one render-and-download; inputs typed apart. *Before* is recomputed from today's pipeline with the M3 features turned off: no suggestions, the M2 question plan kept in code (`plan(..., sections=False)`: typed fields grouped as in M2, untyped fields one by one), no confirm all (every value to print confirmed one by one). It is not a historical M2 measurement | one question per field for *before*, as the plan's wording said | The M2 plan in code is what M2 asked; one question per field would overstate the *before* count. Cards and inputs equal the questions eval's M2 and M3 counts on every dev form |
 
 ### Dev numbers before and after the render fixes (P5-D12 to P5-D21)
 
@@ -87,6 +90,26 @@ age, #21 address, #32 guardian name), #21's certificate date, the existing accou
 and the low-severity notes in Known limitations; new after: #03's address in mixed case although
 page 1 asks for BLOCK letters (the case hint is per page), #01's FATCA account number (a
 conditional annexure without a condition line), #21 page 1's IFSC alone in its table.
+
+### M3 gate measurements (2026-11-06, dev, Groq replayed)
+
+Fill correctness and placement, read back from the rendered PDFs (`eval/reports/phase5-render-eval-dev-20261106-31d7722`; product policy, then confirm all):
+
+| Persona | Printed | Right | Correct of printed | Correct of fillable | Printed-text errors | IoU mean / median | IoU ≥ 0.5 | Containment mean | Chars inside label (centre / whole) |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| asha_verma | 64 | 59 | 92.2 % | 24.5 % (59/241) | 0 | 0.857 / 1.000 | 85.9 % | 0.869 | 92.7 % / 80.4 % |
+| meera_iyer | 46 | 43 | 93.5 % | 17.8 % (43/241) | 0 | 0.887 / 1.000 | 87.0 % | 0.891 | 90.0 % / 86.7 % |
+| ravi_kumar | 61 | 57 | 93.4 % | 23.6 % (57/241) | 0 | 0.855 / 1.000 | 85.2 % | 0.862 | 92.2 % / 75.7 % |
+
+Every printed field reads back as the text the renderer was given, so the read-back and the
+match-level judgement agree on every field. A check with a deliberately broken renderer (last
+character dropped; lower case) found 64 and 31 errors, so the read-back does see them. On the two
+forms labelled from scratch (21, 41; only 21 prints) IoU mean is 0.441 / 0.404 / 0.441.
+
+Actions to complete one form (`eval/reports/phase5-ux-actions-dev-20261106-4ceb39c`; full
+persona; *before* recomputed with the M3 features turned off, not a historical M2 measurement):
+**949 before, 200 after** on the 11 dev forms. Cards 414 → 145, inputs typed 456 → 425, 521
+one-by-one confirms → 10 confirm-alls and 31 suggestions, 3 reviews both ways.
 
 ### Milestone plan (approved)
 
@@ -154,6 +177,15 @@ Accepted by the human on 2026-11-05, no fix in M3 (from the fresh-eyes review of
 - **01/01/2026 in the renders** is the eval's fixed clock (`run_eval.FIXED_TIME`), so runs are
   reproducible; the product prints the day of filling.
 
+Found by the M3 gate evals (2026-11-06), for the human to accept or schedule:
+
+- **Printed text a line above a dotted-line strip** (form 21, labelled from scratch): the human
+  boxes are thin strips on the writing line; the detected box starts a line higher and text is
+  centred in it, so 0 % of the glyphs lie wholly inside the strip (64.7 % by centre). Related to
+  "Values slightly above their line" above.
+- **First characters left of the human box** (form 30): the detected box starts at the colon,
+  the human box where the line starts; 1 or 2 characters per field fall outside it.
+
 ## Open issues
 
 - SPEC §9 lists `PATCH /documents/{id}/fields/{field_id}` as "edit value, bbox, or status"; M3
@@ -167,21 +199,35 @@ Accepted by the human on 2026-11-05, no fix in M3 (from the fresh-eyes review of
   and 32; a replay check shows they are from **form 25 (three batches) and form 32 (one)**. Form
   06's batches were recorded in `51463a8`. Not amended, for the same reason.
 
-## Resume point (2026-11-05)
+- **A value longer than its comb is cut short without a warning** (found 2026-11-06 while
+  building `eval-render`). The fit pass and the overlay renderer both pair characters with cells
+  by `zip(..., strict=False)`: a 10-character value in a 4-cell comb passes the fit check, stays
+  `filled`, is taken by confirm all, and only 4 characters print. Not seen on dev (0 "cut short"
+  in the read-back); a unit test in `test_render_eval.py` shows the read-back catches it.
+  Proposed fix, awaiting the human's decision: the fit pass flags a comb value with more
+  characters than cells ("The value has more characters than the boxes"), so it needs review.
+- **Start-up sweep and the API** (P5-D26): the sweep runs when the worker starts, not when the
+  API starts. Between sweeps the API refuses expired documents (410), so no expired form is
+  served either way. If the M4 platform runs the API without an always-on worker, decide then
+  whether the API's start also sweeps.
+
+## Resume point (2026-11-06)
 
 - **Done in M3:** IR additions (suggestions, uppercase, question text, date parts, groups, comb
   cells, conditions); case hints, suggestions, readable questions (phrase pass), grouping;
   questions, address and fill evals; review routes and audit; overlay renderer with Devanagari
-  (P5-D5), render job and download; `render-samples` and `render-check`; render fixes P5-D12 to
-  P5-D21. Last commit of this stretch: see `git log` after `f5a7c28`; CI green.
-- **Next, in the human's order (2026-11-05):** (1) the Devanagari time-box, started only when the
-  human says so (P5-D5 records a first time-box as met on 2026-10-27; ask what this one covers);
-  (2) the M3 gate and the teach-back / "In my own words" checkpoint. Not built yet and needed for
-  the gate (PLAN Phase 5 acceptance): the expiry job, the review screen with readable questions,
-  the fill-correctness and placement evals, the UX metric, the Playwright happy path.
-- **Decided on 2026-11-05:** P5-D7 approved; the fresh-eyes findings as P5-D22 (case hints),
-  P5-D24 (FATCA) and P5-D25 (#21 IFSC); Devanagari smoke test P5-D23 (passed). Next: the plan for
-  the remaining M3 gate items, for the human's approval.
+  (P5-D5, smoke test P5-D23), render job and download; `render-samples` and `render-check`;
+  render fixes P5-D12 to P5-D25. Gate items 1-3 of the approved plan (2026-11-06): the expiry
+  sweep and the 410 (P5-D26, `2212921`, `62f6b3e`), `make eval-render` (P5-D27, `31d7722`,
+  report `be97cbc`), `make eval-ux` (P5-D28, `4ceb39c`, report `7778f65`). Numbers: "M3 gate
+  measurements" above.
+- **Stopped for the human (2026-11-06):** the eval-render and UX numbers; the comb overflow
+  (Open issues, fix proposed); the two placement limitations; P5-D28's *before* definition.
+- **Next, after the human's approval:** item 4, the review screen (side panel, suggested band,
+  confirm all per P5-D7); item 5, the Playwright happy path in the Compose smoke job, with two
+  privacy assertions (no unmasked sensitive value in the review page's DOM; no unconfirmed
+  suggestion in the downloaded PDF) and review-screen screenshots saved as CI artifacts, not
+  committed; item 6, the close-out (this record, gate checklist, "In my own words", PR).
 
 ## Notes for the next phase
 
