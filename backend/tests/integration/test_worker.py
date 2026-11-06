@@ -19,7 +19,7 @@ from app.config import Settings
 from app.db.models import Document, Job, User
 from app.db.session import make_engine, make_sessionmaker
 from app.jobs.cli import enqueue_ping, run
-from app.jobs.tasks import run_tracked
+from app.jobs.tasks import expire_documents, run_tracked
 from app.jobs.worker import WorkerSettings
 from app.services.jobs import QUEUE_NAME, JobStore, create_queue
 from tests.integration.workers import make_worker
@@ -45,6 +45,9 @@ def test_worker_settings_do_not_retry_and_use_our_queue() -> None:
     assert WorkerSettings.retry_jobs is False
     assert "ping" in {function.__name__ for function in WorkerSettings.functions}
     assert WorkerSettings.health_check_interval == 30
+    # The expiry sweep, hourly at minute 0 (the worker's startup sweeps too).
+    (sweep,) = WorkerSettings.cron_jobs
+    assert (sweep.coroutine, sweep.minute, sweep.hour) == (expire_documents, 0, None)
 
 
 async def test_health_check_passes_while_the_worker_runs(live_settings: Settings) -> None:

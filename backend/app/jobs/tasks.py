@@ -14,6 +14,7 @@ from typing import Any
 from app.config import Settings, get_settings
 from app.db.session import make_engine, make_sessionmaker
 from app.logging import configure_logging, get_logger
+from app.services import expiry
 from app.services.analysis import analyze_document
 from app.services.filling import answer_document
 from app.services.jobs import JobStore
@@ -105,6 +106,17 @@ async def render(ctx: dict[str, Any], job_id: str) -> str:
 FUNCTIONS = [ping, analyze, answers, render]
 
 
+async def expire_documents(ctx: dict[str, Any]) -> str:
+    """The hourly expiry sweep (arq cron, app/services/expiry.py). No job row: nobody waits
+    for it. A failure is logged and the next run tries again."""
+    try:
+        result = await expiry.sweep(ctx["sessionmaker"], ctx["storage"])
+    except Exception:
+        log.exception("expiry_sweep_failed")
+        return "failed"
+    return f"deleted {result.deleted}, busy {result.busy}"
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     # Tests pass their own settings in ctx; the real worker reads the environment.
     settings: Settings = ctx.get("settings") or get_settings()
@@ -116,6 +128,9 @@ async def startup(ctx: dict[str, Any]) -> None:
     ctx["job_store"] = store = JobStore(sessionmaker)
     ctx["storage"] = make_storage(settings)
     await _fail_stale_jobs(store, settings.job_timeout_seconds)
+    # After the stale jobs are failed, so their documents can expire. The host may have slept
+    # through cron runs (app/services/expiry.py).
+    await expire_documents(ctx)
     log.info("worker_started")
 
 

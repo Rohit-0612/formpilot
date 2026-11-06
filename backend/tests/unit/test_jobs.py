@@ -6,8 +6,9 @@ import uuid
 import pytest
 
 from app.config import Settings
-from app.jobs.tasks import FUNCTIONS, ping, run_tracked, shutdown, startup
+from app.jobs.tasks import FUNCTIONS, expire_documents, ping, run_tracked, shutdown, startup
 from app.logging import configure_logging
+from app.services import expiry
 from app.services.jobs import JobStore
 from app.storage.local import LocalStorage
 
@@ -113,13 +114,29 @@ def test_ping_is_registered_with_the_worker() -> None:
 # --- worker startup -------------------------------------------------------------------
 
 
-async def test_startup_fails_stale_jobs_with_the_job_timeout_and_provides_storage(
-    settings: Settings, monkeypatch: pytest.MonkeyPatch
+@pytest.fixture(autouse=True)
+def no_sweep(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Unit tests never reach the database: the expiry sweep is recorded, not run."""
+    calls: list[str] = []
+
+    async def fake_sweep(sessionmaker: object, storage: object) -> expiry.SweepResult:
+        calls.append("sweep")
+        return expiry.SweepResult(deleted=0, busy=0)
+
+    monkeypatch.setattr(expiry, "sweep", fake_sweep)
+    return calls
+
+
+async def test_startup_fails_stale_jobs_then_sweeps_expired_documents(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, no_sweep: list[str]
 ) -> None:
+    """The sweep runs at every start because a sleeping host can miss cron runs; after the
+    stale jobs are failed, so their documents are no longer busy."""
     timeouts: list[int] = []
 
     async def fake_fail_stale(self: JobStore, timeout_seconds: int) -> list[uuid.UUID]:
         timeouts.append(timeout_seconds)
+        no_sweep.append("fail_stale")
         return []
 
     monkeypatch.setattr(JobStore, "fail_stale", fake_fail_stale)
@@ -129,6 +146,7 @@ async def test_startup_fails_stale_jobs_with_the_job_timeout_and_provides_storag
     await shutdown(ctx)
 
     assert timeouts == [123]
+    assert no_sweep == ["fail_stale", "sweep"]
     assert isinstance(ctx["job_store"], JobStore)
     assert isinstance(ctx["storage"], LocalStorage)
 
@@ -155,3 +173,23 @@ async def test_startup_survives_a_failing_stale_job_check(
     assert failure["exc_type"] == "RuntimeError"
     assert LEAKY_EMAIL not in json.dumps(failure)  # exception messages are never logged
     assert any(e["event"] == "worker_started" for e in events)
+
+
+async def test_a_failing_sweep_is_logged_without_its_message_and_not_raised(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stream = io.StringIO()
+    configure_logging("INFO", json=True, stream=stream)
+
+    async def failing_sweep(sessionmaker: object, storage: object) -> expiry.SweepResult:
+        raise RuntimeError(f"could not delete documents/{LEAKY_EMAIL}.pdf")
+
+    monkeypatch.setattr(expiry, "sweep", failing_sweep)
+
+    outcome = await expire_documents({"sessionmaker": None, "storage": None})
+
+    assert outcome == "failed"
+    output = stream.getvalue()
+    assert LEAKY_EMAIL not in output
+    assert '"event": "expiry_sweep_failed"' in output
+    assert '"exc_type": "RuntimeError"' in output
