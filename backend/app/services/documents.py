@@ -21,6 +21,7 @@ from app.passes.answers import Answer
 from app.passes.questions import Question
 from app.services import filling, ir_store
 from app.services.analysis import original_key, page_key
+from app.services.expiry import is_expired
 from app.services.jobs import JobEnqueueError, JobQueue, JobService
 from app.services.rendering import NothingToRenderError, has_something_to_render
 from app.services.review import DocumentBusyError, job_running, output_key
@@ -66,6 +67,15 @@ def job_error_message(error: str | None, *, max_pages: int) -> str | None:
         return _ENQUEUE_FAILED
     template = _JOB_ERROR_MESSAGES.get(error)
     return template.format(max_pages=max_pages) if template else _GENERIC
+
+
+class DocumentExpiredError(Exception):
+    """The document is past its expiry and is deleted at the next sweep (expiry.py)."""
+
+
+EXPIRED_MESSAGE = (
+    "This form expired: FormPilot deletes forms {hours} hours after upload. Upload it again."
+)
 
 
 class UnknownQuestionsError(Exception):
@@ -117,11 +127,19 @@ class DocumentService:
         )
         return document, job
 
-    async def get(self, document_id: uuid.UUID, owner_id: uuid.UUID) -> Document | None:
-        """None if the document does not exist or belongs to someone else (both answer 404)."""
+    async def get(
+        self, document_id: uuid.UUID, owner_id: uuid.UUID, *, expired_ok: bool = False
+    ) -> Document | None:
+        """None if the document does not exist or belongs to someone else (both answer 404).
+
+        DocumentExpiredError if it is the owner's but expired, unless expired_ok (the user's
+        delete). Other users get None either way."""
         document = await self._session.get(Document, document_id)
         if document is None or document.owner_id != owner_id:
             return None
+        if not expired_ok and is_expired(document):
+            hours = round(self._ttl.total_seconds() / 3600)
+            raise DocumentExpiredError(EXPIRED_MESSAGE.format(hours=hours))
         return document
 
     async def latest_job(self, document_id: uuid.UUID) -> Job | None:
@@ -235,7 +253,8 @@ class DocumentService:
             return None
 
     async def get_job(self, job_id: uuid.UUID, owner_id: uuid.UUID) -> Job | None:
-        """None unless the job belongs to a document of this owner (jobs without one: None)."""
+        """None unless the job belongs to a document of this owner (jobs without one: None).
+        DocumentExpiredError if that document expired."""
         job = await self._session.get(Job, job_id)
         if job is None or job.document_id is None:
             return None

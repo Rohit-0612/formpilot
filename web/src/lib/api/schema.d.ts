@@ -1073,6 +1073,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The document expired and is being deleted */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1154,6 +1161,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The document expired and is being deleted */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1187,6 +1201,13 @@ export interface operations {
             };
             /** @description Not found or not analysed yet */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The document expired and is being deleted */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1241,6 +1262,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The document expired and is being deleted */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1283,6 +1311,13 @@ export interface operations {
             };
             /** @description Not found, no such page, or not rendered */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The document expired and is being deleted */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1338,6 +1373,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The document expired and is being deleted */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1378,6 +1420,13 @@ export interface operations {
             };
             /** @description Not possible now: a job is running, the field is never filled, or it has no value to confirm */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The document expired and is being deleted */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1428,6 +1477,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The document expired and is being deleted */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1473,6 +1529,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The document expired and is being deleted */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1506,6 +1569,13 @@ export interface operations {
             };
             /** @description Job not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The job's document expired and is being deleted */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

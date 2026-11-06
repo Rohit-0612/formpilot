@@ -65,14 +65,16 @@ export function useDocument(documentId: string) {
   return useQuery({
     queryKey: documentQueryKey(documentId),
     queryFn: async (): Promise<DocumentInfo | null> => {
-      const { data, response } = await api.GET("/api/v1/documents/{document_id}", {
+      const { data, error, response } = await api.GET("/api/v1/documents/{document_id}", {
         params: { path: { document_id: documentId } },
       });
       if (response.status === 404 || response.status === 422) {
         return null; // 422: not a valid id, so no such document either
       }
       if (!data) {
-        throw new ApiError("Could not load the form.", response.status);
+        // 410: expired. The API's message says so and asks for a new upload.
+        const fallback = response.status === 410 ? "This form expired." : "Could not load the form.";
+        throw new ApiError(detailMessage(error, fallback), response.status);
       }
       return data;
     },

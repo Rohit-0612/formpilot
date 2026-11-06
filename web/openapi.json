@@ -259,6 +259,9 @@
               }
             }
           },
+          "410": {
+            "description": "The document expired and is being deleted"
+          },
           "404": {
             "description": "Document not found"
           },
@@ -356,6 +359,9 @@
               }
             }
           },
+          "410": {
+            "description": "The document expired and is being deleted"
+          },
           "404": {
             "description": "Not found or not analysed yet"
           },
@@ -406,6 +412,9 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "The document expired and is being deleted"
           },
           "404": {
             "description": "Not found or not analysed yet"
@@ -467,6 +476,9 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "The document expired and is being deleted"
           },
           "404": {
             "description": "Not found or not analysed yet"
@@ -532,6 +544,9 @@
             "content": {
               "image/png": {}
             }
+          },
+          "410": {
+            "description": "The document expired and is being deleted"
           },
           "404": {
             "description": "Not found, no such page, or not rendered"
@@ -606,6 +621,9 @@
               }
             }
           },
+          "410": {
+            "description": "The document expired and is being deleted"
+          },
           "404": {
             "description": "Not found, not analysed yet, or no such field"
           },
@@ -660,6 +678,9 @@
                 }
               }
             }
+          },
+          "410": {
+            "description": "The document expired and is being deleted"
           },
           "404": {
             "description": "Not found, not analysed yet, or no such field"
@@ -716,6 +737,9 @@
               }
             }
           },
+          "410": {
+            "description": "The document expired and is being deleted"
+          },
           "404": {
             "description": "Document not found"
           },
@@ -768,6 +792,9 @@
             "content": {
               "application/pdf": {}
             }
+          },
+          "410": {
+            "description": "The document expired and is being deleted"
           },
           "404": {
             "description": "Not found, or not printed since the last change"
@@ -822,6 +849,9 @@
           },
           "404": {
             "description": "Job not found"
+          },
+          "410": {
+            "description": "The job's document expired and is being deleted"
           },
           "422": {
             "description": "Validation Error",

@@ -1,4 +1,4 @@
-"""The 24 h expiry (app/services/expiry.py): the sweep and the worker's start-up sweep.
+"""The 24 h expiry (app/services/expiry.py): the sweep, the worker's start-up sweep, and the 410.
 
 Synthetic fixture form and values only; no model (rules only). A document is made to expire by
 moving its expires_at into the past.
@@ -9,6 +9,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from httpx import AsyncClient
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -18,6 +19,7 @@ from app.db.session import make_sessionmaker
 from app.services import expiry
 from app.storage import make_storage
 from tests.integration.conftest import ClientFactory
+from tests.integration.test_fill_api import DOCS
 from tests.integration.test_review_api import _filled
 from tests.integration.workers import make_worker
 
@@ -133,3 +135,49 @@ async def test_the_worker_sweeps_when_it_starts(
 
     assert (await _rows(engine, document_id))["document"] == 0
     assert not await make_storage(live_settings).exists(f"documents/{document_id}/original.pdf")
+
+
+async def _job_id(engine: AsyncEngine, document_id: str) -> uuid.UUID:
+    async with make_sessionmaker(engine)() as session:
+        job_id = await session.scalar(
+            select(Job.id).where(Job.document_id == uuid.UUID(document_id)).limit(1)
+        )
+    assert job_id is not None
+    return job_id
+
+
+async def _requests(client: AsyncClient, document_id: str, job_id: uuid.UUID) -> list[int]:
+    base = f"{DOCS}/{document_id}"
+    responses = [
+        await client.get(base),
+        await client.get(f"{base}/ir"),
+        await client.get(f"{base}/questions"),
+        await client.get(f"{base}/pages/0.png"),
+        await client.post(f"{base}/confirm-all"),
+        await client.post(f"{base}/render"),
+        await client.get(f"{base}/output"),
+        await client.get(f"/api/v1/jobs/{job_id}"),
+    ]
+    return [r.status_code for r in responses]
+
+
+async def test_an_expired_document_answers_410_until_it_is_swept_and_can_still_be_deleted(
+    client_for: ClientFactory, live_settings: Settings, engine: AsyncEngine
+) -> None:
+    owner = await client_for()
+    document_id = await _filled(owner, live_settings)
+    job_id = await _job_id(engine, document_id)
+    await _expire(engine, document_id)
+    other = await client_for("ravi@example.com")
+
+    gone = await owner.get(f"{DOCS}/{document_id}")
+
+    assert gone.status_code == 410
+    assert gone.json()["detail"] == (
+        "This form expired: FormPilot deletes forms 24 hours after upload. Upload it again."
+    )
+    assert await _requests(owner, document_id, job_id) == [410] * 8
+    assert await _requests(other, document_id, job_id) == [404] * 8  # nothing to see for others
+    assert (await other.delete(f"{DOCS}/{document_id}")).status_code == 404
+    assert (await owner.delete(f"{DOCS}/{document_id}")).status_code == 204
+    assert (await _rows(engine, document_id))["document"] == 0

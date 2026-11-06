@@ -30,6 +30,7 @@ from app.config import Settings
 from app.db.models import Document
 from app.services import filling
 from app.services.documents import (
+    DocumentExpiredError,
     DocumentService,
     UnknownQuestionsError,
     job_error_message,
@@ -60,6 +61,10 @@ FieldId = Annotated[str, Path(min_length=1, max_length=64)]
 _NOT_FOUND = "Document not found"
 _NOT_FOUND_RESPONSE: dict[int | str, dict[str, Any]] = {
     status.HTTP_404_NOT_FOUND: {"description": _NOT_FOUND}
+}
+# Every route of one document except DELETE, which still deletes an expired one.
+_GONE_RESPONSE: dict[int | str, dict[str, Any]] = {
+    status.HTTP_410_GONE: {"description": "The document expired and is being deleted"}
 }
 
 # The body is read by read_upload (size cap while reading), not by a File() parameter, so the
@@ -120,13 +125,20 @@ async def upload_document(
 
 
 async def _owned(documents: DocumentService, document_id: uuid.UUID, user: CurrentUser) -> Document:
-    document = await documents.get(document_id, user.id)
+    try:
+        document = await documents.get(document_id, user.id)
+    except DocumentExpiredError as exc:
+        raise HTTPException(status.HTTP_410_GONE, detail=str(exc)) from None
     if document is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND)
     return document
 
 
-@router.get("/{document_id}", response_model=DocumentResponse, responses=_NOT_FOUND_RESPONSE)
+@router.get(
+    "/{document_id}",
+    response_model=DocumentResponse,
+    responses=_GONE_RESPONSE | _NOT_FOUND_RESPONSE,
+)
 async def get_document(
     document_id: DocumentId, user: CurrentUser, documents: Documents, settings: AppSettings
 ) -> DocumentResponse:
@@ -158,7 +170,8 @@ async def get_document(
 @router.get(
     "/{document_id}/ir",
     response_model=MaskedFormIR,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found or not analysed yet"}},
+    responses=_GONE_RESPONSE
+    | {status.HTTP_404_NOT_FOUND: {"description": "Not found or not analysed yet"}},
 )
 async def get_ir(document_id: DocumentId, user: CurrentUser, documents: Documents) -> MaskedFormIR:
     document = await _owned(documents, document_id, user)
@@ -171,7 +184,8 @@ async def get_ir(document_id: DocumentId, user: CurrentUser, documents: Document
 @router.get(
     "/{document_id}/questions",
     response_model=QuestionsResponse,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Not found or not analysed yet"}},
+    responses=_GONE_RESPONSE
+    | {status.HTTP_404_NOT_FOUND: {"description": "Not found or not analysed yet"}},
 )
 async def get_questions(
     document_id: DocumentId, user: CurrentUser, documents: Documents, settings: AppSettings
@@ -190,7 +204,8 @@ async def get_questions(
     "/{document_id}/answers",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=JobAccepted,
-    responses={
+    responses=_GONE_RESPONSE
+    | {
         status.HTTP_404_NOT_FOUND: {"description": "Not found or not analysed yet"},
         status.HTTP_409_CONFLICT: {"description": "Answers for questions that are not asked now"},
         status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "The job could not be queued"},
@@ -227,7 +242,8 @@ async def post_answers(
 @router.get(
     "/{document_id}/pages/{page}.png",
     response_class=Response,
-    responses={
+    responses=_GONE_RESPONSE
+    | {
         status.HTTP_200_OK: {"content": {"image/png": {}}, "description": "The page image"},
         status.HTTP_404_NOT_FOUND: {"description": "Not found, no such page, or not rendered"},
     },
@@ -275,7 +291,7 @@ async def _review(
 @router.patch(
     "/{document_id}/fields/{field_id}",
     response_model=ReviewResponse,
-    responses=_REVIEW_RESPONSES,
+    responses=_GONE_RESPONSE | _REVIEW_RESPONSES,
 )
 async def patch_field(
     document_id: DocumentId,
@@ -298,7 +314,7 @@ async def patch_field(
 @router.post(
     "/{document_id}/confirm-all",
     response_model=ReviewResponse,
-    responses=_REVIEW_RESPONSES,
+    responses=_GONE_RESPONSE | _REVIEW_RESPONSES,
 )
 async def post_confirm_all(
     document_id: DocumentId,
@@ -317,7 +333,8 @@ async def post_confirm_all(
     "/{document_id}/render",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=JobAccepted,
-    responses={
+    responses=_GONE_RESPONSE
+    | {
         status.HTTP_404_NOT_FOUND: {"description": _NOT_FOUND},
         status.HTTP_409_CONFLICT: {"description": "Nothing confirmed yet, or a job is running"},
         status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "The job could not be queued"},
@@ -351,7 +368,8 @@ def _download_name(original: str) -> str:
 @router.get(
     "/{document_id}/output",
     response_class=Response,
-    responses={
+    responses=_GONE_RESPONSE
+    | {
         status.HTTP_200_OK: {"content": {"application/pdf": {}}, "description": "The filled PDF"},
         status.HTTP_404_NOT_FOUND: {
             "description": "Not found, or not printed since the last change"
@@ -385,7 +403,9 @@ async def get_output(document_id: DocumentId, user: CurrentUser, documents: Docu
 )
 async def delete_document(document_id: DocumentId, user: CurrentUser, documents: Documents) -> None:
     """Delete the document now: the upload, page images, filled PDF, IR versions and jobs."""
-    document = await _owned(documents, document_id, user)
+    document = await documents.get(document_id, user.id, expired_ok=True)
+    if document is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND)
     try:
         await documents.delete(document)
     except DocumentBusyError as exc:
